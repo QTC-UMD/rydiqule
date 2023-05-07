@@ -1,0 +1,71 @@
+"""
+General rydiqule package utilities
+"""
+
+import platform
+import rydiqule
+import inspect
+import os
+import sys
+import psutil
+from importlib.metadata import version
+
+
+def about():
+    """About box describing Rydiqule and its core dependencies.
+
+    Prints human readable strings of information about the system.
+
+    Examples
+    --------
+    >>> import rydiqule as rq
+    >>> rq.about()
+    <BLANKLINE>
+            Rydiqule
+        ================
+    <BLANKLINE>
+    Rydiqule Version:     0.4.0
+    Installation Path:    C:\\~\\rydiqule\\src\\rydiqule
+    <BLANKLINE>
+        Dependencies
+        ================
+    <BLANKLINE>
+    NumPy Version:        1.21.5
+    SciPy Version:        1.7.3
+    Matplotlib Version:   3.5.2
+    ARC Version:          3.2.1
+    Python Version:       3.9.12
+    Python Install Path:  C:\\~\\miniconda3\\envs\\arc
+    Platform Info:        Windows (AMD64)
+    CPU Count:            16
+    Total System Memory:  256 GB
+
+    """
+
+    header = """
+        Rydiqule
+    ================
+    """
+    print(header)
+    print(f'Rydiqule Version:     {rydiqule.__version__:s}')
+    rydiqule_install_path = os.path.dirname(inspect.getsourcefile(rydiqule))  # type: ignore
+    print(f'Installation Path:    {rydiqule_install_path:s}')
+    dep_header = """
+      Dependencies
+    ================
+    """
+    print(dep_header)
+    print(f'NumPy Version:        {version("numpy"):s}')
+    print(f'SciPy Version:        {version("scipy"):s}')
+    print(f'Matplotlib Version:   {version("matplotlib"):s}')
+    print(f"ARC Version:          {version('arc-alkali-rydberg-calculator'):s}")
+    print(f'Python Version:       {platform.python_version():s}')
+    python_install_path = os.path.dirname(sys.executable)
+    print(f'Python Install Path:  {python_install_path:s}')
+    print(f'Platform Info:        {platform.system():s} ({platform.machine():s})')
+    print(f'CPU Count:            {os.cpu_count()}')
+    print(f'Total System Memory:  {psutil.virtual_memory().total/1024**3:.0f} GB')
+
+
+if __name__ == "__main__":
+    about()

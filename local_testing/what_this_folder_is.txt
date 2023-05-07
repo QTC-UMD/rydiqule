@@ -1,0 +1,2 @@
+This folder is to store python notebooks on your local machine. The .gitignore currently excludes all notebooks in this folder.
+You can copy notebooks to and from here and the examples folder to minimize notebooks in commits, because they are kind of annoying.
