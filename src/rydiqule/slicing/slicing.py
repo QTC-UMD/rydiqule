@@ -25,7 +25,7 @@ def compute_grid(stack_shape: np.ndarray, n_slices: int):
     ----------
     stack_shape : np.ndarray
         The shape of the stack to be sliced. Does not include Hamiltonian or matrix equation dimensions,
-        so for a hamiltonain stack of shape `(*l,n,n)`, `stack_shape` will be *l.
+        so for a hamiltonain stack of shape `(*l,n,n)`, `stack_shape` will be `*l`.
     n_slices : int
         The number of slices into which to break the hamiltonian. Lower bound on the number of 
         slices there will actually be.

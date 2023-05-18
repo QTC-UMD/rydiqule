@@ -1,6 +1,26 @@
 Changelog
 =========
 
+v1.0.0rc2
+---------
+
+Improvements
+++++++++++++
+- Added a `copy` method to solution.
+- Expanded the `Solution` object to include more clear axis labels and the basis of the sensor used.
+- Begin hosting public documentation on readthedocs.
+
+Bug Fixes
++++++++++
+
+- Changed an `isinstance` check to `hasattr`, fixing an occasional issue with reloading `rydiqule` in jupyter notebooks.
+- Fixed issue where submodules wree not installed outside of editable mode.
+- Fixed a bug where additional arguments like warning suppression could not be passed to Sensor.add_couplings
+
+Deprecations
+++++++++++++
+
+
 v1.0.0rc1
 ---------
 

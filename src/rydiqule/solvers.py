@@ -189,8 +189,9 @@ def solve_steady_state(
     solution.eta = sensor.eta
     solution.kappa = sensor.kappa
     solution.couplings = sensor.get_couplings()
-    solution.axis_labels = [f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler] + sensor.axis_labels()
-    solution.axis_values = [dop_classes for i in range(spatial_dim) if not sum_doppler] + [val for _,_,val in sensor.variable_parameters()]
+    solution.axis_labels = [f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler] + sensor.axis_labels() + ["density_matrix"]
+    solution.axis_values = [dop_classes for i in range(spatial_dim) if not sum_doppler] + [val for _,_,val in sensor.variable_parameters()] + [sensor.basis()]
+    solution.basis = sensor.basis()
     solution.rq_version = version("rydiqule")
     solution.doppler_classes = dop_classes
 

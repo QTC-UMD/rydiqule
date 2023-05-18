@@ -333,7 +333,7 @@ class Cell(Sensor):
             phase: Optional[ScannableParameter] = 0, kvec: Tuple[float,float,float] = (0,0,0),
             time_dependence: Optional[Callable[[float],float]] = None, label: Optional[str] = None,
             e_field: Optional[ScannableParameter] = None, beam_power: Optional[float] = None,
-            beam_waist: Optional[float] = None, suppress_dipole_warn: Optional[float] = False,
+            beam_waist: Optional[float] = None,
             q: Literal[-1, 0, 1] = 0,
             **extra_kwargs) -> None:
         """
@@ -479,6 +479,8 @@ class Cell(Sensor):
         states = self._states_valid(states)
         state1 = self.states_list()[states[0]]
         state2 = self.states_list()[states[1]]
+        
+        suppress_dipole_warn = extra_kwargs.pop("suppress_dipole_warn", False)
         
         try:
             dipole_moment = self.atom.getDipoleMatrixElement(*state1,*state2, q)

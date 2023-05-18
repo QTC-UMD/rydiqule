@@ -16,7 +16,25 @@ CouplingDict = Dict
 States = Tuple[int, ...]
 
 #this includes only parameters for coherent couplings. "gamma" parameters are handled separately in the relevant places.
-_scannable_keys = ["detuning", "rabi_frequency", "phase", "transition_frequency"]
+BASE_SCANNABLE_KEYS = ["detuning", 
+                       "rabi_frequency", 
+                       "phase", 
+                       "transition_frequency"]
+"""Reference list of all coherent coupling keys that support rydiqules stacking convention.
+Note that all decoherence keys (keys beginning with `gamma_`) are supported, but handled separately."""
+
+BASE_EDGE_KEYS = ["states",
+                   "detuning", 
+                   "rabi_frequency",
+                   "transition_frequency",
+                   "phase",
+                   "kvec",
+                   "time_dependence",
+                   "label",
+                   "dipole_moment"]
+"""Reference list of all keys that can be specified with values in a coherenct coupling.
+Subclasses which inherit the :class:`~.Sensor` class should override the `valid_parameters` attribute,
+NOT this list. The `valid_parameters` attribute is initialized as a copy of `BASE_EDGE_KEYS`."""
 
 class Sensor():
     """
@@ -68,6 +86,7 @@ class Sensor():
             self.add_couplings(*couplings)
 
         self._zipped_parameters: List[List[str]] = []
+        self.valid_parameters = BASE_EDGE_KEYS.copy()
 
 
     def add_coupling(
@@ -166,22 +185,22 @@ class Sensor():
         if states[0] == states[1]:
             raise ValueError('Coherent coupling must couple different states.')
 
-        field_params = {k:v for k,v in locals().items()
-                        if k not in ['self', '__class__','extra_kwargs']
-                        and v is not None}
+        suppress_rwa = extra_kwargs.pop("suppress_rwa_warn", False)
 
+        field_params = {k:v for k,v in locals().items()
+                        if k in self.valid_parameters
+                        and v is not None}
+        
         if not (detuning is not None) ^ (transition_frequency is not None):
             msg = """Please specify \'detuning\' for a field under the RWA or
                 \'transition_frequency\' for a coupling without the approximation,
                 but not both."""
             raise ValueError(msg)
 
-        supress_rwa = extra_kwargs.pop("supress_rwa_warning", False)
-
-        if detuning is None and transition_frequency > 5000 and not supress_rwa:  # type: ignore[operator]
+        if detuning is None and np.abs(transition_frequency) > 5000 and not suppress_rwa:  # type: ignore[operator]
             msg = "Not using the rotating wave approximation for large transition frequencies "\
                 "can result in prohibitively long computation times. Specify detuning to use the"\
-                " rotating wave approximation or set the \"suppress_rwa_warning\" to \"True\" to"\
+                " rotating wave approximation or set the \"suppress_rwa_warn\" to \"True\" to"\
                 " suppress this warning."
 
             with warnings.catch_warnings():
@@ -192,7 +211,7 @@ class Sensor():
 
 
     def add_couplings(self, *couplings: CouplingDict,
-                      no_rwa_warning: Optional[bool] = False) -> None:
+                        **extra_kwargs) -> None:
         """
         Add any number of couplings between pairs of states.
         
@@ -207,10 +226,10 @@ class Sensor():
             coupling 2 states. For more details on the keys of each dictionry see the arguments 
             for :meth:`~.Sensor.add_coupling`. Equivalent to passing each dictiories keys and 
             values to :meth:`~.Sensor.add_coupling` individually.
-        no_rwa_warning: bool
-            Whether to supress the warning that appears when adding a coupling with a sufficiently
-            transition frequency that solving the system may take prohibitively long without the 
-            rotating wave approximation. 
+        **extra_kwargs : dict
+            Additional keyword-only arguments to pass to the relevant `add_coupling` method.
+            The same arguments will be passed to each call of :meth:`~.Sensor.add_coupling`.
+            Often used for warning suppression.
 
         Raises
         ------
@@ -234,7 +253,7 @@ class Sensor():
             except KeyError:
                 raise ValueError("\'states\' parameter must be specified for any field")
 
-            self.add_coupling(states=states, **c_copy, no_rwa_warning=no_rwa_warning)
+            self.add_coupling(states=states, **c_copy, **extra_kwargs)
 
 
     def _add_coupling(self, states: States, **field_params) -> None:
@@ -793,7 +812,7 @@ class Sensor():
             edge_data = self.couplings.edges.get(states)
             
             for key, value in sorted(edge_data.items()):
-                if not key.startswith("gamma") and key not in _scannable_keys:
+                if not key.startswith("gamma") and key not in BASE_SCANNABLE_KEYS:
                     continue
 
                 if isinstance(value, (list,np.ndarray)):
