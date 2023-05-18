@@ -108,8 +108,8 @@ Both are available via `pip`.
 
 ## Documentation
 
-Documentation is available in the `docs\build` directory.
-A precompiled version of the pdf documentation is available in `docs\build\latex\rydiqule.pdf`.
+Documentation is available online at [readthedocs](https://rydiqule.readthedocs.io/en/latest).
+PDF or EPUB formats of the documentation can be downloaded from the online documentation.
 
 ### Examples
 

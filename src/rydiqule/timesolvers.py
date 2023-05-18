@@ -204,8 +204,9 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     solution.rho = sols
     solution.eta = sensor.eta
     solution.kappa = sensor.kappa
-    solution.axis_labels = [f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler] + sensor.axis_labels()
-    solution.axis_values = [dop_classes for i in range(spatial_dim) if not sum_doppler] + [val for _,_,val in sensor.variable_parameters()]
+    solution.axis_labels = [f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler] + sensor.axis_labels() + ["time", "density_matrix"]
+    solution.axis_values = [dop_classes for i in range(spatial_dim) if not sum_doppler] + [val for _,_,val in sensor.variable_parameters()] + [t_eval, sensor.basis()]
+    solution.basis = sensor.basis()
     solution.rq_version = version("rydiqule")
     solution.doppler_classes = dop_classes
     # time solver specific

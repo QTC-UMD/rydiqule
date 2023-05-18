@@ -5,6 +5,8 @@ Adds essential keys with "None" entries
 from __future__ import annotations
 from typing import Optional
 
+import copy
+
 import numpy as np
 
 # have to import this way to prevent circular imports
@@ -38,6 +40,9 @@ class Solution(dict):
     If doppler averaging but not summing, doppler classes in internal units are added."""
     rq_version: str
     """str : Version of rydiqule that created the Solution."""
+    basis: list[str]
+    """list of str: The list of density matrix elements in the order they appear in the solution.
+    See :meth:`Sensor.basis` for details."""
 
     # doppler specific
     doppler_classes: Optional[np.ndarray]
@@ -76,3 +81,9 @@ class Solution(dict):
         """
 
         return sensor_utils.get_rho_ij(self.rho, i, j)
+
+    def copy(self):
+        return copy.copy(self)
+    
+    def deepcopy(self):
+        return copy.deepcopy(self)

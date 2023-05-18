@@ -423,12 +423,7 @@ def get_rho_ij(sols: Union[np.ndarray, Solution], i: int, j: int) -> np.ndarray:
     [0.-1.j 3.-4.j 6.-7.j]
 
     """
-    if isinstance(sols, Solution):
-        rhos = sols.rho
-    elif isinstance(sols, np.ndarray):
-        rhos = sols
-    else:
-        raise TypeError('sols must be a Solution object or a numpy array')
+    rhos = _validate_sols(sols)
 
     b = int(np.sqrt(rhos.shape[-1]+1))  # basis size
     if i == 0 and j == 0:
@@ -473,12 +468,7 @@ def get_rho_populations(sols: Union[np.ndarray, Solution]) -> np.ndarray:
         reduced to the basis size.
     """
 
-    if isinstance(sols, Solution):
-        rhos = sols.rho
-    elif isinstance(sols, np.ndarray):
-        rhos = sols
-    else:
-        raise TypeError('sols must be a Solution object or a numpy array')
+    rhos = _validate_sols(sols)
 
     b = int(np.sqrt(rhos.shape[-1]+1))  # basis size
     nonzero_state_pops = rhos[...,b::b+1]
@@ -666,6 +656,36 @@ def _get_collapse_str(len: int, *matched_dims) -> str:
     full_expression = idxs_rhs + "...->" + idxs_lhs + "..."
     return full_expression
 
+
+def _validate_sols(sols):
+    """Helper function to validate that solutions are of an appropriate type.
+    There are 3 outcomes:
+    
+      - `sols` is a np.ndarray, returns `sols`.
+      - `sols` is an object with a `rho` attribute that is a `numpy.ndarray`, in which case returns `rho`.
+      - `sols` does not meet either of the above criteria, in which case raises an exception.
+
+    Parameters
+    ----------
+    sols : any
+        The value to validate, should be a np.ndarray or an object (like a :class:`~.sensor_solution.Solution`)
+        with a `rho` attribute which is a numpy array.
+        
+    Raises
+    ------
+    ValueError:
+        If `sols` is not an array or object with a `rho` attribute that is an array.
+    """
+    if hasattr(sols, "rho"):
+        rho = sols.rho
+    else:
+        rho = sols
+        
+    if not isinstance(rho, np.ndarray):
+        raise TypeError("sols must be a numpy array or have an attribute \"rho\" which is a numpy array.")
+    
+    return rho
+    
 
 def _combine_parameter_labels(*labels: str) -> str:
     """
