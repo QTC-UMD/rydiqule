@@ -21,7 +21,7 @@ BASE_SCANNABLE_KEYS = ["detuning",
                        "phase", 
                        "transition_frequency"]
 """Reference list of all coherent coupling keys that support rydiqules stacking convention.
-Note that all decoherence keys (keys beginning with "gamma_") are supported, but handled separately."""
+Note that all decoherence keys (keys beginning with `gamma_`) are supported, but handled separately."""
 
 BASE_EDGE_KEYS = ["states",
                    "detuning", 
