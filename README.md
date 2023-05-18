@@ -1,10 +1,10 @@
 ![Rydiqule Logo](docs/source/img/Rydiqule_Logo_Transparent_300.png)
 
-[![Docs](https://readthedocs.org/projects/rydiqule/badge/?version=latest)](https://rydiqule.readthedocs.io/en/latest)
-
 The Rydberg Interactive Quantum module is a modelling library designed to simulate
 the response of a Rydberg atoms to arbitrary input RF waveforms.
 It also functions as a general master equation solver based on the semi-classical density matrix method.
+
+[![Docs](https://readthedocs.org/projects/rydiqule/badge/?version=latest)](https://rydiqule.readthedocs.io/en/latest)
 
 ## Installation
 
@@ -124,4 +124,4 @@ Creation of this software was supported in part by the Defense Advanced Research
 
 ## Disclaimer
 
-The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S.~Government.
+The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government.
