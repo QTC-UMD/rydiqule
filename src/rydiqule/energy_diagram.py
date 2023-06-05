@@ -94,6 +94,11 @@ def draw_wiggly_arrow(ax: plt.Axes, start: Collection, stop: Collection,
         Matplotlib alpha specification.
         Default is 1.
     """
+    if np.isnan(alpha):
+        alpha = 1
+    alpha = min(1.0, alpha)
+    alpha = max(0.0, alpha)
+
     start = np.array(start)
     stop = np.array(stop)
     vec = stop-start
