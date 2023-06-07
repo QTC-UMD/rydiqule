@@ -44,6 +44,7 @@ def test_rabi_flop_cyrk():
 
 
 @pytest.mark.time
+@pytest.mark.slow
 def test_rabi_flop_nbrk():
     """Tests that the cyrk.nbrk_ode backend runs"""
 

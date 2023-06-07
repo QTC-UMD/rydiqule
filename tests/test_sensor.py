@@ -72,7 +72,7 @@ def test_coupling_exceptions():
 
     # RWA violation should not be shown
     with warnings.catch_warnings(record=True) as record:
-        f3 = {'states':(0,1), 'transition_frequency': 5001, 'supress_rwa_warning':True}
+        f3 = {'states':(0,1), 'transition_frequency': 5001, 'suppress_rwa_warn':True}
         s.add_coupling(**f3)
 
         assert len(record) == 0, 'RWA warning not supressed'

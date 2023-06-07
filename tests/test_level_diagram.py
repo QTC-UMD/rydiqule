@@ -32,7 +32,8 @@ def test_lv_diagram():
     test_laser_5 = {'states': (3,4), 'rabi_frequency': 8,
                     'beam_waist': 1, 'time_dependence': testfun}
 
-    RbSensor_ss.add_couplings(test_laser_1, test_laser_2, test_laser_3, test_laser_4, test_laser_5)
+    RbSensor_ss.add_couplings(test_laser_1, test_laser_2, test_laser_3, test_laser_4, test_laser_5,
+                              suppress_dipole_warn=True, suppress_rwa_warn=True)
     RbSensor_ss.add_transit_broadening([0,1,2,3])
 
     # Draw the level diagram

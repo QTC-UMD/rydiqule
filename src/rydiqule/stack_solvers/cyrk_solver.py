@@ -16,7 +16,8 @@ def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
                **kwargs
                ) -> np.ndarray:
     """
-    Solve a set of Optical Bloch Equations (OBEs) with rydiqule's time solving convention using CyRK's `cyrk_ode`.
+    Solve a set of Optical Bloch Equations (OBEs) with rydiqule's time solving convention
+    using CyRK's `cyrk_ode`.
 
     Uses matrix components of the equations of motion provided by the methods of a :meth:`~.Sensor`.
     Designed to be used as a wrapped function within :func:`~.timesolvers.solve_time`.
@@ -52,7 +53,8 @@ def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
         The ith slice along the first axis should be multiplied by the imaginary part
         of the ith entry in `time_inputs`.
     time_inputs: list(callable)
-        List of callable functions of length `n_t`. The functions should take a single floating point
+        List of callable functions of length `n_t`.
+        The functions should take a single floating point
         as an input representing the time in microseconds,
         and return a real or complex floating point value represent an
         electric field in V/m at that time.
@@ -76,7 +78,7 @@ def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
     OverflowError: If system size exceeds cyrk backend limit of 65535 equations.
         If we see this error a lot, consider getting CyRK project to increase it
         by changing type of `y_size` from unisgned short.
-    """
+    """  # noqa
 
     if init_cond.size > np.iinfo(np.ushort).max:
         raise OverflowError(f'Max system size exceeded for cyrk backend. '

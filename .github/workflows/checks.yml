@@ -1,0 +1,44 @@
+name: Checks
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  linting:
+    name: Linting
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'QTC-UMD'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Linting
+        uses: chartboost/ruff-action@v1
+        with:
+          src: "./src"
+
+  pytest:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'QTC-UMD'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Rydiqule and Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[tests]
+
+      - name: Run Unit Tests
+        run: |
+          pytest ./tests/ -m "not high_memory and not slow"

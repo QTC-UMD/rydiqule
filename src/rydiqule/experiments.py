@@ -108,7 +108,8 @@ def get_OD(rho_probe: np.ndarray, cell_length: float,
     (3,)
     0.7412112017002291
     7.412112017002292
-    ~/src/Rydiqule/src/rydiqule/experiments.py:103: UserWarning: At least one solution has optical depth greater than 1.
+    ~/src/Rydiqule/src/rydiqule/experiments.py:103: UserWarning:
+    At least one solution has optical depth greater than 1.
     Integrated results are likely invalid.
 
     """
@@ -336,7 +337,8 @@ def get_snr(sensor: Sensor, optical_path_length: float, param_label: str,
        electromagnetically-induced-transparency readout,"
        Phys. Rev. A, vol. 104, p. 043103, 2021.
     """
-    if (sensor.eta is not None or sensor.kappa is not None) and (eta is not None or kappa is not None):  # noqa
+    if (sensor.eta is not None or sensor.kappa is not None) and (eta is not None
+                                                                 or kappa is not None):
         raise ValueError('Cannot provide alternate eta/kappa values from Sensor class')
     elif eta is None or kappa is None:
         if sensor.eta is None or sensor.kappa is None:

@@ -15,13 +15,13 @@ ScannableParameter = Union[float, List[float], np.ndarray]
 CouplingDict = Dict
 States = Tuple[int, ...]
 
-#this includes only parameters for coherent couplings. "gamma" parameters are handled separately in the relevant places.
 BASE_SCANNABLE_KEYS = ["detuning", 
                        "rabi_frequency", 
                        "phase", 
                        "transition_frequency"]
 """Reference list of all coherent coupling keys that support rydiqules stacking convention.
-Note that all decoherence keys (keys beginning with `gamma_`) are supported, but handled separately."""
+Note that all decoherence keys (keys beginning with `gamma_`) are supported, but handled separately.
+"""
 
 BASE_EDGE_KEYS = ["states",
                    "detuning", 
@@ -33,7 +33,7 @@ BASE_EDGE_KEYS = ["states",
                    "label",
                    "dipole_moment"]
 """Reference list of all keys that can be specified with values in a coherenct coupling.
-Subclasses which inherit the :class:`~.Sensor` class should override the `valid_parameters` attribute,
+Subclasses which inherit from :class:`~.Sensor` should override the `valid_parameters` attribute,
 NOT this list. The `valid_parameters` attribute is initialized as a copy of `BASE_EDGE_KEYS`."""
 
 class Sensor():
@@ -180,7 +180,7 @@ class Sensor():
         >>> kp = 250*np.array([1,0,0])
         >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=2, kvec=kp)
 
-        """ 
+        """ # noqa
 
         if states[0] == states[1]:
             raise ValueError('Coherent coupling must couple different states.')
@@ -197,11 +197,11 @@ class Sensor():
                 but not both."""
             raise ValueError(msg)
 
-        if detuning is None and np.abs(transition_frequency) > 5000 and not suppress_rwa:  # type: ignore[operator]
+        if detuning is None and np.abs(transition_frequency) > 5000 and not suppress_rwa:
             msg = "Not using the rotating wave approximation for large transition frequencies "\
                 "can result in prohibitively long computation times. Specify detuning to use the"\
-                " rotating wave approximation or set the \"suppress_rwa_warn\" to \"True\" to"\
-                " suppress this warning."
+                " rotating wave approximation or passing \"suppress_rwa_warn=True\" to"\
+                " add_coupling() to suppress this warning."
 
             with warnings.catch_warnings():
                 warnings.simplefilter("always")
@@ -215,8 +215,10 @@ class Sensor():
         """
         Add any number of couplings between pairs of states.
         
-        Acts as an alternative to calling :meth:`~.Sensor.add_coupling` individually for each pair of states.
-        Can be used interchangably up to preference, and all of keyword :meth:`~.Sensor.add_coupling` are supported dictionary
+        Acts as an alternative to calling :meth:`~.Sensor.add_coupling`
+        individually for each pair of states.
+        Can be used interchangably up to preference,
+        and all of keyword :meth:`~.Sensor.add_coupling` are supported dictionary
         keys for dictionaries passed to this function.
 
         Parameters
@@ -243,9 +245,10 @@ class Sensor():
         >>> red = {"states":(1,2), "rabi_frequency":3, "detuning":4}
         >>> s.add_couplings(blue, red)
         >>> print(s.couplings.edges(data=True))
-        [(0, 1, {'rabi_frequency': 1, 'detuning': 2, 'phase': 0, 'kvec': (0, 0, 0)}), (1, 2, {'rabi_frequency': 3, 'detuning': 4, 'phase': 0, 'kvec': (0, 0, 0)})]
+        [(0, 1, {'rabi_frequency': 1, 'detuning': 2, 'phase': 0, 'kvec': (0, 0, 0)}),
+        (1, 2, {'rabi_frequency': 3, 'detuning': 4, 'phase': 0, 'kvec': (0, 0, 0)})]
 
-        """ # noqa
+        """
         for c in couplings:
             c_copy = c.copy()
             try:
@@ -301,7 +304,8 @@ class Sensor():
         ----------
         labels : str
             Parameter labels to scan together. Parameter labels are strings of the form 
-            `"<coupling_label>_<parameter_name>"`, such as `"(0,1)_detuning"`. Must be at least 2 labels to zip.
+            `"<coupling_label>_<parameter_name>"`, such as `"(0,1)_detuning"`.
+            Must be at least 2 labels to zip.
 
         Raises
         ------
@@ -353,7 +357,8 @@ class Sensor():
         new_label_array = np.expand_dims(labels, (-1,-2))
         current_zipped_params = np.expand_dims(self._zipped_parameters, 0)
         
-        if len(self._zipped_parameters)>0 and np.any(new_label_array==current_zipped_params):  #see if ANY provided label is currently zipped
+        # see if ANY provided label is currently zipped
+        if len(self._zipped_parameters)>0 and np.any(new_label_array==current_zipped_params):
 
             for l in labels: #if so, find which label for error reporting
                 if l in current_zipped_params:
@@ -372,7 +377,7 @@ class Sensor():
             
             #make sure parameter exists and is an array
             try:
-                param_value = self.couplings.edges[states][param]
+                _ = self.couplings.edges[states][param]
             except KeyError:
                 raise ValueError(f"Coupling {coupling} has no parameter {param}")
             if not hasattr(param, "__len__"):
@@ -381,7 +386,9 @@ class Sensor():
             #make sure parameters are the same length
             current_len = len(self.couplings.edges[states][param])
             if previous_len > 0 and current_len != previous_len:
-                raise ValueError(f"Got length {current_len} for parameter \"{l}\", but \"{labels[0]}\" is length {previous_len}")
+                raise ValueError(
+                    f"Got length {current_len} for parameter \"{l}\", "
+                    f"but \"{labels[0]}\" is length {previous_len}")
             
             previous_len = current_len
                         
@@ -412,8 +419,8 @@ class Sensor():
         Notes
         -----
         .. note::
-            This function should always be used rather than modifying the `_zipped_parameters` attribute
-            directly.
+            This function should always be used rather than modifying the `_zipped_parameters`
+            attribute directly.
             
         Examples
         --------
@@ -531,8 +538,8 @@ class Sensor():
         """
         Adds transit broadening by adding a decoherence from each node to ground.
         
-        For each graph node n, adds a decoherent transition from n the specified state (0 by default)
-        using the :meth:`~.Sensor.add_decoherence` method with the `"transit"` label. 
+        For each graph node n, adds a decoherent transition from n the specified state
+        (0 by default) using the :meth:`~.Sensor.add_decoherence` method with the `"transit"` label.
         See :meth:`~.Sensor.add_decoherence` for more details on labeling.
 
         If an array of transit values are provided, they will be automatically zipped together
@@ -667,7 +674,7 @@ class Sensor():
         >>> print(s.decoherence_matrix().shape)
         (11,3,3)   
              
-        """
+        """  # noqa
         base_couplings = self.couplings.copy()
 
         stack_shape = self._stack_shape(collapse=False)
@@ -753,7 +760,7 @@ class Sensor():
         (7, 11, 3, 3)
         ['(0,1)_rabi_frequency', '(0,1)_detuning|(1,2)_detuning']
         
-        """ # noqa
+        """  # noqa
         axis_labels = []
 
         # build the base list of axis labels based just on couplings
@@ -790,8 +797,9 @@ class Sensor():
         -------
         list of tuples
             A list of tuples corresponding to the parameters of the systems that are variable 
-            (i.e. stored as an array). They are ordered accordning to states, then according to variable 
-            name. Tuple entries of the list take the form `(states, param_name, value)`
+            (i.e. stored as an array). They are ordered accordning to states,
+            then according to variable name.
+            Tuple entries of the list take the form `(states, param_name, value)`
 
         Examples
         --------
@@ -830,7 +838,8 @@ class Sensor():
         """
         Returns the parameter mesh of the sensor.
 
-        The parameter mesh is the flattened grid of variable parameters in all the couplings of a sensor.
+        The parameter mesh is the flattened grid of variable parameters
+        in all the couplings of a sensor.
         Wraps `numpy.meshgrid` by passing arguments as the variable parameters in a
         sensor. The `indexing` argument is always `"ij"` for matrix indexing. 
         For full documention of all arguments, see `numpy.meshgrid` documentation.
@@ -1059,16 +1068,17 @@ class Sensor():
         a `time_dependence` key.
 
         The ouput will be two lists of matricies representing which terms of the hamiltonian
-        are dependent on each time-dependent coupling. The lists will be of length M and shape `(*l_time, n, n)`,
+        are dependent on each time-dependent coupling.
+        The lists will be of length M and shape `(*l_time, n, n)`,
         where M is the number of time-dependent couplings, `l_time` is time-dependent stack shape
         (possibly all ones), and `n` is the basis size. Each matrix will have terms equal to the rabi frequency
         (or half the rabi frequency under RWA) in positions that correspond to the associated transition.
         For example, in the case where there is a `time_dependence` function defined for the `(2,3)` transition
-        with a rabi frequency of 1, the associated time coupling matrix will be all zeros, with a 1 in the `(2,3)`
-        and `(3,2)` positions.
+        with a rabi frequency of 1, the associated time coupling matrix will be all zeros,
+        with a 1 in the `(2,3)` and `(3,2)` positions.
 
-        Typically, this function is called internally and multiplied by the output of the :meth:`~.Sensor.get_time_dependence`
-        function.
+        Typically, this function is called internally and multiplied by the output
+        of the :meth:`~.Sensor.get_time_dependence` function.
 
         Returns
         -------
@@ -1119,7 +1129,7 @@ class Sensor():
         (11, 1, 3, 3)
         (11, 1, 3, 3)
 
-        """ # noqa
+        """  # noqa
         #save to re-add later
         base_couplings = self.couplings.copy()
 
@@ -1193,7 +1203,7 @@ class Sensor():
             >>> print(s.get_time_dependence())
             [<function <lambda> at 0x7fb310edd9d0>, <function <lambda> at 0x7fb37c0c81f0>]
 
-        """ # noqa
+        """  # noqa
         time_dependence = []
         for (i,j),f in self.couplings_with("time_dependence").items():
             time_dependence.append(f['time_dependence'])
@@ -1205,9 +1215,9 @@ class Sensor():
         Apply addition and subtraction logic corresponding to the direction of the couplings.
 
         For a given state `n`, the path from ground will be traced to `n`. For each edge along this
-        path, values will be added where the path direction and coupling direction match, and subtracting
-        values where they do not. The sum of all such values along the path is the `n` th term in
-        the output array. 
+        path, values will be added where the path direction and coupling direction match,
+        and subtracting values where they do not.
+        The sum of all such values along the path is the `n` th term in the output array. 
 
         Primarily for internal functions which help generate hamiltonians. Most commonly used
         to calculate total detunings for ranges of couplings under the RWA
@@ -1240,7 +1250,9 @@ class Sensor():
         if no_stack:
             diag = np.zeros(self.basis_size)
         else:
-            diag = np.zeros((*self._stack_shape(collapse=False, time_dependence="steady"), self.basis_size), dtype=np.complex128)
+            diag = np.zeros((*self._stack_shape(collapse=False, time_dependence="steady"),
+                             self.basis_size),
+                             dtype=np.complex128)
 
         connected_levels = nx.weakly_connected_components(coherent_graph)
         subgraphs = [coherent_graph.subgraph(ls) for ls in connected_levels]
@@ -1281,8 +1293,8 @@ class Sensor():
         """
         Gets an array of the diagonal elements of the Hamiltonian from the field detunings.
 
-        Wraps the :meth:`~.Sensor.get_hamiltonian_diagonal` function using both transition frequencies and detunings.
-        Primarily for internal use. 
+        Wraps the :meth:`~.Sensor.get_hamiltonian_diagonal` function using both
+        transition frequencies and detunings. Primarily for internal use. 
 
         Returns
         -------
@@ -1340,10 +1352,10 @@ class Sensor():
         """
         Set the decoherence matrix for the system. 
         
-        Works by first removing all existing decoherent data from graph edges, then 
-        individually adding all nonzero terms of a provided gamma matrix to the corresponding graph edges.
-        Can be used to set all decoherence attributes to edges simultaneously, but :meth:`~.add_decoherence`
-        is preferred.
+        Works by first removing all existing decoherent data from graph edges, then individually
+        adding all nonzero terms of a provided gamma matrix to the corresponding graph edges.
+        Can be used to set all decoherence attributes to edges simultaneously,
+        but :meth:`~.add_decoherence` is preferred.
         
         Unlike :meth:`~.add_decoherence`, does not support scanning multiple decoherence values,
         rather should be used to set the decoherences of the system to individual static values.
@@ -1490,7 +1502,7 @@ class Sensor():
         >>> s.set_gamma_matrix(gamma)
         >>> print(s.couplings_with("detuning"))
         {(0, 1): {'rabi_frequency': 2, 'detuning': 1, 'phase': 0, 'kvec': (0, 0, 0), 'no_rwa_warning': False, 'label': '(0,1)'}}
-        """
+        """  # noqa
         def notAll(x):
             return not all(x)
 
@@ -1608,12 +1620,14 @@ class Sensor():
         try:
             tpl = tuple(states)
         except TypeError:
-            raise ValueError(f'states argument of type {type(states)} cannot be interpreted as a tuple')
+            raise ValueError(
+                f'states argument of type {type(states)} cannot be interpreted as a tuple')
         if len(tpl) != 2:
-            raise ValueError(f'A field must couple exactly 2 states, but {len(tpl)} are specified in {states}')
+            raise ValueError(
+                f'A field must couple exactly 2 states, but {len(tpl)} are specified in {states}')
         for i in tpl:
             if not isinstance(i, int):
-                raise TypeError(f'State specifications must be an integer')
+                raise TypeError('State specifications must be an integer')
             if i >= self.basis_size:
                 raise ValueError((f'State specification {i} is outside '
                                   f'the basis size {self.basis_size:d}'))
@@ -1736,7 +1750,8 @@ class Sensor():
             return
 
         if kind != 'coherent' and not kind.startswith('gamma'):
-            msg = 'If clearing incoherent data, must provide key to clear that starts with `gamma`, not {}'
+            msg = ("If clearing incoherent data,"
+                   " must provide key to clear that starts with `gamma`, not {}")
             raise ValueError(msg.format(kind))
 
         #get rid of zipped couplings containing
@@ -1769,7 +1784,8 @@ class Sensor():
         Helper function to return the pair of states corresponding to a particular label string.
         For internal use.
         """
-        label_map = {key:(state1, state2) for state1, state2, key in self.couplings.edges(data="label")}
+        label_map = {key:(state1, state2)
+                     for state1, state2, key in self.couplings.edges(data="label")}
         if label in label_map.keys():
             return label_map[label]
         else:

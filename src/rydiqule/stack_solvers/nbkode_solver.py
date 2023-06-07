@@ -15,7 +15,8 @@ def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
                  t_eval: np.ndarray, init_cond: np.ndarray, **kwargs
                  ) -> np.ndarray:
     """
-    Solve a set of Optical Bloch Equations (OBEs) using rydiqule's time solving convention using :doc:`numbakit-ode <numbakitode:index>`.
+    Solve a set of Optical Bloch Equations (OBEs) using rydiqule's time solving convention using
+    :doc:`numbakit-ode <numbakitode:index>`.
 
     Uses matrix components of the equations of motion provided by the methods of a :meth:`~.Sensor`.
     Designed to be used as a wrapped function within :func:`~.timesolvers.solve_time`.
@@ -51,7 +52,8 @@ def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
         The ith slice along the first axis should be multiplied by the imaginary part
         of the ith entry in `time_inputs`.
     time_inputs: list(callable)
-        List of callable functions of length `n_t`. The functions should take a single floating point
+        List of callable functions of length `n_t`.
+        The functions should take a single floating point
         as an input representing the time in microseconds,
         and return a real or complex floating point value represent an
         electric field in V/m at that time.
@@ -69,7 +71,7 @@ def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
     numpy.ndarray
         The matrix solution of shape `(*l,n,n_t)`
         representing the density matrix of the system at each time t.
-    """
+    """  # noqa
 
     # numbakit-ode requires all functions to be of same type
     to_compile = [not nb.extending.is_jitted(f) for f in time_inputs]
