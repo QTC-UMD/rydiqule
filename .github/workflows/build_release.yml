@@ -5,6 +5,9 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+*'
 
+env:
+  PACKAGE_NAME: rydiqule
+
 jobs:
   build:
     name: Build
@@ -72,7 +75,7 @@ jobs:
     needs: [build]
     environment:
       name: pypi
-      url: https://pypi.org/p/rydiqule
+      url: https://pypi.org/p/${{ env.PACKAGE_NAME }}
     permissions:
       id-token: write
     steps:
@@ -85,7 +88,7 @@ jobs:
       - name: Publish on TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository_url: https://test.pypi.org/legacy
+          repository_url: https://test.pypi.org/legacy/
 
       - name: Publish on PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
