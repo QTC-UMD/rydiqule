@@ -14,7 +14,7 @@ from .sensor import Sensor, ScannableParameter
 from .sensor_utils import scale_dipole, calc_eta, calc_kappa
 from .atom_utils import ATOMS
 
-from typing import Literal, Optional, Sequence, List, Tuple, Union, Callable
+from typing import Literal, Optional, Sequence, List, Tuple, Callable
 
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
 
@@ -30,7 +30,8 @@ class Cell(Sensor):
 
     In addition to the core functionality of `~.Sensor`, this class allows for labelling of states
     with quantum numbers, calculating of state lifetimes and decoherences and tracking of
-    of some physical laser parameters. A key distictinction between a :class:`~.Cell` and a :class:`~.Sensor` is that
+    of some physical laser parameters.
+    A key distictinction between a :class:`~.Cell` and a :class:`~.Sensor` is that
     a cell supports (and requires) and absolute ordering of energy between states,
     which allows for implicit calculation of decay rates an transition frequencies.
 
@@ -81,7 +82,7 @@ class Cell(Sensor):
         ValueError
             If atom_flag is not one of ARC's supported alkali atoms.
 
-        """ #noqa
+        """
         if atom_flag not in ATOMS.keys():
             raise ValueError(f"Atom flag must be one of {ATOMS.keys()}")
 
@@ -131,8 +132,9 @@ class Cell(Sensor):
         for energy and decay rates. 
         
         Quantum numbers and other states information are stored on the couplings graph nodes.
-        The first state added to the system is treated as the ground state, and all "absolute energies"
-        are calculated as a difference from ground. Should only be called in :meth:`~.Cell.__init__`.
+        The first state added to the system is treated as the ground state,
+        and all "absolute energies" are calculated as a difference from ground.
+        Should only be called in :meth:`~.Cell.__init__`.
 
         Parameters
         ----------
@@ -142,7 +144,7 @@ class Cell(Sensor):
             are the ususal quantum numbers describing the state: principal,
             orbital, total angular momentum, and magnetic quantum numbers respectively.
 
-        """ #noqa
+        """
         for state in states:
             node_info: dict = {"qnums": state}
 
@@ -191,7 +193,7 @@ class Cell(Sensor):
         >>> print(cell.states_list())
         [[5, 0, 0.5, 0.5], [5, 1, 1.5, 0.5], [50, 2, 2.5, 2.5], [51, 2, 2.5, 2.5]]
 
-        """ #noqa
+        """ # noqa
         return [state[1] for state in self.couplings.nodes("qnums")]
 
 
@@ -235,7 +237,7 @@ class Cell(Sensor):
         [[5, 0, 0.5, 0.5], [5, 1, 1.5, 0.5], [51, 2, 2.5, 2.5], [50, 2, 2.5, 2.5]]
         [2, 3, 1, 0]
 
-        """ # noqa
+        """
         energies = list(self.couplings.nodes("energy")).copy()
         energies.sort(key=lambda val:val[1],reverse=True)
         return [s[0] for s in energies]
@@ -254,7 +256,7 @@ class Cell(Sensor):
             polarization of probing optical field in spherical basis. Must be -1, 0, 1.
             Defaults to 0 for linear polarization.
 
-        """ #noqa
+        """
         gState = self.states_list()[0]
         iState = self.states_list()[1]
 
@@ -299,12 +301,12 @@ class Cell(Sensor):
 
     def _add_decay_to_graph(self) -> None:
         """
-        Internal helper method to add population decay rates to the nodes in order to calculate gamma matrix.
+        Internal helper method to add population decay rates to the nodes to calculate gamma matrix.
 
         1. add the state lifetime to each node
         2. add the transition rate to each edge
         
-        """ #noqa
+        """
         # First going to get absolute lifetimes of each state
         states = self.level_ordering()
 
@@ -422,19 +424,21 @@ class Cell(Sensor):
         Notes
         -----
         .. note::
-            Note that while this function can be used directly just as in :class:`~.sensor.Sensor`, it will often
-            be called implicitly via :meth:`~.Sensor.add_couplings` which `Cell`
+            Note that while this function can be used directly just as in :class:`~.sensor.Sensor`,
+            it will often be called implicitly via :meth:`~.Sensor.add_couplings` which `Cell`
             inherits. While they are equivalent, the second of these options is
             often the more clear approach.
             
         .. note::
-            Specifying the beam power by beam parameters or electric field still computes the `rabi_frequency` and
-            adds that quantity to the `Cell` to maintain consistency across `rydiqule`'s other calculations. In other
-            words, `beam_power`, `beam_waist`, and `e_field` will never appear as quantities on the graph of a `Cell`.
+            Specifying the beam power by beam parameters or electric field still computes
+            the `rabi_frequency` and adds that quantity to the `Cell` to maintain consistency across
+            `rydiqule`'s other calculations.
+            In other words, `beam_power`, `beam_waist`, and `e_field` will never appear
+            as quantities on the graph of a `Cell`.
         
         Examples
         --------
-        In the simplest case, it is clear physical properties are calculated automatically in a `Cell`
+        In the simplest case, physical properties are calculated automatically in a `Cell`
         All the familiar quantities are present, as well as many more.
 
         >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"))
@@ -454,8 +458,9 @@ class Cell(Sensor):
         'phase': 0, 'kvec': (0, 0, 0), 'label': '(0,1)'}, (1, 0): {'gamma_transition': 37.829349995476726, 
         'label': '(1,0)', 'gamma_transit': 0.41172855461658464}}
 
-        `e_field` can be specified in stead of `rabi_frequency`, but a `rabi_frequency` will still be added
-        to the system based on the `e_field`, rather than `e_field` directly.
+        `e_field` can be specified in stead of `rabi_frequency`,
+        but a `rabi_frequency` will still be added to the system based on the `e_field`,
+        rather than `e_field` directly.
         
         >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"))
         >>> c = {"states":(0,1), "detuning":1, "e_field":6}
@@ -465,7 +470,8 @@ class Cell(Sensor):
         [(0, 0, None), (0, 1, None), (1, 0, None)]
         [(0, 0, None), (0, 1, -1.172912676105507), (1, 0, None)]
         
-        As can `beam_power` and `beam_waist`, with similar behavior regarding how information is stored.
+        As can `beam_power` and `beam_waist`,
+        with similar behavior regarding how information is stored.
 
         >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"))
         >>> c = {"states":(0,1), "detuning":1, "beam_power":1, "beam_waist":1}
@@ -495,14 +501,23 @@ class Cell(Sensor):
         if isinstance(e_field, list):
             e_field = np.array(e_field)
 
-        if (e_field is not None and beam_power is None and beam_waist is None and rabi_frequency is None):
+        if (e_field is not None
+            and beam_power is None
+            and beam_waist is None
+            and rabi_frequency is None
+            ):
             passed_rabi = e_field*scale_dipole(dipole_moment)
 
-        elif (e_field is None and beam_power is not None and rabi_frequency is None and beam_waist is not None):  # noqa
+        elif (e_field is None
+              and beam_power is not None
+              and rabi_frequency is None
+              and beam_waist is not None
+              ):
             if isinstance(beam_power, Sequence) and isinstance(beam_waist, Sequence):
                 raise ValueError('beam_power and beam_waist cannot be scanned simultaneously')
             else:
-                passed_rabi = np.array([[1e-6*self.atom.getRabiFrequency(*state1, *state2[:-1], q, bp, bw)
+                passed_rabi = np.array([[1e-6*self.atom.getRabiFrequency(*state1, *state2[:-1],
+                                                                         q, bp, bw)
                                         for bp in np.array(beam_power, ndmin=1)]
                                         for bw in np.array(beam_waist, ndmin=1)]).squeeze()
                 if passed_rabi.shape == tuple():

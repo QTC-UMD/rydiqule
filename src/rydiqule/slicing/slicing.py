@@ -8,23 +8,27 @@ import itertools
 
 import numpy as np
 
-from typing import Dict, Tuple, Iterator, Union, List
+from typing import Tuple, Iterator, Union, List
 
 
 def compute_grid(stack_shape: np.ndarray, n_slices: int):
     """Calculate the bin edges to break a given stack shape into at least a certain number of pieces
 
-    Works by iterating first over a number of slices per axis (N=1,2,3), then over each in the stack shape,
-    splitting the axis into N slices, and comparing the total number of slices to the number specified. In a
-    sense, the algorithm factors a number greater than or equal to n_slices, then breaks the stack along each
-    axis according to this factorization. If the axis lengths do not break evenly into the appropriate number
-    of pieces, the bin edges are truncated to an integer. This means that the slices are not guaranteed to be
-    `(1/n_slices)`, but they will be close enough for most cases. 
+    Works by iterating first over a number of slices per axis (N=1,2,3),
+    then over each in the stack shape, splitting the axis into N slices,
+    and comparing the total number of slices to the number specified.
+    In a sense, the algorithm factors a number greater than or equal to n_slices,
+    then breaks the stack along each axis according to this factorization.
+    If the axis lengths do not break evenly into the appropriate number of pieces,
+    the bin edges are truncated to an integer.
+    This means that the slices are not guaranteed to be `(1/n_slices)`,
+    but they will be close enough for most cases. 
 
     Parameters
     ----------
     stack_shape : np.ndarray
-        The shape of the stack to be sliced. Does not include Hamiltonian or matrix equation dimensions,
+        The shape of the stack to be sliced.
+        Does not include Hamiltonian or matrix equation dimensions,
         so for a hamiltonain stack of shape `(*l,n,n)`, `stack_shape` will be `*l`.
     n_slices : int
         The number of slices into which to break the hamiltonian. Lower bound on the number of 
@@ -65,7 +69,9 @@ def compute_grid(stack_shape: np.ndarray, n_slices: int):
     return [np.linspace(0,stack_shape[i], n_ax_slices[i]+1, dtype=int) for i in range(total_axes)]
 
 
-def matrix_slice(*matrices: np.ndarray, edges:Union[List, None]=None, n_slices:Union[int, None]=None) -> Iterator[Tuple[tuple, np.ndarray]]:
+def matrix_slice(*matrices: np.ndarray,
+                 edges:Union[List, None]=None,
+                 n_slices:Union[int, None]=None) -> Iterator[Tuple[tuple, np.ndarray]]:
     """
     Generator that returns parts of a stack of matrices.
 
@@ -73,8 +79,8 @@ def matrix_slice(*matrices: np.ndarray, edges:Union[List, None]=None, n_slices:U
     in the specified number of smaller stacks. For example, given a stack of matrices of shape
     `(10,10,4,4)` with 4 slices, generates 4 stacks of shape `(5,4,4)`. Due to the nature
     of the slicing, the number of slices might be slightly greater that the number specified.
-    Output matrices will be broadcastable by numpy's broadcasting rules. Input arrays are interpreted as
-    a stack, with the last 2 dimensions staying intact.
+    Output matrices will be broadcastable by numpy's broadcasting rules.
+    Input arrays are interpreted as a stack, with the last 2 dimensions staying intact.
 
     Args
     ----
@@ -84,12 +90,12 @@ def matrix_slice(*matrices: np.ndarray, edges:Union[List, None]=None, n_slices:U
         must have the same number of dimensions, even if some dimensions are of size 1. For example,
         matrices of sizes `(10,1,4,4)` and `(1,20,4,4)` can be sliced together. 
     edges: list(iterable)
-        The values along each axis that define the edges of bins on an n-dimensional grid. For example,
-        to slice a grid of hamiltonians with stack_shape `(10,10)` into 4 pieces, `edges` could be defined as
-        `[0,5,10]` for each of the 2 stack axes. 
+        The values along each axis that define the edges of bins on an n-dimensional grid.
+        For example, to slice a grid of hamiltonians with stack_shape `(10,10)` into 4 pieces,
+        `edges` could be defined as `[0,5,10]` for each of the 2 stack axes. 
     n_slices : int or None 
         The number of slices into which to break the matrix stack. Ignored if the
-        `edges` parameter is not `None`. Must be specified as an integer value if `edges` is `None`, 
+        `edges` parameter is not `None`. Must be specified as an integer value if `edges` is `None`,
         ignored otherwise. Defaults to None. 
 
     Yields
@@ -134,7 +140,7 @@ def matrix_slice(*matrices: np.ndarray, edges:Union[List, None]=None, n_slices:U
         yield (), *matrices
         return
     #Build the grid if only the number of slices is specified. 
-    if edges==None:
+    if edges is None:
         if n_slices in (1,None):
             yield (), *matrices
             return
@@ -144,7 +150,9 @@ def matrix_slice(*matrices: np.ndarray, edges:Union[List, None]=None, n_slices:U
     #check that the bins slice each axis appropriately
     for i,e in enumerate(edges):
         if e[0] != 0 or e[-1] != stack_shape[i]:
-            raise ValueError(f"slices must start at 0 and end at the axis length ({stack_shape[i]} for axis {i})")
+            raise ValueError(
+                f"slices must start at 0 and end at the axis length ({stack_shape[i]} for axis {i})"
+                )
 
     start_edges = [e[:-1] for e in edges] # "left" edge
     end_edges = [e[1:] for e in edges] #"right" edge
@@ -191,7 +199,8 @@ def memory_size(shape: Tuple[int, ...], item_size: int) -> int:
 
 def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int, ...],
                   sum_doppler: bool, weight_doppler: bool,
-                  n_slices: Union[int,None] = None, debug: bool = False) -> Tuple[int, Tuple[int, ...]]:
+                  n_slices: Union[int,None] = None,
+                  debug: bool = False) -> Tuple[int, Tuple[int, ...]]:
     """
     Estimates the memory required for the desired steady state solve.
 
@@ -232,7 +241,7 @@ def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int
     # set the initial number of slices to 1 if None are specified
     #This is primarily to handle the fact that n_slices defaults to None
     # in matrix_slice
-    if n_slices==None:
+    if n_slices is None:
         n_slices=1
     # get total avaialable memory for the system
     total_mem = psutil.virtual_memory().available
@@ -313,7 +322,8 @@ def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int
     if (total_mem - min_sol_mem) <= 0:
         raise MemoryError(f'System is too large to solve. Need at least {min_sol_mem/1024**3} GiB')
     
-    compare_vals = np.array([np.ceil(single_eom_mem*stack_factor / available_mem), n_slices], dtype=float)
+    compare_vals = np.array([np.ceil(single_eom_mem*stack_factor / available_mem), n_slices],
+                            dtype=float)
     n_ham_slices = int(np.nanmax(compare_vals))
 
     if doppler_shape:
@@ -466,10 +476,12 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
         print(f'Available memory for sliced solves: {available_mem/1024**3:.5g} GiB')
 
     if (total_mem - min_sol_mem) <= 0:
-        warnings.warn(f'System is likely too large to solve. Need at least {min_sol_mem/1024**3} GiB')
+        warnings.warn(
+            f'System is likely too large to solve. Need at least {min_sol_mem/1024**3} GiB')
 
     #array of the minimum necessary slices and the specified number of slices
-    compare_vals = np.array([np.ceil(single_eom_mem*stack_factor / available_mem), n_slices], dtype=float)
+    compare_vals = np.array([np.ceil(single_eom_mem*stack_factor / available_mem), n_slices],
+                            dtype=float)
     n_ham_slices = int(np.nanmax(compare_vals))
 
     if doppler_shape:

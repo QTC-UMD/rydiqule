@@ -23,7 +23,8 @@ def solve_steady_state(
 
     If insuffucent system memory is available to solve the system in a single call, 
     system is broken into "slices" of manageable memory footprint which are solved indivudually.
-    This slicing behavior does not affect the result. Can be performed with or without doppler averging.
+    This slicing behavior does not affect the result.
+    Can be performed with or without doppler averging.
 
     Parameters
     ----------
@@ -166,13 +167,15 @@ def solve_steady_state(
         
     # allocate arrays
     hamiltonians = sensor.get_hamiltonian()
+    hamiltonians_time, _ = sensor.get_time_couplings()
+    hamiltonians_total = hamiltonians + np.sum(hamiltonians_time, axis=0)
     gamma = sensor.decoherence_matrix()
     sols = np.zeros(out_sol_shape)
     
     # loop over individual slices of hamiltonian
     n_slices_true = sum(1 for _ in matrix_slice(gamma, n_slices=n_slices))
 
-    for i, (idx, H, G) in enumerate(matrix_slice(hamiltonians, gamma, n_slices=n_slices)):
+    for i, (idx, H, G) in enumerate(matrix_slice(hamiltonians_total, gamma, n_slices=n_slices)):
     
         if n_slices_true > 1:
             print(f"Solving equation slice {i+1}/{n_slices_true}", end='\r')
@@ -189,8 +192,12 @@ def solve_steady_state(
     solution.eta = sensor.eta
     solution.kappa = sensor.kappa
     solution.couplings = sensor.get_couplings()
-    solution.axis_labels = [f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler] + sensor.axis_labels() + ["density_matrix"]
-    solution.axis_values = [dop_classes for i in range(spatial_dim) if not sum_doppler] + [val for _,_,val in sensor.variable_parameters()] + [sensor.basis()]
+    solution.axis_labels = ([f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler]
+                            + sensor.axis_labels()
+                            + ["density_matrix"])
+    solution.axis_values = ([dop_classes for i in range(spatial_dim) if not sum_doppler]
+                            + [val for _,_,val in sensor.variable_parameters()]
+                            + [sensor.basis()])
     solution.basis = sensor.basis()
     solution.rq_version = version("rydiqule")
     solution.doppler_classes = dop_classes

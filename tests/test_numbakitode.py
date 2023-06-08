@@ -35,6 +35,7 @@ def test_nbkit():
 
 
 @pytest.mark.time
+@pytest.mark.slow
 def test_time_complex_match_steady_numbakit():
     """Tests the time solver vs steady state
     with aribtrary (complex) and time-dependent rabi frequencies

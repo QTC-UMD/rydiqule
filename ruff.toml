@@ -1,0 +1,17 @@
+# longer line length
+line-length = 100
+
+# global additions
+extend-select = ["RUF100"]
+
+# global ignores
+ignore = ["E231", "E741"]
+
+# point to src directory
+src = ["src"]
+
+# ignore import violations in __init__.py files
+[per-file-ignores]
+"__init__.py" = ["E501", "F401"]
+"src/rydiqule/solvers.py" = ["F403", "F405"]
+"src/rydiqule/timesolvers.py" = ["F403", "F405"]

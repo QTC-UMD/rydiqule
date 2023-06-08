@@ -552,13 +552,17 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> ED:
                 diagram.add_arrow(*item, linestyle)
 
     gamma_matrix = sensor.decoherence_matrix()
-    #we get the biggest possible decoherence value for each term by doing a max reduction along stack axes
+    # we get the biggest possible decoherence value for each term
+    # by doing a max reduction along stack axes
     stack_axes = tuple(np.arange(0,gamma_matrix.ndim-2))
     gamma_matrix = gamma_matrix.max(axis=stack_axes)
 
     if include_dephasing and gamma_matrix.any():
         max_dephase = gamma_matrix.max()
         min_dephase = gamma_matrix[gamma_matrix != 0.0].min()
+        if np.isclose(min_dephase, max_dephase):
+            # all non-zero dephasings are the same, prevent /0 error in normalization
+            min_dephase = max_dephase*1e-1
         idxs = np.argwhere(gamma_matrix != 0.0)[::-1,:]  # reverse order so transits don't all align
         for idx in idxs:
             # ensure alpha doesn't get too small to not be seen
@@ -635,7 +639,8 @@ def _get_collapse_str(len: int, *matched_dims) -> str:
     Internal helper function to build the string argument of `numpy.einsum`
     when dimensions are collapsed.
 
-    Creates a string of the appropriate number of ascii characters (the first n for an n-dimensional stack).
+    Creates a string of the appropriate number of ascii characters
+    (the first n for an n-dimensional stack).
     Then swaps in new characters in the appropriate place to produce a string that can be passed
     to `numpy`'s `einsum` function.
     """
@@ -662,13 +667,15 @@ def _validate_sols(sols):
     There are 3 outcomes:
     
       - `sols` is a np.ndarray, returns `sols`.
-      - `sols` is an object with a `rho` attribute that is a `numpy.ndarray`, in which case returns `rho`.
+      - `sols` is an object with a `rho` attribute that is a `numpy.ndarray`,
+        in which case returns `rho`.
       - `sols` does not meet either of the above criteria, in which case raises an exception.
 
     Parameters
     ----------
     sols : any
-        The value to validate, should be a np.ndarray or an object (like a :class:`~.sensor_solution.Solution`)
+        The value to validate, should be a np.ndarray or an object
+        (like a :class:`~.sensor_solution.Solution`)
         with a `rho` attribute which is a numpy array.
         
     Raises
@@ -682,7 +689,8 @@ def _validate_sols(sols):
         rho = sols
         
     if not isinstance(rho, np.ndarray):
-        raise TypeError("sols must be a numpy array or have an attribute \"rho\" which is a numpy array.")
+        raise TypeError(
+            "sols must be a numpy array or have an attribute \"rho\" which is a numpy array.")
     
     return rho
     

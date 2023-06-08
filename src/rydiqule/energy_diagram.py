@@ -36,7 +36,7 @@ This is a simple script to plot energy profile diagram using matplotlib.
 
 Original author is Giacomo Marchioro.
 The following is modified from https://github.com/giacomomarchioro/PyEnergyDiagrams
-"""  # noqa
+"""
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import matplotlib as mpl
@@ -340,7 +340,7 @@ class ED(object):
             Figure handle for the generated figure.
         ax: :class:`matplotlib:matplotlib.axes.Axes`
             Axes handle for the generated figure.
-        '''  # noqa
+        '''
 
         # Create a figure and axis if the user didn't specify them.
         if ax is None:

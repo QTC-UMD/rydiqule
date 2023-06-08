@@ -1,11 +1,34 @@
 Changelog
 =========
 
+v1.0.0
+------
+
+Improvements
+++++++++++++
+
+- Steady-state behavior for time-dependent fields (and thus initial conditions for time solves) is now computed as a static value rather than zero (previous behavior).
+- Added a flag in `scipy_solve` to specify how to define the right-hand function of the differential equation, to use either loops (the newer method) or list comprehension (the older method).
+- Implemented `ruff` linting rules as an action for new PRs to help enforce good coding practices.
+- Implemented unit-testing action for new PRs to help automate catching regression bugs.
+
+Bug Fixes
++++++++++
+
+- Fixed a broken uinit test that did not affect package functionality.
+- Fixed issue where level diagrams don't draw correctly if all non-zero dephasings are equal.
+
+
+Deprecations
+++++++++++++
+
+
 v1.0.0rc2
 ---------
 
 Improvements
 ++++++++++++
+
 - Added a `copy` method to solution.
 - Expanded the `Solution` object to include more clear axis labels and the basis of the sensor used.
 - Begin hosting public documentation on readthedocs.
