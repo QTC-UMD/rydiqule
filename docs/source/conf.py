@@ -39,7 +39,7 @@ version = release
 # HTML icons
 img_path = 'img'
 html_logo = img_path + '/Rydiqule_Icon_64.svg'
-html_favicon = img_path + '/Rydiqule_Icon_Transparent.ico'
+html_favicon = img_path + '/Rydiqule_Icon_Transparent_64_32_16.ico'
 
 # -- General configuration (should be identical across all projects) ------------------
 

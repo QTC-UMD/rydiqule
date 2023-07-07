@@ -13,7 +13,7 @@ Numpy arrays
 
 Typically, python lists are quite slow to perform operations on since they are dynamically sized
 and typed. This allows tremendous flexibility in what can be put into a list but some problems
-with how fast elements are accessed from that list and operating on. `Numpy arrays[https://numpy.org/doc/stable/user/whatisnumpy.html]_`
+with how fast elements are accessed from that list and operating on. `Numpy arrays <https://numpy.org/doc/stable/user/whatisnumpy.html>`_
 were created to address this limitation and Rydiqule makes extensive use of them to make
 its calculations fast without losing the ease-of-use benefits of a Python interface. Fundamentally,
 a numpy ``ndarray`` is a grid of numbers that has dimensionality `m1` by `m2` by `m3` and so on.
@@ -22,7 +22,7 @@ Numpy routines are written to operate on these arrays very quickls for large num
 Stacking
 ========
 
-While numpy's own way of handling arrays via matrix broadcasting is `well-documented[https://numpy.org/doc/]_`,
+While numpy's own way of handling arrays via matrix broadcasting is `well-documented <https://numpy.org/doc/>`_,
 and most of Rydiqule's own functions use the standard numpy conventions, there are some additional
 assumptions Rydiqule makes when performing these operations that are worth outlining. Fundamentally,
 Rydiqule thinks about these `ndarray` objects as groups of matrices, meaning that calculations 
