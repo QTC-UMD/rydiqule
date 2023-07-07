@@ -5,7 +5,7 @@
    viewBox="0 0 63.999991 63.999994"
    version="1.1"
    id="svg20"
-   sodipodi:docname="Rydiqule_Icon.svg"
+   sodipodi:docname="Rydiqule_Icon_bkgd.svg"
    inkscape:version="1.2.2 (732a01da63, 2022-12-09)"
    inkscape:export-filename="Rydiqule_Icon_16.png"
    inkscape:export-xdpi="18.000002"
@@ -27,13 +27,13 @@
      inkscape:document-units="pt"
      showgrid="false"
      inkscape:zoom="3.5548557"
-     inkscape:cx="30.240327"
-     inkscape:cy="49.509745"
-     inkscape:window-width="1223"
-     inkscape:window-height="766"
-     inkscape:window-x="597"
-     inkscape:window-y="138"
-     inkscape:window-maximized="0"
+     inkscape:cx="16.034406"
+     inkscape:cy="49.650398"
+     inkscape:window-width="1920"
+     inkscape:window-height="1001"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
      inkscape:current-layer="layer3" />
   <defs
      id="defs10">
@@ -92,7 +92,7 @@
      id="layer4"
      inkscape:label="Background"
      sodipodi:insensitive="true"
-     style="display:none">
+     style="display:inline">
     <rect
        style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.77336;stroke-dasharray:none;stroke-opacity:1"
        id="rect8228"
