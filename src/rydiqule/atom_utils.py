@@ -12,7 +12,7 @@ ATOMS = {
     'Na': arc_atoms.Sodium,
     'K39': arc_atoms.Potassium39, 'K40': arc_atoms.Potassium40, 'K41': arc_atoms.Potassium41,
     'Rb85': arc_atoms.Rubidium85, 'Rb87': arc_atoms.Rubidium87,
-    'Cs': arc_atoms.Caesium
+    'Cs': arc_atoms.Caesium, 'Cs133': arc_atoms.Caesium
 }
 """
 Alkali atoms defined by ARC that can be used with :class:`~.Cell`.
@@ -24,7 +24,7 @@ ground_n = {
     "Na": 3,
     "K": 4, "K39": 4, "K40": 4, "K41": 4,
     "Rb": 5, "Rb85": 5, "Rb87": 5,
-    "Cs": 6
+    "Cs": 6, "Cs133": 6
 }
 
 
@@ -38,7 +38,7 @@ def D1_states(n: Union[int, str]):
     n: int or str
         Either the string flag of the atom or the principle quantum number n of
         an atom. If string, must be one of ['H', 'Li', 'Li6', 'Li7', 'Na', 'K', 'K39', 'K40',
-        'K41', 'Rb', 'Rb85', 'Rb87', 'Cs'].
+        'K41', 'Rb', 'Rb85', 'Rb87', 'Cs', 'Cs133'].
 
     Returns
     -------
@@ -72,7 +72,7 @@ def D2_states(n: Union[int, str]):
     n: int or str
         Either the string flag of the atom or the principle quantum number n of
         an atom. If string, must be one of ['H', 'Li', 'Li6', 'Li7', 'Na', 'K', 'K39', 'K40',
-        'K41', 'Rb', 'Rb85', 'Rb87', 'Cs'].
+        'K41', 'Rb', 'Rb85', 'Rb87', 'Cs', 'Cs133'].
 
     Returns
     -------

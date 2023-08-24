@@ -18,7 +18,7 @@ from typing import Literal, Optional, Sequence, List, Tuple, Callable
 
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
 
-AtomFlags = Literal['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs']
+AtomFlags = Literal['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs', 'Cs133']
 QState = Sequence  # TODO: consider using named tuples here
 States = Tuple[int, ...]
 
@@ -52,7 +52,7 @@ class Cell(Sensor):
         ----------
         atom_flag : str 
             Which atom is used in the cell for calculating physical properties with ARC Rydberg.
-            One of ['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs'].
+            One of ['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs', 'Cs133'].
         atomic_states : list[list]
             List of states to be added to the cell. Each state is 
             an iterable whose elements are each a list of the form [n, l, j, m], represnting the 
