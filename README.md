@@ -32,7 +32,7 @@ Now install dependencies that are available via conda.
 To capture as many dependencies as possible,
 we will add the `conda-forge` channel at a lower priority.
 ```shell
-(rydiqule) ~/> conda config --append channels conda-forge
+(rydiqule) ~/> conda config --env --append channels conda-forge
 (rydiqule) ~/> conda config --set channel_priority strict
 (rydiqule) ~/> conda install numpy scipy matplotlib networkx numba psutil
 # ARC specific dependencies available via conda
@@ -108,9 +108,19 @@ This package requires installation of the excellent [ARC](https://github.com/nik
 It also requires other standard computation dependenices, such as `numpy`, `scipy`, `matplotlib`, etc.
 These dependencies will be automatically installed by pip if not already present.
 
-The timesolver backend dependencies include the [numbakit-ode](https://github.com/hgrecco/numbakit-ode)
+Rydiqule's performance does depend on these depedencies.
+In particular, `numpy` can be compiled with a variety of backends that implements
+BLAS and LAPACK routines that can have different performance for different computer architectures.
+When using Windows, it is recommended to install `numpy` from conda,
+which is built against the IntelMKL and has generally shown the best performance for Intel-based PCs.
+
+Optional timesolver backend dependencies include the [numbakit-ode](https://github.com/hgrecco/numbakit-ode)
 and [CyRK](https://github.com/jrenaud90/CyRK) packages.
 Both are available via `pip`.
+They can be installed automatically via the optional extras specification for the `pip` command.
+```shell
+pip install rydiqule[backends]
+```
 
 ## Documentation
 
@@ -129,3 +139,11 @@ Creation of this software was supported in part by the Defense Advanced Research
 ## Disclaimer
 
 The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government.
+
+## Contact
+
+The github repository is for code distribution only.
+While we monitor it, 
+we will not directly respond to issues or pull requests posted to it.
+If you would like a response from the developers, please e-mail
+david.h.meyer3.civ@army.mil or kevin.c.cox29.civ@army.mil

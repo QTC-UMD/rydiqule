@@ -103,9 +103,11 @@ def test_time_match_steady():
 
     RbSensor_ss = rq.Cell("Rb85", *rq.D2_states(5),
                           rydberg_target_state, rydberg_excited_state,
+                          cell_length=0,
                           gamma_transit=0.1)
     RbSensor_t = rq.Cell("Rb85", *rq.D2_states(5),
                          rydberg_target_state, rydberg_excited_state,
+                         cell_length=0,
                          gamma_transit=0.1)
 
     RbSensor_ss.add_couplings(red_laser, blue_laser, rf_coupling_ss)
@@ -183,7 +185,7 @@ def test_time_complex_match_steady():
     # sol_t_numba = rq.solve_time(sensor_t, end_time, sample_num, rtol=1E-6, atol=1e-6,
     #                             use_nkode = True, complex_numba = True)
     np.testing.assert_allclose(sols_s.rho,sol_t.rho[-1,:],atol=0.005,
-            err_msg='Complex time and steady state solutions do not match.  non-compiled.')  # noqa
+            err_msg='Complex time and steady state solutions do not match.  non-compiled.')
     # np.testing.assert_allclose(sols_s.rho,sol_t_numba.rho[-1,:],atol=0.005,
     #       err_msg='Complex time and steady state solutions do not match.  numbakit.')
 
@@ -198,9 +200,11 @@ def test_time_rwa():
 
     RbSensor_rwa = rq.Cell("Rb85", *rq.D2_states(5),
                            RydbergTargetState, RydbergExcitedState,
+                           cell_length=0,
                            gamma_transit=2*np.pi*1)
     RbSensor_norwa = rq.Cell("Rb85", *rq.D2_states(5),
                              RydbergTargetState, RydbergExcitedState,
+                             cell_length=0,
                              gamma_transit=2*np.pi*1)
 
     rf_freq = RbSensor_norwa.atom.getTransitionFrequency(n+1, 2, 2.5, n, 3, 3.5)*1E-6
@@ -228,10 +232,10 @@ def test_time_rwa():
     time_sol_rwa = rq.solve_time(RbSensor_rwa, endTime, sampleNum, rtol=1E-6)
     time_sol_norwa = rq.solve_time(RbSensor_norwa, endTime, sampleNum, rtol=1E-6)
 
-    transNO = np.imag(rq.get_susceptibility(time_sol_norwa, RbSensor_norwa))
-    transRWA = np.imag(rq.get_susceptibility(time_sol_rwa, RbSensor_rwa))
+    transNO = np.imag(time_sol_norwa.get_susceptibility())
+    transRWA = np.imag(time_sol_rwa.get_susceptibility())
     np.testing.assert_allclose(transNO,transRWA,rtol=0.01,
-            err_msg='Non-RWA and RWA give different results when they should match')  # noqa
+            err_msg='Non-RWA and RWA give different results when they should match')
     
     
 @pytest.mark.time

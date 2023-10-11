@@ -1,6 +1,68 @@
 Changelog
 =========
 
+v1.1.0
+------
+
+Improvements
+++++++++++++
+
+- Added the ability to specify hyperfine states in a `Cell`. They are distiguished by having 5 quantum numbers `[n, l, j, F, m_F]`.
+- `kappa` and `eta` are now proprties of `Cell` which are calculated on the fly.
+- Separated rotating frame logic from hamiltonian diagonal generation into a new function `Sensor.get_rotating_frames()`.
+  Allows for simple inspection of what rotating frame rydiqule is using in a solve.
+- Reworked the under-the-hood parameter zipping framework. This should have minimal impact on user-facing functionality.
+  - Hamiltonians with zipped parameters are no longer generated with a `diag` operation.
+  - Zipped parameters are now handled with a dictionary rather than a list.
+  - Zipped parameters can now be given a shorthand label rather than the default behavior of concatenating individual labels.
+- The rearrangement of axes in a stack is now defined completely by the behavior of `axis_labels()`.
+- Added a `diff_nearest` boolean argument to `get_snr`. When true, calculates SNR based on nearest neighbor diff.
+  This is in contrast to the default behavior of taking the difference relative to the first element.
+  One case where this is necessary is when getting SNR vs LO Rabi frequency of a heterodyne measurement.
+- Added the ability to label states of a sensor with the `label_states` method. States with a label matching a particular pattern can be accessed with the `states_with_label` function.
+- Timesolver now allows for returning doppler-averaged solutions without applying the doppler weight factors.
+  This is mostly useful for internal testing.
+- `solve_steady_state` now treats time-dependent couplings as having their :math:`t=0` value.
+  Most importantly, this affects the default behavior for timesolve initial condition generation and should limit large transient behavior.
+  This also allows the user to specify if time-dependent couplings should be solved with field on or off in steady-state
+  by altering their :math:`t=0` value (eg changing between sin and cos).
+- Added unit tests for observables, (susceptibility, optical depth, transmission coefficient, and phase shift).
+- All Observables (susceptibility, optical depth, etc) now only require a `Solution` object to run.
+- `rq.D1_states` and `rq.D2_states` can now specify the atom via string with any isotope specification (including none)
+- `get_snr` now warns if any couplings have time-dependence, which are ignored.
+- Zipped parameter labels may now include underscores
+- `about` function now conceals the user's home directory by default when printing paths
+- Moved level diagram plotting to use an external library
+
+Bug Fixes
++++++++++
+
+- Fixed return units of `get_snr` to actually return in 1s BW. Previously was returning in 1us BW.
+- Sign errors when specifying detunings both in and out of the rotating frame have been fixed.
+  All detuning signs now follow the convention that positive = blue detuned from atomic resonance,
+  so long as the couplings are added correctly (ie second state of `states` tuple is always the higher energy one).
+- Fixed potential issue in `get_snr` where output results could be overwritten to views of intermediate arrays
+- Fixed numerical bugs in observables: phase shift, susceptibility, optical depth, transmission coef.  Now unit tested 
+  against Steck Quantum Optics notes.
+- Ensure that non-dipole-allowed transitions are properly warned about in `Cell.add_coupling` with ARC==3.4
+
+
+Deprecations
+++++++++++++
+
+- The new `kappa` and `eta` properties of `Cell` directly calculate from Cell properties.
+- Time-solver backends (except scipy) are now optional dependencies that are no longer installed by default. To install them, use the `pip install rydiqule[backends]` command.
+- The uncollapsed stack shape can no longer be accessed to avoid confusion.
+- Removed the ability to pass additional parameters to `np.meshgrid` through the `get_parameter_mesh` function. 
+- `get_snr` no longer returns in units of 1us.
+- Default timesolver initial conditions no longer assume time-dependent couplings have the value of `rabi_frequency`.
+  It is now `rabi_frequency` times the `time_dependence`.
+- Multiple sign errors have been corrected in `Sensor` and `Cell` with regards to detunings.
+  Results that are asymmetric about zero detuning are likely to change.
+  Please ensure all couplings are following correct sign conventions for consisten results
+  (ie second state of `states` tuple has higher energy).
+- most of the functions in experiments.py have been moved to become methods of `Solution` class.
+
 v1.0.0
 ------
 

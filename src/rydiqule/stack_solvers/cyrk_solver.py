@@ -1,9 +1,14 @@
 import warnings
 
 import numpy as np
-import numba as nb
 
-from CyRK import cyrk_ode
+try:
+    import numba as nb
+    from CyRK import cyrk_ode
+    cyrk_available = True
+except ImportError as e:
+    cyrk_available = False
+    cyrk_import_error = e
 
 from typing import Sequence, Callable, Union, Tuple
 
@@ -79,6 +84,9 @@ def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
         If we see this error a lot, consider getting CyRK project to increase it
         by changing type of `y_size` from unisgned short.
     """  # noqa
+
+    if not cyrk_available:
+        raise ImportError('CyRK backend not installed') from cyrk_import_error
 
     if init_cond.size > np.iinfo(np.ushort).max:
         raise OverflowError(f'Max system size exceeded for cyrk backend. '

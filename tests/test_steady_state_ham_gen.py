@@ -16,7 +16,7 @@ def test_ladder_5_level():
     sensor = Sensor(5)
     sensor.add_couplings(f1, f2, f3, f4)
 
-    expected_ham = np.diag([0, 1, 1+2, 1+2+4, 1+2+4+8])
+    expected_ham = np.diag([0, -1, -1-2, -1-2-4, -1-2-4-8])
     ham = sensor.get_hamiltonian()
 
     np.testing.assert_allclose(ham, expected_ham,
@@ -33,7 +33,7 @@ def test_lambda_4_level():
     sensor = Sensor(4)
     sensor.add_couplings(f1, f2, f3)
 
-    expected_ham = np.diag([0, 1, 1+2-4, 1+2])
+    expected_ham = np.diag([0, -1, -1-2+4, -1-2])
     ham = sensor.get_hamiltonian()
 
     np.testing.assert_allclose(ham, expected_ham,
@@ -51,7 +51,7 @@ def test_v_5_level():
     sensor = Sensor(5)
     sensor.add_couplings(f1, f2, f3, f4)
 
-    expected_ham = np.diag([0, 1, 1+2, 1+2+4, 1+2+8])
+    expected_ham = np.diag([0, -1, -1-2, -1-2-4, -1-2-8])
     ham = sensor.get_hamiltonian()
 
     np.testing.assert_allclose(ham, expected_ham,
@@ -70,12 +70,12 @@ def test_v_5_cell():
     state2 = [11, 3, 3.5, 0.5]
     state3 = [9, 3, 3.5, 0.5]
 
-    RbSensor_ss = Cell('Rb85', *D2_states(5), state1, state2, state3)
+    RbSensor_ss = Cell('Rb85', *D2_states(5), state1, state2, state3, cell_length = 0.00001)
 
     RbSensor_ss.add_couplings(f1, f2, f3, f4)
 
-    expected_ham = np.diag([0, 1, 1+2, 1+2+4, 1+2+8])
+    expected_ham = np.diag([0, -1, -1-2, -1-2-4, -1-2-8])
     ham = RbSensor_ss.get_hamiltonian()
 
     np.testing.assert_allclose(ham, expected_ham,
-                               err_msg="5 Level V failed hamilonian generation")
+                               err_msg="5 Level V cell failed hamilonian generation")

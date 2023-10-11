@@ -13,24 +13,24 @@ def test_zip_detunings():
 
     # what the correct hamiltonian will be for this system
     expected_ham = np.array([[[0. + 0.j,  0.5+0.j,  0. + 0.j],
-                              [0.5-0.j, -2. + 0.j,  1. + 0.j],
-                              [0. + 0.j,  1. - 0.j, -2. + 0.j]],
+                              [0.5-0.j, 2. + 0.j,  1. + 0.j],
+                              [0. + 0.j,  1. - 0.j, 2. + 0.j]],
 
                              [[0. + 0.j,  0.5+0.j,  0. + 0.j],
-                              [0.5-0.j, -1. + 0.j,  1. + 0.j],
+                              [0.5-0.j, 1. + 0.j,  1. + 0.j],
                               [0. + 0.j,  1. - 0.j,  0. + 0.j]],
 
                              [[0. + 0.j,  0.5+0.j,  0. + 0.j],
                               [0.5-0.j,  0. + 0.j,  1. + 0.j],
-                              [0. + 0.j,  1. - 0.j,  2. + 0.j]],
+                              [0. + 0.j,  1. - 0.j,  -2. + 0.j]],
 
                              [[0. + 0.j,  0.5+0.j,  0. + 0.j],
-                              [0.5-0.j,  1. + 0.j,  1. + 0.j],
-                              [0. + 0.j,  1. - 0.j,  4. + 0.j]],
+                              [0.5-0.j,  -1. + 0.j,  1. + 0.j],
+                              [0. + 0.j,  1. - 0.j,  -4. + 0.j]],
 
                              [[0. + 0.j,  0.5+0.j,  0. + 0.j],
-                              [0.5-0.j,  2. + 0.j,  1. + 0.j],
-                              [0. + 0.j,  1. - 0.j,  6. + 0.j]]])
+                              [0.5-0.j,  -2. + 0.j,  1. + 0.j],
+                              [0. + 0.j,  1. - 0.j,  -6. + 0.j]]])
 
     s = rq.Sensor(3)
     detunings_red = np.linspace(-2, 2, 5)
@@ -44,7 +44,8 @@ def test_zip_detunings():
 
     test_ham = s.get_hamiltonian()
 
-    np.testing.assert_equal(test_ham, expected_ham)
+    np.testing.assert_equal(test_ham, expected_ham,
+                            err_msg='Detuning zip failed')
 
 
 @pytest.mark.structure
@@ -86,7 +87,8 @@ def test_zip_rabi():
     s.zip_parameters("(0,1)_rabi_frequency", "(1,2)_rabi_frequency")
 
     test_ham = s.get_hamiltonian()
-    np.testing.assert_equal(test_ham, expected_ham)
+    np.testing.assert_equal(test_ham, expected_ham,
+                            err_msg='Rabi zip failed')
 
 
 @pytest.mark.structure
@@ -126,4 +128,50 @@ def test_zip_phase():
     s.zip_parameters("(0,1)_phase", "(1,2)_phase")
 
     test_ham = s.get_hamiltonian()
-    np.testing.assert_allclose(expected_ham, test_ham, atol=1e-4)
+    np.testing.assert_allclose(expected_ham, test_ham, atol=1e-4,
+                               err_msg='Phase zip failed')
+
+
+@pytest.mark.structure
+def test_unzip():
+    s = rq.Sensor(3)
+    det = np.linspace(-1, 1, 11)
+    rabi = np.linspace(-1, 1, 13)
+
+    s.add_coupling((0,1), detuning=det, rabi_frequency=rabi, label="blue")
+    s.add_coupling((1,2), detuning=det, rabi_frequency=rabi, label="red")
+
+    shape1 = s._stack_shape()
+    s.zip_parameters("red_detuning", "blue_detuning")
+    shape2 = s._stack_shape()
+    s.unzip_parameters("zip_0")
+    shape3 = s._stack_shape()
+
+    np.testing.assert_equal(shape1, shape3,
+                            err_msg='Unzipping unsuccessful')
+    np.testing.assert_raises(AssertionError, np.testing.assert_equal,
+                             shape2, shape3,
+                             err_msg='Zipping unsuccessful')
+    
+@pytest.mark.structure
+def test_zip():
+
+    s = rq.Sensor(3)
+    det = np.linspace(-1, 1, 11)
+    rabi = np.linspace(-1, 1, 13)
+    gam = np.linspace(-0.1, 0.1, 11)
+
+    s.add_coupling((0,1), detuning=det, rabi_frequency=rabi, label="blue")
+    s.add_coupling((1,2), detuning=det, rabi_frequency=rabi, label="red_transition")
+
+    s.add_decoherence((1,0), gam)
+    s.add_decoherence((2,1), gam, label='coupling')
+
+    s.zip_parameters('red_transition_detuning', 'blue_detuning')
+    s.unzip_parameters('zip_0')
+    s.zip_parameters('red_transition_rabi_frequency', 'blue_rabi_frequency')
+    s.unzip_parameters('zip_0')
+    s.zip_parameters('red_transition_detuning', '(1,0)_gamma')
+    s.unzip_parameters('zip_0')
+    s.zip_parameters('(2,1)_gamma_coupling', 'blue_detuning')
+    s.unzip_parameters('zip_0')

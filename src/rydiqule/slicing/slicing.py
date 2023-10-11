@@ -340,7 +340,7 @@ def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int
 
 def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
                     doppler_shape: Tuple[int, ...], time_points: int,
-                    sum_doppler: bool,
+                    sum_doppler: bool, weight_doppler: bool,
                     n_slices: Union[int,None], debug: bool = False) -> Tuple[int, Tuple[int, ...]]:
     """
     Estimates the memory required for the desired time solve.
@@ -371,6 +371,8 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
         An internal fudge factor of 4 is applied for memory estimation purposes.
     sum_doppler: bool
         Whether solution will be summing the doppler average
+    weight_doppler: bool
+        Whether the solution will apply weights to the doppler averaging
     n_slices: int, default=1
         Manually override the minimum number of hamiltonian slices to use.
     debug: bool, default=False
@@ -440,7 +442,7 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
         dop_sol_size = memory_size(dop_sol_shape,8)
 
         single_eom_mem += dop_sol_size * time_fudge
-        if sum_doppler:
+        if weight_doppler:
             # weighting adds extra dop sol allocation
             single_eom_mem += dop_sol_size
 

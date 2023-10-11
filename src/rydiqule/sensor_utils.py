@@ -5,10 +5,10 @@ import string
 import math
 
 import numpy as np
-from .energy_diagram import ED
 from .sensor_solution import Solution
 import scipy.constants
-from scipy.constants import hbar, c, e, epsilon_0
+from scipy.constants import hbar, e
+from leveldiagram import LD
 
 from typing import Dict, Tuple, Union, TYPE_CHECKING
 if TYPE_CHECKING:
@@ -498,7 +498,7 @@ def scale_dipole(dipole: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     return dipole
 
 
-def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> ED:
+def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
     """
     Draw a matplotlib plot that shows the energy level diagram, couplings, and dephasing paths.
 
@@ -526,35 +526,37 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> ED:
 
     Returns
     -------
-    :class:`~.ED`
+    :class:`leveldiagram.LD`
         Diagram handle
 
     """
     from .cell import Cell
-    diagram = ED()
+    rq_g = sensor.couplings.copy()
+
+    # level settings
     if isinstance(sensor, Cell):
-        for index, state_info in enumerate(sensor.states_list()):
-            diagram.add_level(index, str(state_info))
-    else:
-        for i in range(0, sensor.basis_size):
-            diagram.add_level(i, '')
+        for lev, vals in rq_g.nodes.items():
+            ld_kw = {'left_text':vals['qnums']}
+            rq_g.nodes[lev]['ld_kw'] = ld_kw
 
+    # coupling settings
+    for edge, vals in rq_g.edges.items():
+        ld_kw = {}
+        if 'dipole_moment' in vals:
+            ld_kw['linestyle'] = 'dashed'
+        elif 'rabi_frequency' in vals:
+            if not np.all(vals.get('rabi_frequency')):
+                ld_kw['hidden'] = True
 
-    for item in sensor.couplings.edges:
-        #draw coherent couplings
-        if 'dipole_moment' in sensor.couplings.edges[item].keys():
-            linestyle = 'dashed'  # loosely dashdotted
-            diagram.add_arrow(*item, linestyle)
+        rq_g.edges[edge]['ld_kw'] = ld_kw
 
-        elif 'rabi_frequency' in sensor.couplings.edges[item].keys():
-            if np.all(sensor.couplings.edges[item].get('rabi_frequency')) != 0:
-                linestyle = 'solid'  # solid
-                diagram.add_arrow(*item, linestyle)
+    # decoherence settings
 
+    # get decoherence normalizations
     gamma_matrix = sensor.decoherence_matrix()
     # we get the biggest possible decoherence value for each term
     # by doing a max reduction along stack axes
-    stack_axes = tuple(np.arange(0,gamma_matrix.ndim-2))
+    stack_axes = tuple(np.arange(0, gamma_matrix.ndim-2))
     gamma_matrix = gamma_matrix.max(axis=stack_axes)
 
     if include_dephasing and gamma_matrix.any():
@@ -563,75 +565,34 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> ED:
         if np.isclose(min_dephase, max_dephase):
             # all non-zero dephasings are the same, prevent /0 error in normalization
             min_dephase = max_dephase*1e-1
-        idxs = np.argwhere(gamma_matrix != 0.0)[::-1,:]  # reverse order so transits don't all align
+
+        # reversing order of traverse to prevent transit overlaps
+        idxs = np.argwhere(gamma_matrix != 0.0)[::-1,:]
         for idx in idxs:
+
+            ld_kw = {}
+
+            ld_kw['wavy'] = True
+            ld_kw['deflect'] = True
+            ld_kw['start_anchor'] = 'right'
+            if idx[0] == idx[1]:
+                ld_kw['deflection'] = 0.15
+                ld_kw['stop_anchor'] = (0.1, 0.0)
+            else:
+                ld_kw['stop_anchor'] = (0.4, 0.0)
             # ensure alpha doesn't get too small to not be seen
             # also uses a log scale for the full range of non-zero dephasings
-            alph = 1-(0.95*np.log10(gamma_matrix[tuple(idx)]/max_dephase
-                                    )/np.log10(min_dephase/max_dephase))
-            ls = {'linestyle':'solid','alpha':alph}
-            diagram.add_wiggly_arrow(*idx,ls)  # type: ignore[call-arg]
+            alph = 1-(0.8*np.log10(gamma_matrix[tuple(idx)]/max_dephase
+                                )/np.log10(min_dephase/max_dephase))
+            ld_kw['alpha'] = alph
 
-    fig, ax = diagram.plot(show_IDs=True)
-    return diagram
+            rq_g.edges[tuple(idx)]['ld_kw'] = ld_kw
 
+    # create diagram handle
+    ld = LD(rq_g, use_ld_kw=True)
+    ld.draw()
 
-def calc_kappa(probe_freq: float, probe_elem: float, density: float) -> float:
-    """
-    Calculate kappa according to Eq. 5 of
-    Meyer et. al. PRA 104, 043103 (2021)
-
-    Parameters
-    ----------
-    probe_freq: float
-        Frequency of the probing field, in Hz
-    probe_elem: float
-        Dipole moment of the probing transition, in units of a_0*e
-    density: float
-        Atomic density, in m^(-3)
-
-    Returns
-    -------
-    kappa: float
-        in units of MHz/m
-
-    """
-    kappa = 2.0*np.pi*(probe_freq *
-                       density *
-                       probe_elem**2 *
-                       a0**2 *
-                       e**2)/(2.0*c*epsilon_0*hbar*1.0E6)
-
-    return kappa
-
-
-def calc_eta(probe_freq: float, probe_elem: float, beam_area: float) -> float:
-    """
-    Calculate eta according to Eq. 7 of
-    Meyer et. al. PRA 104, 043103 (2021)
-
-    Parameters
-    ----------
-    probe_freq: float
-        Frequency of the probing field, in Hz
-    probe_elem: float
-        Dipole moment of the probing transition, in units of a_0*e
-    beam_area: float
-        Area of the probing field, in m^2
-
-    Returns
-    -------
-    eta: float
-        in units of sqrt(MHz)
-
-    """
-    eta = np.sqrt((2.0*np.pi *
-                   probe_freq *
-                   probe_elem**2 *
-                   a0**2 *
-                   e**2)/(2.0*c*epsilon_0*hbar*beam_area*1.0E6))
-
-    return eta
+    return ld
 
 
 def _get_collapse_str(len: int, *matched_dims) -> str:

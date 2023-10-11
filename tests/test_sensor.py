@@ -5,22 +5,6 @@ import warnings
 
 
 @pytest.mark.structure
-def test_detunings():
-    """Tests that detunings are properly accounted for."""
-
-    s = rq.Sensor(4)
-    f1 = {'states':(0,1), 'rabi_frequency':0, 'detuning':1}
-    f2 = {'states':(1,2), 'rabi_frequency':0, 'detuning':2}
-    f3 = {'states':(2,3), 'rabi_frequency':0, 'detuning':4}
-    s.add_couplings(f1,f2,f3)
-    ham = s.get_hamiltonian()
-
-    expected_ham = np.diag([0,1,1+2,1+2+4]).astype(np.complex128)
-
-    np.testing.assert_allclose(ham, expected_ham, err_msg='4-level ladder detunings not correct')
-
-
-@pytest.mark.structure
 def test_dephasings():
     """Tests that decoherence matrix is made correctly, with higher dimensions."""
 

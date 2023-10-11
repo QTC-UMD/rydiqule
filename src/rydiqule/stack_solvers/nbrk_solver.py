@@ -1,9 +1,14 @@
 import warnings
 
 import numpy as np
-import numba as nb
 
-from CyRK import nbrk_ode
+try:
+    import numba as nb
+    from CyRK import nbrk_ode
+    nbrk_available = True
+except ImportError as e:
+    nbrk_available = False
+    nbrk_import_error = e
 
 from typing import Sequence, Callable, Union, Tuple
 
@@ -72,6 +77,9 @@ def nbrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
         The matrix solution of shape `(*l,n,n_t)`
         representing the density matrix of the system at each time t.
     """  # noqa
+
+    if not nbrk_available:
+        raise ImportError('CyRK backend not installed') from nbrk_import_error
 
     to_compile = [not nb.extending.is_jitted(f) for f in time_inputs]
     complex_out = [isinstance(f(0.0), complex) for f in time_inputs]

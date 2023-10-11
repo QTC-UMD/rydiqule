@@ -95,7 +95,7 @@ def get_doppler_equations(base_eoms: np.ndarray,
 
 
 def generate_doppler_shift_eom(doppler_hamiltonians: np.ndarray) -> np.ndarray:
-    """doppler_mesh_method
+    """
     Generates the EOMs for the supplied doppler shifts.
 
     Multiply the output by the velocity in each dimension,
@@ -122,7 +122,9 @@ def generate_doppler_shift_eom(doppler_hamiltonians: np.ndarray) -> np.ndarray:
 
 def gaussian3d(Vs: np.ndarray) -> np.ndarray:
     """
-    Evaluate a multi-dimensional gaussian, with sigma=1, for the given detunings.
+    Evaluate a multi-dimensional gaussian for the given detunings (in units of most probable speed).
+
+    This is equivalent to a gaussian distribution with rms width :math:`\\sigma=1/\\sqrt{2}`.
 
     Parameters
     ----------
@@ -151,10 +153,13 @@ def doppler_classes(method: Optional[MeshMethod] = None
     """
     Defines which velocity classes to sample for doppler averaging.
 
-    These are defined in units of the gaussian width sigma of the Maxwell-Boltzmann
+    These are defined in units of the most probable speed of the Maxwell-Boltzmann
     distribution.
 
-    Note: To avoid issues, optical detunings should not leave densely sampled velocity classes.
+    Note
+    ----
+
+    To avoid issues, optical detunings should not leave densely sampled velocity classes.
     To avoid artifacts, the density of points should provide >~10 points over the
     narrowest absorptive feature. The default is a decent first guess, but for many
     problems the sampling mesh should be adjusted.
@@ -171,7 +176,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
               Configuration parameters include:
 
                 - `"width_doppler"`: Float that specifies one-sided width of gaussian
-                  distributionto average over, in units of sigma. Defaults to 2.0.
+                  distribution to average over, in units of most probable speed. Defaults to 2.0.
                 - `"n_uniform"`: Int that specifies how many points to use. Defaults to 1601.
 
             - `"isopop"`: Defines a grid with uniform population in each interval.
@@ -192,9 +197,9 @@ def doppler_classes(method: Optional[MeshMethod] = None
 
               - `"width_doppler"`: Float that specifies one-sided width of coarse grided portion
                 of the gaussian distribution.
-                Units are in sigma. Defaults to 2.0.
+                Units are in most probable speed. Defaults to 2.0.
               - `"width_coherent"`: Float that specifies one-sided width of fine grided portion
-                of gaussian distribution. Units are in sigma. Defaults to 0.4.
+                of gaussian distribution. Units are in most probable speed. Defaults to 0.4.
               - `"n_doppler"`: Int that specifies how many points to use for the coarse grid.
                 Note that points of the coarse grid that fall within the fine grid are
                 dropped. Default is 201.
@@ -202,14 +207,14 @@ def doppler_classes(method: Optional[MeshMethod] = None
                 Default is 401.
 
               .. note::
-                Note that for the "split" method, a union of 2 samplings is taken,
+                For the "split" method, a union of 2 samplings is taken,
                 so the number of total points will not necessary be equal to the sum
                 of `"n_coherent"` and `"n_doppler"`.
 
             - `"direct"`: Use the supplied 1-D numpy array to build the mesh.
 
               - `"doppler_velocities"`: Mandatory parameter that holds the 1-D numpy array
-                to use when building the mesh grids.
+                to use when building the mesh grids. Given in units of most probably speed.
 
     Returns
     -------
@@ -252,8 +257,8 @@ def doppler_classes(method: Optional[MeshMethod] = None
     ----------
     .. [1] Andrew P. Rotunno, et. al.
         Inverse Transform Sampling for Efficient Doppler-Averaged Spectroscopy Simulation,
-        arXiv:2304.12468 (2023)
-        http://arxiv.org/abs/2304.12468
+        AIP Advances 13, 075218 (2023)
+        https://doi.org/10.1063/5.0157748
 
     """
     if method is None:
@@ -354,7 +359,7 @@ def apply_doppler_weights(sols: np.ndarray,
     Calculates and applies the weight for each doppler class given unweighted solutions
     to doppler-shifted equations.
 
-    Works for both time-domain and stead-states solutions.
+    Works for both time-domain and stead-state solutions.
 
     Parameters
     ----------
@@ -365,7 +370,7 @@ def apply_doppler_weights(sols: np.ndarray,
         is the number of dimensions over which doppler shifts are being considered
         and `*n_dop` is a number of axes equal to n_dim with length equal to the number
         of doppler velocity classes which are being considered. The values correspond
-        the velocity class in units of sigma.
+        the velocity class in units of most probable speed.
     volumes : numpy.ndarray
         Array of shape equal to `velocities`.
         The values correspond to the spacings between doppler classes on each axis.

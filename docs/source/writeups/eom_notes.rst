@@ -198,6 +198,8 @@ This matrix is calculated in the ``get_basis_transformation()`` helper
 function and is subsequently used to transform between the complex and
 real bases.
 
+.. rubric:: References
+
 .. container:: references csl-bib-body
    :name: refs
 

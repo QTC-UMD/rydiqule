@@ -27,7 +27,7 @@ we will add the `conda-forge` channel at a lower priority.
 
 .. code-block:: shell
 
-  (rydiqule) ~/> conda config --append channels conda-forge
+  (rydiqule) ~/> conda config --env --append channels conda-forge
   (rydiqule) ~/> conda config --set channel_priority strict
   (rydiqule) ~/> conda install numpy scipy matplotlib networkx numba psutil
   # ARC specific dependencies available via conda
@@ -117,6 +117,19 @@ package, which is used to get Rydberg atomic properties.
 It also requires other standard computation dependenices, such as `numpy`, `scipy`, `matplotlib`, etc.
 These will be automatically installed by pip if not already present.
 
-The timesolver backend dependencies include the `numbakit-ode <https://github.com/hgrecco/numbakit-ode>`_
+.. note::
+
+    Rydiqule's performance does depend on these depedencies.
+    In particular, `numpy` can be compiled with a variety of backends that implements
+    BLAS and LAPACK routines that can have different performance for different computer architectures.
+    When using Windows, it is recommended to install `numpy` from conda,
+    which is built against the IntelMKL and has generally shown the best performance for Intel-based PCs.
+
+Optional timesolver backend dependencies include the `numbakit-ode <https://github.com/hgrecco/numbakit-ode>`_
 and `CyRK <https://github.com/jrenaud90/CyRK>`_ packages.
 Both are available via `pip`.
+They can be installed automatically via the optional extras specification for the `pip` command.
+
+.. code-block:: shell
+
+  pip install rydiqule[backends]

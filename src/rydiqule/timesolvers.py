@@ -29,6 +29,7 @@ solver_type = Union[Callable, Literal['scipy', 'nbkode', 'cyrk', 'nbrk']]
 def solve_time(sensor: Sensor, end_time: float, num_pts: int,
                init_cond: Optional[np.ndarray] = None, doppler: bool = False,
                doppler_mesh_method: Optional[MeshMethod] = None, sum_doppler: bool = True,
+               weight_doppler: bool = True,
                n_slices: Union[int, None] = None, solver: solver_type = "scipy",
                **kwargs) -> Solution:
     """
@@ -63,8 +64,8 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
         matching the output shape of a steady state solve if the initial condition
         may be different for different combinations of parameters. 
         If `None`, will solve the problem in the steady state with all time-dependent fields
-        "off" and use the solution as the initial condition for the time behavior. Other
-        possible manual options might include a matrix populated by zeros representing the
+        at their :math:`t=0` value and use the solution as the initial condition.
+        Other possible manual options might include a matrix populated by zeros representing the
         entire population in the ground state. Defaults to `None`.
     doppler : bool, optional
         Whether to account for doppler shift among moving atoms in
@@ -85,6 +86,12 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
         is complete. Setting to false will not perform the sum, allowing viewing
         of the weighted results of the solve for each doppler class. Ignored
         if `doppler=False`. Default is `True`.
+    weight_doppler : bool
+        Whether to apply weights to doppler solution to perform
+        averaging. If `False`, will **not** apply weights or perform a doppler_average,
+        regardless of the value of `sum_doppler`. Changing from default intended
+        only for internal use. Ignored if `doppler=False` or `sum_doppler=False`. 
+        Default is `True`.
     n_slices : int or None, optional
         How many sets of equations to break the full equations into.
         The actual number of slices will be the largest between this value and the minumum
@@ -130,7 +137,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
         the initial conditions used for the solve.
         
     """
-    if type(solver) == str:
+    if isinstance(solver, str):
         try:
             solver = stack_solvers[solver]
         except KeyError:
@@ -177,7 +184,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
 
     # use available memory to figure out how to slice the hamiltonian
     n_slices, out_sol_shape = get_slice_num_t(basis_size, stack_shape, doppler_axis_shape,
-                                                  num_pts, sum_doppler, n_slices)
+                                                  num_pts, sum_doppler, weight_doppler, n_slices)
 
     if n_slices > 1:
         print(f"Breaking equations of motion into {n_slices} sets of equations...")
@@ -208,13 +215,25 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
                                                   init_cond[(*doppler_axes, *idx)], solver,
                                                   doppler=doppler,
                                                   dop_classes=dop_classes, sum_doppler=sum_doppler,
+                                                  weight_doppler=weight_doppler,
                                                   doppler_shifts=doppler_shifts,
                                                   spatial_dim=spatial_dim, **kwargs)
 
     # save results to the Solution
     solution.rho = sols
+    # specific to observable calculations
     solution.eta = sensor.eta
     solution.kappa = sensor.kappa
+    solution.cell_length = sensor.cell_length
+    solution.beam_area = sensor.beam_area
+    solution.probe_freq = sensor.probe_freq
+    solution.probe_tuple = sensor.probe_tuple
+    if sensor.probe_tuple is not None:
+        probe_rabi = sensor.get_coupling_rabi(sensor.probe_tuple)
+        solution.probe_rabi = probe_rabi
+    else:
+        solution.probe_rabi = None
+
     solution.axis_labels = ([f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler]
                             + sensor.axis_labels()
                             + ["time", "density_matrix"])
@@ -259,12 +278,15 @@ def _solve_hamiltonian_stack(hamiltonians_base: np.ndarray, hamiltonians_time: n
                                eom_time_i, const_i, time_functions,
                                t_eval, init_cond, solver, **kwargs)
 
-        sols_weighted = apply_doppler_weights(sols, dop_velocities, dop_volumes)
-        if sum_doppler:
-            sum_axes = tuple(np.arange(spatial_dim))
-            sols_final = np.sum(sols_weighted, axis=sum_axes)
+        if weight_doppler:
+            sols_weighted = apply_doppler_weights(sols, dop_velocities, dop_volumes)
+            if sum_doppler:
+                sum_axes = tuple(np.arange(spatial_dim))
+                sols_final = np.sum(sols_weighted, axis=sum_axes)
+            else:
+                sols_final = sols_weighted
         else:
-            sols_final = sols_weighted
+            sols_final = sols
 
     else:
         sols_final = solve_eom_stack(eom_base, const, eom_time_r, const_r,
