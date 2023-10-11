@@ -93,6 +93,7 @@ intersphinx_mapping = {
     'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'numbakitode': ('https://numbakit-ode.readthedocs.io/en/latest/', None),
+    'leveldiagram': ('https://leveldiagram.readthedocs.io/en/latest/', None),
 }
 
 # Make `some code` equivalent to :code:`some code`

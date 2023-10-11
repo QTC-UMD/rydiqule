@@ -65,7 +65,7 @@ The markers we use are
     - Marks a test as using the time solver
   * - doppler
     - Marks a test that incorporates Doppler averaging.
-  * - exp
+  * - experiments
     - Marks a test that represents a full experiment.
   * - util
     - Marks a test of the ancillary utilties.

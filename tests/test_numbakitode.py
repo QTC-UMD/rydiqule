@@ -16,6 +16,7 @@ def test_nbkit():
 
     RbSensor_time = rq.Cell("Rb85", *rq.D2_states(5),
                             RydbergTargetState, RydbergExcitedState,
+                            cell_length=0,
                             gamma_transit=2*np.pi*.1)
 
     def rf_carrier(t):

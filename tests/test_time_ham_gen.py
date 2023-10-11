@@ -1,7 +1,6 @@
 import numpy as np
 import rydiqule as rq
 import pytest
-from rydiqule import Sensor
 
 @pytest.mark.time
 def test_time_ham_gen():
@@ -13,7 +12,7 @@ def test_time_ham_gen():
     calc_ham_t = s.get_time_couplings()[0][0]
     
     h_true = np.zeros((1,3,3), dtype=np.complex128)
-    h_true += np.diag([0,1,3])
+    h_true += np.diag([0,-1,-3])
     h_true[:,0,1]=(2+2j)/2
     h_true[:,1,0]=(2-2j)/2
     

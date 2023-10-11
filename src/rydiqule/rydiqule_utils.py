@@ -8,13 +8,20 @@ import inspect
 import os
 import sys
 import psutil
+from pathlib import Path
 from importlib.metadata import version
 
 
-def about():
+def about(obscure_paths: bool = True):
     """About box describing Rydiqule and its core dependencies.
 
     Prints human readable strings of information about the system.
+
+    Parameters
+    ----------
+
+    obscure_paths: bool, optional
+        Remove user directory from printed paths. Default is True.
 
     Examples
     --------
@@ -41,6 +48,18 @@ def about():
     Total System Memory:  256 GB
 
     """
+    home = Path.home()
+    rydiqule_install_path = Path(inspect.getsourcefile(rydiqule)).parent
+    try:
+        ryd_path = '~' / rydiqule_install_path.relative_to(home)
+    except ValueError:
+        ryd_path = rydiqule_install_path
+
+    python_install_path = Path(sys.executable).parent
+    try:
+        py_path = '~' / python_install_path.relative_to(home)
+    except ValueError:
+        py_path = python_install_path
 
     header = """
         Rydiqule
@@ -48,8 +67,8 @@ def about():
     """
     print(header)
     print(f'Rydiqule Version:     {rydiqule.__version__:s}')
-    rydiqule_install_path = os.path.dirname(inspect.getsourcefile(rydiqule))  # type: ignore
-    print(f'Installation Path:    {rydiqule_install_path:s}')
+    
+    print(f'Installation Path:    {ryd_path}')
     dep_header = """
       Dependencies
     ================
@@ -60,8 +79,7 @@ def about():
     print(f'Matplotlib Version:   {version("matplotlib"):s}')
     print(f"ARC Version:          {version('arc-alkali-rydberg-calculator'):s}")
     print(f'Python Version:       {platform.python_version():s}')
-    python_install_path = os.path.dirname(sys.executable)
-    print(f'Python Install Path:  {python_install_path:s}')
+    print(f'Python Install Path:  {py_path}')
     print(f'Platform Info:        {platform.system():s} ({platform.machine():s})')
     print(f'CPU Count:            {os.cpu_count()}')
     print(f'Total System Memory:  {psutil.virtual_memory().total/1024**3:.0f} GB')

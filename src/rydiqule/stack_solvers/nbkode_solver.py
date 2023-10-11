@@ -1,9 +1,14 @@
 import warnings
 
 import numpy as np
-import numba as nb
-import nbkode
-from numba import NumbaExperimentalFeatureWarning
+try:
+    import numba as nb
+    import nbkode
+    from numba import NumbaExperimentalFeatureWarning
+    nbkode_available = True
+except ImportError as e:
+    nbkode_available = False
+    nbkode_import_error = e
 
 from typing import Sequence, Tuple, Callable, Union
 
@@ -72,6 +77,9 @@ def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
         The matrix solution of shape `(*l,n,n_t)`
         representing the density matrix of the system at each time t.
     """  # noqa
+
+    if not nbkode_available:
+        raise ImportError('numbakit-ode backend not installed') from nbkode_import_error
 
     # numbakit-ode requires all functions to be of same type
     to_compile = [not nb.extending.is_jitted(f) for f in time_inputs]

@@ -10,14 +10,14 @@ from .doppler_utils import *
 from .slicing.slicing import *
 from .sensor_solution import Solution
 
+
 from typing import Optional, Iterable, Union
 
 
 def solve_steady_state(
         sensor: Sensor, doppler: bool = False, doppler_mesh_method: Optional[MeshMethod] = None,
         sum_doppler: bool = True, weight_doppler: bool = True, 
-        n_slices: Union[int, None] = None,
-        ) -> Solution:
+        n_slices: Union[int, None] = None) -> Solution:
     """
     Finds the steady state solution for a system characterized by a sensor.
 
@@ -71,6 +71,10 @@ def solve_steady_state(
         The solution produced by this function will be expressed using rydiqule's convention
         of converting a density matrix into the real basis and removing the ground state to
         improve numerical stability.
+
+    .. note::
+        If the sensor contains couplings with `time_dependence`, this solver will add those
+        couplings at their :math:`t=0` value to the steady-state hamiltonian to solve.
 
     Returns
     -------
@@ -137,6 +141,7 @@ def solve_steady_state(
     ['doppler_0', '(0,1)_detuning']
     
     """
+    
     solution = Solution()
 
     # relevant sensor-related quantities
@@ -165,11 +170,19 @@ def solve_steady_state(
     if n_slices > 1:
         print(f"Breaking equations of motion into {n_slices} sets of equations...")
         
-    # allocate arrays
+    # get steady-state hamiltonians
     hamiltonians = sensor.get_hamiltonian()
-    hamiltonians_time, _ = sensor.get_time_couplings()
+    # add t=0 time-dependent parts of hamiltonian
+    hamiltonians_time_r, hamiltonians_time_i = sensor.get_time_couplings()
+    time_functions = sensor.get_time_dependence()
+    hamiltonians_time = np.zeros_like(hamiltonians_time_i)
+    for func, htr, hti in zip(time_functions, hamiltonians_time_r, hamiltonians_time_i):
+        f0 = func(0)
+        hamiltonians_time += f0.real*htr + f0.imag*hti
     hamiltonians_total = hamiltonians + np.sum(hamiltonians_time, axis=0)
+    # get decoherence matrix
     gamma = sensor.decoherence_matrix()
+    # allocate solution array
     sols = np.zeros(out_sol_shape)
     
     # loop over individual slices of hamiltonian
@@ -189,8 +202,19 @@ def solve_steady_state(
 
     # save results to Solution object
     solution.rho = sols
+    # specific to observable calculations
     solution.eta = sensor.eta
     solution.kappa = sensor.kappa
+    solution.cell_length = sensor.cell_length
+    solution.beam_area = sensor.beam_area
+    solution.probe_freq = sensor.probe_freq
+    solution.probe_tuple = sensor.probe_tuple
+    if sensor.probe_tuple is not None:
+        probe_rabi = sensor.get_coupling_rabi(sensor.probe_tuple)
+        solution.probe_rabi = probe_rabi
+    else:
+        solution.probe_rabi = None
+
     solution.couplings = sensor.get_couplings()
     solution.axis_labels = ([f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler]
                             + sensor.axis_labels()
@@ -249,7 +273,7 @@ def steady_state_solve_stack(eom: np.ndarray, const: np.ndarray) -> np.ndarray:
     """
     Helper function which returns the solution to the given equations of motion
 
-    Solves an equation of the form :math:`\dot{x} = Ax + b`, or a set of such equations
+    Solves an equation of the form :math:`\\dot{x} = Ax + b`, or a set of such equations
     arranged into stacks. 
     Essentially just wraps numpy.linalg.solve(), but included as its own 
     function for modularity if another solver is found to be worth invesitigating. 

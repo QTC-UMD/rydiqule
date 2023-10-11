@@ -17,7 +17,7 @@ def Rb85_sensor_kwargs():
     return sensor_init_kwargs
 
 
-def _find_zero_crossings(sols,detunings,sign='pos'):
+def _find_zero_crossings(sols,detunings,sign='neg'):
     # ensure arrays are 1-D of same size
     assert sols.shape == detunings.shape
     assert len(sols.shape) == 1

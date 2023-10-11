@@ -33,6 +33,9 @@ def test_cell_coupling_exceptions(Rb85_sensor_kwargs):
     with pytest.raises(ValueError, match='Cell does not support explicit'):
         f2 = {'states':(0,1), 'rabi_frequency':2, 'transition_frequency':5}
         c.add_coupling(**f2)
+        
+    with pytest.raises(ValueError, match="States must either be of length 4 or 5."):
+        c2 = rq.Cell('Rb85', *rq.D2_states('Rb85'), [1,2,3,4,5,6], cell_length = .0001)
 
 
 @pytest.mark.structure
@@ -111,3 +114,24 @@ def test_warns_dipole(Rb85_sensor_kwargs):
     with pytest.warns(UserWarning, match='not electric-dipole allowed'):
         f1 = {'states':(0,2), 'rabi_frequency':1, 'detuning':0}
         c.add_coupling(**f1)
+
+
+@pytest.mark.structure
+def test_hyperfine_dipole():
+    extra_states = [[6, 2, 2.5, 4, 0], [7, 1, 1.5, 4, 1]]
+    c_hyp = rq.Cell('Rb85',*rq.D2_states('Rb85'), *extra_states, cell_length = 0.0001)
+    c_hyp.add_coupling((0,1), rabi_frequency=1, detuning=1)
+    c_hyp.add_coupling((1,2), rabi_frequency=1, detuning=1)
+    c_hyp.add_coupling((3,2), rabi_frequency=1, detuning=1, q=-1)
+    
+    atom = Rubidium85()
+    states = c_hyp.states_list()
+    
+    dipole_01 = atom.getDipoleMatrixElement(*states[0], *states[1], 0)
+    assert dipole_01 == c_hyp.couplings.edges[0,1]["dipole_moment"]
+    
+    dipole_12 = -1 * atom.getDipoleMatrixElementHFStoFS(*states[2], *states[1], 0)
+    assert dipole_12 == c_hyp.couplings.edges[1,2]["dipole_moment"]
+    
+    dipole_32 = atom.getDipoleMatrixElementHFS(*states[3], *states[2], -1)
+    assert dipole_32 == c_hyp.couplings.edges[3,2]["dipole_moment"]

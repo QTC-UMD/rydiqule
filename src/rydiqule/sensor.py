@@ -4,9 +4,12 @@ Sensor objects that control solvers.
 
 import numpy as np
 import networkx as nx  # type: ignore
+import re
 import warnings
 
-from .sensor_utils import _get_collapse_str, _combine_parameter_labels
+import itertools
+
+from .sensor_utils import _combine_parameter_labels
 
 from typing import List, Tuple, Dict, Literal, Callable, Optional, Union
 
@@ -53,9 +56,23 @@ class Sensor():
     Automatically calculated when using :class:`Cell`."""
 
     kappa: Optional[float] = None
-    """Differential prefactor, in units of (Mrad/s)/m.
+    """Differential prefactor, in units of (rad/s)/m.
     Must be specified when using :class:`Sensor`.
     Automatically calculated when using :class:`Cell`."""
+
+    probe_tuple: Optional[Tuple[int, int]] = None
+    """Coupling edge that corresponds to the probing field.
+    Defaults to `(0,1)` in :class:`Cell`."""
+
+    probe_freq: Optional[float] = None
+    """Probing transition frequency, in rad/s."""
+
+    cell_length: Optional[float] = None
+    """Optical path length of the medium, in meters."""
+
+    beam_area: Optional[float] = None
+    """Cross-sectional area of the probing beam, in square meters."""
+
 
     def __init__(self, basis_size: int, *couplings: CouplingDict) -> None:
         """
@@ -74,19 +91,103 @@ class Sensor():
             If `basis_size` is not an integer.
         
         """
-        if type(basis_size) != int:
+        if not isinstance(basis_size, int):
             raise TypeError("basis_size must be an integer")
-        
-        self.basis_size = basis_size
-
+        self.valid_parameters = BASE_EDGE_KEYS.copy()     
         self.couplings = nx.DiGraph()
-        self.couplings.add_nodes_from(range(self.basis_size))
+        self.couplings.add_nodes_from(range(basis_size))
 
         if len(couplings) > 0:
             self.add_couplings(*couplings)
 
-        self._zipped_parameters: List[List[str]] = []
-        self.valid_parameters = BASE_EDGE_KEYS.copy()
+        self._zipped_parameters: Dict = {}
+
+
+
+    def set_experiment_values(self, probe_tuple: Tuple[int,int],
+                              probe_freq: float,
+                              kappa: float,
+                              eta: Optional[float] = None,
+                              cell_length: Optional[float] = None,
+                              beam_area: Optional[float] = None,
+                              ):
+        """Sets attributes needed for observable calculations
+        
+        Parameters
+        ----------
+        probe_tuple: tuple of int
+            Coupling that corresponds to the probing field.
+        probe_freq: float
+            Frequency of the probing transition, in Mrad/s.
+        kappa: float
+            Numerical prefactor that defines susceptibility, in (rad/s)/m.
+            See :func:`~.get_susceptibility` and :class:`Cell.kappa` for details.
+        eta: float
+            Noise-density prefactor, in root(Hz).
+            See :class:`Cell.eta` for details.
+        cell_length: float, optional
+            The optical path length through the medium, in meters.
+        beam_area: float, optional
+            The cross-sectional area of the beam, in m^2.        
+        """
+
+        self.probe_tuple = self._states_valid(probe_tuple)
+        self.probe_freq = probe_freq
+        self.cell_length = cell_length
+        self.beam_area = beam_area
+        self.eta = eta
+        self.kappa = kappa
+    
+
+    @property
+    def basis_size(self):
+        """Property to return the number of nodes on the Sensor graph
+
+        Returns
+        -------
+        int
+            The number of nodes on the graph, corresponding to the basis size for the system.
+        """
+        return len(self.couplings)
+    
+
+    def label_states(self, labels: dict):
+        """Add labels to the node of the graph. Does not add functionality immediatly, just
+        makes it easier to track which nodes correspond to specific states as the number
+        of states increases.
+
+        Parameters
+        ----------
+        labels : dict
+            A dictionary defining which labels should be applied to which node. The keys of the
+            dictionary must be integer values corresponding to the numbered nodes of the sensor
+            graph, and the values must be string values. Specific nodes can be accessed directly 
+            or through regex patterns in the :meth:`~.Sensor.states_with_label` function.
+
+        Raises
+        ------
+        ValueError
+            If `labels` cannot be interpreted as a dictionary.
+        KeyError
+            If any of the keys in `labels` are not integer nodes of the graph.
+        ValueError
+            If any of the labels are not a string.
+        """
+        try:
+            labels_items = labels.items()
+        except AttributeError:
+            raise ValueError("The labels argument must be a dictionary")
+        
+        nodes_list = list(self.couplings.nodes())
+        
+        for state, label in labels_items:
+            if state not in nodes_list:
+                raise KeyError(f"{state} is not a node of the sensor graph.")
+            if not isinstance(label, str):
+                raise ValueError("States can only be labelled with a string")
+            
+            self.couplings.nodes[state]["label"] = label
+            
 
 
     def add_coupling(
@@ -112,17 +213,20 @@ class Sensor():
             The pair of states of the sensor which the state couples
             Must be a tuple of intergers of length 2, and the integers must
             be unique indicies within the basis.
+            Tuple order indicates which state to has higher energy:
+            namely the second state is always assumed to have higher energy.
         rabi_frequency : float or complex, or list-like of float or complex
             The rabi frequency of the field being added. Defined in units of Mrad/s. List-like
             values will invoke Rydiqule's stacking convention when relevant quantities are calculated.
-        detuning : float or list-like of floats or  None, optional 
+        detuning : float or list-like of floats, optional 
             The frequency difference between the transition frequency and the field frequency in 
             units of Mrad/s. List-like values will invoke Rydiqule's stacking convention when relevant 
             quantities are calculated. If specified, the coupling is treated with the rotating-wave 
             approximation rather than in the lab frame, and `transition_frequency` is ignored if present.
-        transition_frequency : float or list-like of floats or None, optional 
-            The transition frequency between a particular pair of states. List-like
-            values will invoke Rydiqule's stacking convention when relevant quantities are calculated. 
+        transition_frequency : float or list-like of floats, optional 
+            The transition frequency between a particular pair of states. 
+            Must be a positive number.
+            List-like values will invoke Rydiqule's stacking convention when relevant quantities are calculated. 
             Only used directly in calculations if `detuning` is `None`, ignored otherwise. 
             Note that on its own, it only defines the spacing between two energy levels and not the
             field itsself. To define a field, the `time_dependence` argument must be specified, or else 
@@ -183,7 +287,7 @@ class Sensor():
         """ # noqa
 
         if states[0] == states[1]:
-            raise ValueError('Coherent coupling must couple different states.')
+            raise ValueError(f'{states}: Coherent coupling must couple different states.')
 
         suppress_rwa = extra_kwargs.pop("suppress_rwa_warn", False)
 
@@ -192,16 +296,19 @@ class Sensor():
                         and v is not None}
         
         if not (detuning is not None) ^ (transition_frequency is not None):
-            msg = """Please specify \'detuning\' for a field under the RWA or
-                \'transition_frequency\' for a coupling without the approximation,
-                but not both."""
-            raise ValueError(msg)
+            raise ValueError(f"{states}: Please specify \'detuning\' for a field under the RWA"
+                            " or \'transition_frequency\' for a coupling without the approximation,"
+                            " but not both.")
+        
+        if (transition_frequency is not None) and (transition_frequency < 0):
+            raise ValueError(f"{states}: \'transition_frequency\' must be positive.")
 
-        if detuning is None and np.abs(transition_frequency) > 5000 and not suppress_rwa:
-            msg = "Not using the rotating wave approximation for large transition frequencies "\
-                "can result in prohibitively long computation times. Specify detuning to use the"\
-                " rotating wave approximation or passing \"suppress_rwa_warn=True\" to"\
-                " add_coupling() to suppress this warning."
+        if detuning is None and transition_frequency > 5000 and not suppress_rwa:
+            msg = (f"{states}: Not using the rotating wave approximation"
+                " for large transition frequencies can result in "
+                "prohibitively long computation times. Specify detuning to use "
+                "the rotating wave approximation or pass \"suppress_rwa_warn=True\" "
+                "to add_coupling() to suppress this warning.")
 
             with warnings.catch_warnings():
                 warnings.simplefilter("always")
@@ -290,22 +397,29 @@ class Sensor():
         self.couplings.add_edge(*states, **field_params)
 
 
-    def zip_parameters(self, *labels: str) -> None:
+    def zip_parameters(self, *parameters: str,  zip_label:str=None) -> None:
         """
         Define 2 scannable parameters as "zipped" so they are scanned in parallel.
 
         Zipped parameters will share an axis when quantities relevant to the equations of
         motion, such as the `gamma_matrix` and `hamiltonian` are generated. Note that calling
         this function does not affect internal quanties directly, but adds their labels together
-        in the internal `self._zipped_parameters` list, and they are zipped at calculation time
+        in the internal `self._zipped_parameters` dict, and they are zipped at calculation time
         for `hamiltonian` and `decoherence_matrix`.
 
         Parameters
         ----------
-        labels : str
+        parameters : str
             Parameter labels to scan together. Parameter labels are strings of the form 
-            `"<coupling_label>_<parameter_name>"`, such as `"(0,1)_detuning"`.
-            Must be at least 2 labels to zip.
+            `"<coupling_label>, <parameter_name>"`, such as `"(0,1)_detuning"`.
+            Must be at least 2 labels to zip. Note that couplings are specified in the 
+            :meth:`~.Sensor.add_coupling` function. If unspecified in this function, the 
+            pair of states in the coupling cast to a string will be used.
+        
+        zip_label : optional, str
+            String label shorthand for the zipped parameters. The label for the axis of these
+            parameters in :meth:`~.Sensor.axis_labels()`. Does not affect functionality of the
+            Sensor. If unspecified, the label used will be `"zip_" + <number>`.
 
         Raises
         ------
@@ -339,36 +453,58 @@ class Sensor():
         >>> det = np.linspace(-1,1,11)
         >>> s.add_coupling(states=(0,1), detuning=det, rabi_frequency=1, label="probe")
         >>> s.add_coupling(states=(1,2), detuning=det, rabi_frequency=1)
-        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning")
+        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning", zip_label="demo_zip")
         >>> print(s._zipped_parameters) #NOT modifying directly
-        [['(1,2)_detuning', 'probe_detuning']]
+        {'demo_zip': ['(1,2)_detuning', 'probe_detuning']}
 
         """
+        #give a dummy label if not provided
+        if zip_label is None:
+            zip_label = "zip_" + str(len(self._zipped_parameters))
+
+        #ensure zip label does not already exist
+        if zip_label in self._zipped_parameters.keys():
+            raise ValueError(f"Parameters already zipped with label {zip_label}."
+                             "Please use a unique label.")
+
         # check for at least 2 labels
-        if len(labels) < 2:
+        if len(parameters) < 2:
             raise ValueError(("Please provide at least 2 parameter labels "
-                              f"to zip (only provided {len(labels)})"))
+                              f"to zip (only provided {len(parameters)})"))
             
         #check that all labels are unique
-        if len(labels) != len(set(labels)): #set will be shorter if there are duplicates
+        if len(parameters) != len(set(parameters)): #set will be shorter if there are duplicates
             raise ValueError("parameters cannot be zipped to themselves")
         
         #check if any labels are already zipped
-        new_label_array = np.expand_dims(labels, (-1,-2))
-        current_zipped_params = np.expand_dims(self._zipped_parameters, 0)
-        
-        # see if ANY provided label is currently zipped
-        if len(self._zipped_parameters)>0 and np.any(new_label_array==current_zipped_params):
-
-            for l in labels: #if so, find which label for error reporting
-                if l in current_zipped_params:
-                    raise ValueError(f"Label {l} has already been zipped with another parameter")
+        current_zips = [self._zipped_parameters.values()]
+        for l1, l2 in itertools.product(current_zips, parameters):
+            if l1 == l2:
+                raise ValueError(f"Parameter {l1} already zipped!")
 
         #ensure provided labels are valid for zipping
         previous_len = 0
-        for l in labels:
+        for l in parameters:
             
-            coupling, param = l.split("_", 1)
+            # divide coupling from parameter
+            # check if parameter exists done later
+            split = l.split('_')
+            if len(split) < 2:
+                raise ValueError(f"Invalid parameter label {l}")
+            try:
+                # incoherent parameter
+                gi = split.index('gamma')
+                coupling = '_'.join(split[:gi])
+                param = '_'.join(split[gi:])
+            except ValueError:
+                # coherent parameter
+                if split[-1] in BASE_SCANNABLE_KEYS:
+                    coupling = '_'.join(split[:-1])
+                    param = split[-1]
+                else:
+                    coupling = '_'.join(split[:-2])
+                    param = '_'.join(split[-2:])
+            
             #make sure the label exists
             try:
                 states = self._coupling_with_label(coupling)
@@ -383,21 +519,21 @@ class Sensor():
             if not hasattr(param, "__len__"):
                 raise ValueError(f"Parameter {l} is not list-like and cannot be zipped")
             
-            #make sure parameters are the same length
+            #make sure array-defined parameters are the same length
             current_len = len(self.couplings.edges[states][param])
             if previous_len > 0 and current_len != previous_len:
                 raise ValueError(
                     f"Got length {current_len} for parameter \"{l}\", "
-                    f"but \"{labels[0]}\" is length {previous_len}")
+                    f"but \"{parameters[0]}\" is length {previous_len}")
             
             previous_len = current_len
                         
-        labels = list(labels)
-        labels.sort()
-        self._zipped_parameters.append(labels)
+        parameters = list(parameters)
+        parameters.sort()
+        self._zipped_parameters[zip_label] = parameters
 
 
-    def unzip_parameters(self, *labels: str, **extra_kwargs):
+    def unzip_parameters(self, zip_label, verbose=True):
         
         """
         Remove a set of zipped parameters from the internal zipped_parameters list.
@@ -408,13 +544,9 @@ class Sensor():
 
         Parameters
         ----------
-        labels : str 
-            Any number of string labels matching ALL the names of a set of parameters
-            that has already been zipped.
-        **extra_kwargs: dict
-            Optional Extra keyword-only arguments. Supported argument is
-              - verbose (str): Whether to print if there are no parameters matching `labels`
-                in `_zipped_parameters`. Defaults to `True`.
+        zip_label : str 
+            The string label corresponding the key to be deleted in the `_zipped_parameters`
+            attribute. 
         
         Notes
         -----
@@ -428,12 +560,12 @@ class Sensor():
         >>> det = np.linspace(-1,1,11)
         >>> s.add_coupling(states=(0,1), detuning=det, rabi_frequency=1, label="probe")
         >>> s.add_coupling(states=(1,2), detuning=det, rabi_frequency=1)
-        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning")
+        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning", zip_label="demo1")
         >>> print(s._zipped_parameters) #NOT modifying directly
-        >>> s.unzip_parameters('(1,2)_detuning', 'probe_detuning')
+        >>> s.unzip_parameters("demo1")
         >>> print(s._zipped_parameters) #NOT modifying directly
-        [['(1,2)_detuning', 'probe_detuning']]
-        []
+        {'demo1': ['(1,2)_detuning', 'probe_detuning']}
+        {}
         
         If the labels provided are not a match, a message is printed and nothing is altered. 
         
@@ -443,25 +575,18 @@ class Sensor():
         >>> s.add_coupling(states=(1,2), detuning=det, rabi_frequency=1)
         >>> s.zip_parameters("probe_detuning", "(1,2)_detuning")
         >>> print(s._zipped_parameters) #NOT modifying directly
-        >>> s.unzip_parameters('green_detuning', 'probe_detuning')
+        >>> s.unzip_parameters('blip_0')
         >>> print(s._zipped_parameters) #NOT modifying directly
-        [['(1,2)_detuning', 'probe_detuning']]
-        No zipped parameters matching ['green_detuning', 'probe_detuning']
-        [['(1,2)_detuning', 'probe_detuning']]
+        {'zip_0': ['(1,2)_detuning', 'probe_detuning']}
+        No label matching blip_0, no action taken
+        {'zip_0': ['(1,2)_detuning', 'probe_detuning']}
         
         """
-        labels = list(labels)
-        labels.sort()
-        
-        verbose = extra_kwargs.get("verbose", True)
-
-        for i, param_list in enumerate(self._zipped_parameters):
-            if labels == param_list:
-                del self._zipped_parameters[i]
-                return
-        
-        if verbose:
-            print(f"No zipped parameters matching {labels}")
+        try:
+            del self._zipped_parameters[zip_label]
+        except KeyError:
+            if verbose:
+                print(f"No label matching {zip_label}, no action taken")
 
 
     def add_decoherence(self, states: Tuple[int, ...], gamma: ScannableParameter,
@@ -677,7 +802,7 @@ class Sensor():
         """  # noqa
         base_couplings = self.couplings.copy()
 
-        stack_shape = self._stack_shape(collapse=False)
+        stack_shape = self._stack_shape()
         for states, param, arr in self.variable_parameters(apply_mesh=True):
             self.couplings.edges[states][param] = arr
 
@@ -696,14 +821,11 @@ class Sensor():
                 idx = (..., *states)
                 gamma_matrix[idx] += f[label]
 
-        if len(self._zipped_parameters) > 0:
-            gamma_matrix = self.collapse_dims(gamma_matrix)
-
         self.couplings = base_couplings
         return gamma_matrix
 
 
-    def axis_labels(self, collapse: bool = True) -> List[str]:
+    def axis_labels(self, collapse: bool=True, full_labels:bool=False) -> List[str]:
         """
         Get a list of axis labels for stacked hamiltonians. 
         
@@ -754,14 +876,17 @@ class Sensor():
         >>> s = rq.Sensor(3)
         >>> s.add_coupling(states=(0,1), detuning=np.arange(11), rabi_frequency=np.linspace(-3, 3, 7))
         >>> s.add_coupling(states=(1,2), detuning=0.5*np.arange(11), rabi_frequency=1)
-        >>> s.zip_parameters("(0,1)_detuning", "(1,2)_detuning")
+        >>> s.zip_parameters("(0,1)_detuning", "(1,2)_detuning", zip_label="detunings")
         >>> print(s.get_hamiltonian().shape)
         >>> print(s.axis_labels())
+        >>> print(s.axsi_labels(full_labels=True))
         (7, 11, 3, 3)
+        ['(0,1)_rabi_frequency', 'detunings']
         ['(0,1)_rabi_frequency', '(0,1)_detuning|(1,2)_detuning']
-        
+
         """  # noqa
-        axis_labels = []
+        key_labels = []
+        item_labels = []
 
         # build the base list of axis labels based just on couplings
         for states, param, _ in self.variable_parameters():
@@ -769,22 +894,27 @@ class Sensor():
                 label = str(self.couplings.edges[states]['label']) + '_' + str(param)
             else:
                 label = str(states) + "_" + str(param)
-            axis_labels.append(label)
+            key_labels.append(label)
+            item_labels.append(label)
 
         # combine labels for parameters that have been zipped and move to the end of stack
         if collapse:
-            for params in self._zipped_parameters:
+            for key, params in self._zipped_parameters.items():
                 new_label = _combine_parameter_labels(*params)
 
                 for p in params:
-                    axis_labels.remove(p)
+                    key_labels.remove(p)
+                    item_labels.remove(p)
 
-                axis_labels.append(new_label)
+                item_labels.append(new_label)
+                key_labels.append(key)
 
-        return axis_labels
+        if full_labels:
+            return item_labels
+        else:
+            return key_labels
 
-
-    def variable_parameters(self, apply_mesh=False):
+    def variable_parameters(self, apply_mesh:bool = False):
         """
         Property to retrieve the values of parameters that were stored on the graph as arrays.
 
@@ -829,12 +959,13 @@ class Sensor():
         if apply_mesh:
             vals = [val for _,_,val in l]
             mesh_vals = np.meshgrid(*vals, indexing='ij', sparse=True)
+            mesh_vals = self._collapse_mesh(mesh_vals)
             l = [(*l[i][:2], mesh_vals[i].copy()) for i in range(len(l))]
 
         return l
 
 
-    def get_parameter_mesh(self, sparse:bool=True, **kwargs) -> Tuple[np.ndarray, ...]:
+    def get_parameter_mesh(self) -> Tuple[np.ndarray, ...]:
         """
         Returns the parameter mesh of the sensor.
 
@@ -844,20 +975,6 @@ class Sensor():
         sensor. The `indexing` argument is always `"ij"` for matrix indexing. 
         For full documention of all arguments, see `numpy.meshgrid` documentation.
         Argument documentation copied from `numpy.meshgrid`.
-
-        Parameters
-        ----------
-        sparse : bool, optional
-            If `True`, the shape of the returned coordinate array for dimension i is 
-            reduced from `(N1, ..., Ni, ... Nn)` to `(1, ..., 1, Ni, 1, ..., 1)`. 
-            These sparse coordinate grids are intended to be used in a way consistent 
-            with numpy's broadcasting conventions. When all coordinates are used in an 
-            expression, broadcasting still leads to a fully-dimensonal result array. 
-            Recommended to keep as `True`. Default is `True`.
-        kwargs : dict, optional
-            Additional keyword arguments to pass to `numpy.meshgrid`. All arguments are 
-            passed directly to `numpy.meshgrid` with the exception of `indexing`, which 
-            is fixed to `"ij"` and cannot be specified.
             
         Examples
         --------
@@ -872,12 +989,8 @@ class Sensor():
         (1, 21)
         
         """
-        if "indexing" in kwargs.keys():
-            raise TypeError("get_parameter_mesh() got an unexpected keyword argument \'indexing\'")
+        parameter_mesh = [v for _,_,v in self.variable_parameters(apply_mesh=True)]
 
-        vals = [v for _,_,v in self.variable_parameters()]
-
-        parameter_mesh = np.meshgrid(*vals, indexing='ij', sparse=sparse, **kwargs)
         return parameter_mesh
 
 
@@ -944,10 +1057,10 @@ class Sensor():
         """
         base_couplings = self.couplings.copy()
 
-        stack_shape = self._stack_shape(collapse=False, time_dependence='steady')
+        stack_shape = self._stack_shape(time_dependence='steady')
 
         for states, param, arr in self.variable_parameters(apply_mesh=True):
-            # print(states, param, arr.shape)
+
             self.couplings.edges[states][param] = arr
 
         hamiltonian_shape = (*stack_shape, self.basis_size, self.basis_size)
@@ -966,49 +1079,57 @@ class Sensor():
             conj_idx = (...,*states[::-1])
 
             # factor of 1/2 accounts for implicit rotating wave approximation
-
             hamiltonian[idx] = (f['rabi_frequency']*np.cos(f['phase'])
                                 + 1j*f['rabi_frequency']*np.sin(f['phase']))/2
             hamiltonian[conj_idx] = np.conj(hamiltonian[idx])
 
-        if len(self._zipped_parameters) > 0:
-            hamiltonian = self.collapse_dims(hamiltonian)
-
         self.couplings = base_couplings
         return hamiltonian
+    
 
+    def _collapse_mesh(self, mesh):
+        """Collapses the given mesh using rydiqule logic for parameter zipping.
 
-    def collapse_dims(self, stack: np.ndarray) -> np.ndarray:
-        """
-        Collapse dimensions of a stack accoring to the `_zipped_parameters` attribute.
-       
-        Designed primarily for internal use, but can be called externally or
-        in custom overloads of :meth:`~.Sensor.get_hamiltonian`. Effectively performs
-        a `numpy.einsum` operation to replicate `numpy.diag` along the appropriate
-        dimensions. 
+        Expected to be given a mesh which is generated by applying `numpy.meshgrid`
+        function on the output of :meth:`~.Sensor.variable_parameters` for the system.
+        Given such a mesh, ensures that output mesh matches the shape expected by
+        rydiqule's stacking convention, meaning that parameters that are zipped together
+        will share an axis in the hamiltonian stack.
 
         Parameters
         ----------
-        stack : numpy.ndarray
-            Array with shape matching uncollapsed system hamiltonians. 
+        mesh : tuple(numpy.ndarray)
+            The uncollapsed meshgid of parameters for the system. Typically the output of
+            `numpy.meshgrid` called on :meth:`~.Sensor.variable_parameters`.
 
         Returns
         -------
-        numpy.ndarray
-            Input array with appropriate dimensions removed via a numpy.diag-like operation.
-
+        tuple(np.ndarray)
+            The collapsed meshgid with zipped parameters sharing and axis.
         """
-        axis_labels = self.axis_labels(collapse=False)
 
-        paired_axes = []
+        mesh_copy = mesh.copy() #to not mess up original mesh
+        
+        labels_full = self.axis_labels(collapse=False) #uncollapsed labels
+        labels_col = self.axis_labels(collapse=True, full_labels=True) #collapsed labels
 
-        for couplings in self._zipped_parameters:
-            paired_axes.append([axis_labels.index(c) for c in couplings])
+        labels_split = [l.split("|") for l in labels_col]
+        axes = np.zeros(len(labels_full), dtype=int)
 
-        einsum_str = _get_collapse_str(len(axis_labels), *paired_axes)
-        collapsed_stack = np.einsum(einsum_str, stack)
+        #generate a list of where each axis is 
+        for i, l_base in enumerate(labels_full):
+            for j in range(len(labels_col)):
 
-        return collapsed_stack
+                if l_base in labels_split[j]:
+                    axes[i] = j
+
+        #shift the "scanning" dimension of each parameter array to the appropriate axis
+        for i, m in enumerate(mesh_copy):
+            shape = np.ones(len(labels_col), dtype=int)
+            shape[axes[i]] = m.size
+            mesh_copy[i] = mesh_copy[i].reshape(shape)
+
+        return mesh_copy
 
 
     def get_time_hamiltonians(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -1133,7 +1254,7 @@ class Sensor():
         #save to re-add later
         base_couplings = self.couplings.copy()
 
-        stack_shape = self._stack_shape(collapse=False, time_dependence='time')
+        stack_shape = self._stack_shape(time_dependence='time')
 
         for states, param, arr in self.variable_parameters(apply_mesh=True):
             self.couplings.edges[states][param] = arr
@@ -1214,8 +1335,9 @@ class Sensor():
         """
         Apply addition and subtraction logic corresponding to the direction of the couplings.
 
-        For a given state `n`, the path from ground will be traced to `n`. For each edge along this
-        path, values will be added where the path direction and coupling direction match,
+        For a given state `n`, the path from ground will be traced to `n`.
+        For each edge along this path,
+        values will be added where the path direction and coupling direction match,
         and subtracting values where they do not.
         The sum of all such values along the path is the `n` th term in the output array. 
 
@@ -1240,46 +1362,33 @@ class Sensor():
             where `l` is the shape of the hamiltonian stack for the sensor.
 
         """
-        coherent_edges = [
-            states for states in self.couplings.edges
-            if "rabi_frequency" in self.couplings.edges[states]
-            ]
-
-        coherent_graph = self.couplings.edge_subgraph(coherent_edges)
-
         if no_stack:
             diag = np.zeros(self.basis_size)
         else:
-            diag = np.zeros((*self._stack_shape(collapse=False, time_dependence="steady"),
+            diag = np.zeros((*self._stack_shape(time_dependence="steady"),
                              self.basis_size),
                              dtype=np.complex128)
 
-        connected_levels = nx.weakly_connected_components(coherent_graph)
-        subgraphs = [coherent_graph.subgraph(ls) for ls in connected_levels]
+        subgraphs = self.get_rotating_frames()
 
-        for g in subgraphs:
+        for g, paths in subgraphs.items():
 
-            # min sets lowest state in graph as "ground"
-            paths = nx.shortest_path(nx.to_undirected(g), source=min(g.nodes))
-            paths_np = {k:np.array(v) for k,v in paths.items()}  # convert to numpy arrays
-
-            for i, path in paths_np.items():
+            for i, path in paths.items():
 
                 term = 0
 
                 for j in range(1, len(path)):
 
-                    # get the jth couplings along the path and initialize the sign as positive
-                    field = tuple(np.copy(path[j-1:j+1]))
-                    sign = 1
+                    # get the jth couplings along the path
+                    # remove frame signs
+                    field = tuple(np.abs(path[j-1:j+1]))
+                    # get the sign from the rotating frame
+                    sign = np.sign(path[j])
 
-                    if field not in self.couplings.edges:
-                        # switch the sign if the arrow points in the opposite direction
-                        # This corresponds to moving to a lower energy state
+                    if sign < 0:
                         # Since it is getting an existing edge from the undirected graph,
                         # we are guaranteed either field or field[::-1] being on the graph
                         field = field[::-1]
-                        sign = -1
 
                     # sum to the cumulative term along the path from ground
                     term = term + values.get(field,0)*sign
@@ -1287,6 +1396,53 @@ class Sensor():
                 diag[..., i] = term
 
         return diag
+    
+
+    def get_rotating_frames(self) -> dict:
+        """
+        Determines the rotating frames for the disconnected subgraphs.
+
+        Each returned path gives the states traversed,
+        and the sign gives the direction of the coupling.
+        If the sign is negative, the coupling is going to a lower energy state.
+        Choice of frame depends on graph distance to lowest indexed node on subgraph,
+        ties broken by lowest indexed path traversed first.
+
+        Returns
+        -------
+        dict
+            Dictionary keyed by disconnected subgraphs,
+            values are path dictionaries for each node of the subgraph.
+            Each path shows the node indexes traversed,
+            where a negative sign denotes a transition to a lower energy state.
+        """
+
+        coherent_edges = [
+            states for states in self.couplings.edges
+            if "rabi_frequency" in self.couplings.edges[states]
+        ]
+
+        coherent_graph = self.couplings.edge_subgraph(coherent_edges)
+
+        connected_levels = nx.weakly_connected_components(coherent_graph)
+        subgraphs = {coherent_graph.subgraph(ls):None for ls in connected_levels}
+
+        for g in subgraphs:
+            # min sets lowest state in graph as "ground"
+            paths = nx.shortest_path(nx.to_undirected(g), source=min(g.nodes))
+
+            for i, path in paths.items():
+                for j in range(1, len(path)):
+                    # get the jth couplings along the path and assume the sign as positive
+                    field = tuple(path[j-1:j+1])
+                    if field not in coherent_graph.edges:
+                        # switch the sign if the arrow points in the opposite direction
+                        # This corresponds to moving to a lower energy state
+                        path[j] *= -1
+
+            subgraphs[g] = paths
+
+        return subgraphs
 
 
     def get_transition_frequencies(self) -> np.ndarray:
@@ -1304,8 +1460,12 @@ class Sensor():
             
         """
         detuning_dict = self.get_value_dictionary("detuning")
+        # enforces detuning convention that positive detuning == blue detuning
+        for key, val in detuning_dict.items():
+            detuning_dict[key] = -val
         transition_frequency_dict = self.get_value_dictionary("transition_frequency")
         freq_dict = {**detuning_dict, **transition_frequency_dict}
+
         return self.get_hamiltonian_diagonal(freq_dict)
 
 
@@ -1515,6 +1675,54 @@ class Sensor():
                 for s,p in self.couplings.edges.items()
                 if methods[method]([k in p for k in keys])
                 }
+    
+
+    def states_with_label(self, label):
+        """Return a dict of all states with a label matching a given regular expression (regex) 
+        pattern. The dictionary will be consist of keys which are string labels applied to states
+        with the :meth:`~.Sensor.label_states` function, and values which are the corresponding
+        integer values of the node on the graph. For more information on using regex patterns see 
+        `this guide <https://docs.python.org/3/howto/regex.html#regex-howto>`.
+
+        Parameters
+        ----------
+        label : string
+            Regular expression pattern to match labels to. All labels matching the string will
+            be returned in the keys of the dictionary. 
+
+        Returns
+        -------
+        dict
+            Dictionary consisting of string labels for keys and the corresponding integer node 
+            numbers as the values.
+
+        Raises
+        ------
+        ValueError
+            If label is not a regular expression string.
+
+        Examples
+        --------
+        >>> s = rq.Sensor(3)
+        >>> s.add_coupling((0,1), detuning=1, rabi_freqency=1, label="hi mom")
+        >>> s.add_coupling((1,2), detuning=2, rabi_requency=2)
+        >>> s.label_states({0:"g", 1:"e1", 2:"e2"})
+        >>> print(s.states_with_label("e[12]"))
+        {'e1': 1, 'e2': 2}
+
+        """
+        try:
+            re_match = re.compile(label)
+        except TypeError:
+            raise ValueError("label must be a regex string.")
+        
+        out_dict = {}
+
+        for (n, l) in self.couplings.nodes(data="label"):
+            if re_match.match(l) is not None:
+                out_dict[l] = n
+        
+        return out_dict
 
 
     def get_couplings(self) -> Dict[States, CouplingDict]:
@@ -1635,65 +1843,47 @@ class Sensor():
         return tpl
 
 
-    def _stack_shape(self, collapse=True, time_dependence="all") -> Tuple[int, ...]:
+    def _stack_shape(self, time_dependence="all") -> Tuple[int, ...]:
         """
         Internal function to get the shape of the tuple preceding the two hamiltonian
         axes in :meth:`~.get_hamiltonian()`
 
         """
-        # generate the uncollapsed stack
-        stack_shape = []
+        if len(self.variable_parameters()) == 0:
+            return []
 
-        #case where we ignore time dependence in the stack shape
-        if time_dependence == 'all':
-            for _, _, arr in self.variable_parameters():
-                stack_shape.append(len(np.squeeze(arr)))
-
-        #case where we only want time-dependant stack shape
-        elif time_dependence == "time":
-            time_couplings = self.couplings_with("time_dependence")
-            for states, param, arr in self.variable_parameters():
-                if states in time_couplings and param == "rabi_frequency":
-                    stack_shape.append(len(np.squeeze(arr)))
-                else:
-                    stack_shape.append(1)
-
-        #case where we only want non-time-dependant stack shape
-        elif time_dependence == "steady":
-            time_couplings = self.couplings_with("time_dependence")
-            for states, param, arr in self.variable_parameters():
-                if states not in time_couplings or param != "rabi_frequency":
-                    stack_shape.append(len(np.squeeze(arr)))
-                else:
-                    stack_shape.append(1)
+        #make sure time_dependence is valid
+        if time_dependence not in ["steady", "time", "all"]:
+            raise ValueError("time_dependence must be one of 'steady', 'time', or 'all'")
         
-        else:
-            raise ValueError("time_dependence must be one of \"time\", \"steady\", or \"all\"")
+        shape_array = np.array([m.shape for m in self.get_parameter_mesh()])
+        stack_shape_full = np.max(shape_array, axis=0)
 
+        axis_labels = self.axis_labels(full_labels=True)
+        axis_labels_split = [l.split("|") for l in axis_labels]
+        
+        steady_idx = [] #axes which have steady-state variable parameters
+        time_idx = [] #axes which have time-dependent variable parameters
+        
+        time_couplings = self.couplings_with("time_dependence").keys()
+        time_rabi_labels = [str(s).replace(" ","")+"_rabi_frequency" for s in time_couplings]
 
-        # if collapsing, figure out the einsum logic
-        if collapse and len(self._zipped_parameters) > 0:
-            # list logic direct lifted from Sensor.collapse_dims()
-            axis_labels = self.axis_labels(collapse=False)
-            
-            paired_axes = []
-            for couplings in self._zipped_parameters:
-                paired_axes.append([axis_labels.index(c) for c in couplings])
-                
-            col_str = _get_collapse_str(len(axis_labels), *paired_axes)
-            
-            # this logic adapted from
-            # https://stackoverflow.com/questions/58380445/output-shape-of-numpy-einsum
-            insubs, outsubs = col_str.replace('.','').split('->')
-            insubs_array = np.array(list(insubs))
-            outshape = []
-            for o in outsubs:
-                indices, = np.where(insubs_array == o)
-                outshape.append(max([stack_shape[idx] for idx in indices]))
-                
-            stack_shape = tuple(outshape)
-
-        return stack_shape
+        #find which axes have time vs steady-state parameters
+        for i, l_list in enumerate(axis_labels_split):
+            for l in l_list:
+                if l in time_rabi_labels:
+                    time_idx.append(i)
+                else:
+                    steady_idx.append(i)
+        
+        #apply steady and time indeces
+        final_shape = np.ones_like(stack_shape_full)
+        if time_dependence in ["steady", "all"]:
+            final_shape[steady_idx] = stack_shape_full[steady_idx]
+        if time_dependence in ["time", "all"]:
+            final_shape[time_idx] = stack_shape_full[time_idx]
+        
+        return final_shape    
 
 
     def basis(self) -> np.ndarray:
@@ -1791,3 +1981,49 @@ class Sensor():
         else:
             raise ValueError(f"No coupling with label {label}")
         
+      
+    def get_coupling_rabi(self,coupling_tuple: Tuple[int, ...] = (0, 1)
+                          ) -> Union[float, np.ndarray]:
+        """
+        Helper function that returns the Rabi frequency of the coupling
+        from a Sensor for use in functions that return experimental values.
+
+        Parameters
+        ----------
+        coupling_tuple: tuple of int
+            The tuple that defines the coupling to extract to rabi frequencies from
+
+        Returns
+        -------
+        float of numpy.ndarray
+            Rabi frequency defined in the Sensor
+
+        Warns
+        -----
+        UserWarning
+            If the coupling has time dependence.
+            In this case, the returned Rabi frequency may not be well defined.
+        
+        """
+        coupling = self.couplings.edges[coupling_tuple]
+
+        if coupling.get('time_dependence', False):
+            warnings.warn(('Probe is time dependent.  Output of get_coupling_rabi '
+                           'is not guaranteed to be well defined.'))
+
+        rabi = coupling.get('rabi_frequency', None)
+        if isinstance(rabi, (list, np.ndarray)):
+
+            # get Rabi from parameter mesh so broadcasting works
+            coupling_label = coupling['label']
+
+            # get index in mesh for the scanned Rabi frequency
+            labels = self.axis_labels()
+            mesh_index = labels.index(coupling_label+'_rabi_frequency')
+            parameter_mesh = self.get_parameter_mesh()
+
+            return parameter_mesh[mesh_index]
+
+        else:
+            # it's just a number
+            return rabi
