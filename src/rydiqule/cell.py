@@ -737,7 +737,11 @@ class Cell(Sensor):
                     passed_rabi = float(passed_rabi)
 
         elif (e_field is None and beam_power is None and rabi_frequency is not None):
-            passed_rabi = rabi_frequency
+            if np.abs(dipole_moment) > np.finfo(float).eps:
+                passed_rabi = rabi_frequency
+            else:
+                passed_rabi = 0
+                warnings.warn(f'This coupling is a forbidden transition: {state1} -> {state2}; q={q}')
 
         else:
             msg = ("Please only define one of: 1) rabi_frequency or "
