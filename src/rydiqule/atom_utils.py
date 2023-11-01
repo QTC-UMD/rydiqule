@@ -15,7 +15,7 @@ ATOMS = {
     'Na': arc_atoms.Sodium,
     'K39': arc_atoms.Potassium39, 'K40': arc_atoms.Potassium40, 'K41': arc_atoms.Potassium41,
     'Rb85': arc_atoms.Rubidium85, 'Rb87': arc_atoms.Rubidium87,
-    'Cs': arc_atoms.Caesium
+    'Cs': arc_atoms.Caesium, 'Cs133': arc_atoms.Caesium
 }
 """
 Alkali atoms defined by ARC that can be used with :class:`~.Cell`.
