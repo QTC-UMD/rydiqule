@@ -10,12 +10,22 @@ import scipy.constants
 from scipy.constants import hbar, e
 from leveldiagram import LD
 
-from typing import Dict, Tuple, Union, TYPE_CHECKING
+from typing import Dict, Tuple, Union, Sequence, List, Callable, TYPE_CHECKING
 if TYPE_CHECKING:
     # only import when type checking, avoid circular import
     from .sensor import Sensor
 
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
+
+# put composite types of Sensor/Cell/Solution here
+ScannableParameter = Union[float, List[float], np.ndarray]
+
+CouplingDict = Dict
+State = Union[int, str]
+States = Tuple[State, State]
+QState = Sequence  # TODO: consider using named tuples here
+
+TimeFunc = Callable[[float], complex]
 
 RHO: Dict[int, np.ndarray] = {}
 U: Dict[int, np.ndarray] = {}
@@ -276,7 +286,7 @@ def make_real(equations: np.ndarray, constant: np.ndarray,
 
     # transform to the real basis
     new_eqns = u@(equations@u_inv)
-    new_const = 0
+    new_const = np.zeros(equations.shape[:-1])
 
     if ground_removed:
         new_const = np.einsum('ij,...j', u, constant)
@@ -385,7 +395,8 @@ def _get_rho(n: int) -> np.ndarray:
         return rho
 
 
-def get_rho_ij(sols: Union[np.ndarray, Solution], i: int, j: int) -> np.ndarray:
+def get_rho_ij(sols: Union[np.ndarray, Solution],
+               i: int, j: int) -> Union[complex, np.ndarray]:
     """
     For a given density matrix solution, retrieve a specific element of the density matrix.
 
@@ -534,14 +545,25 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
     rq_g = sensor.couplings.copy()
 
     # level settings
-    if isinstance(sensor, Cell):
-        for lev, vals in rq_g.nodes.items():
-            ld_kw = {'left_text':vals['qnums']}
-            rq_g.nodes[lev]['ld_kw'] = ld_kw
+    # use rotating frames to send levels up or down relative to others
+    frames = sensor.get_rotating_frames()
+    # get flattend dictionary of all state paths
+    # also calculates energy based on sum of frame signs in path
+    energies = {k: np.sum(np.sign(v)[1:]) # ignore first state so all subgraphs start at 0
+                for d in list(frames.values()) # get list of subgraph path dicts
+                for k, v in d.items()}
+    for lev, vals in rq_g.nodes.items():
+        ld_kw = vals.get('ld_kw', {})
+        ld_kw['energy'] = energies[lev]
+        
+        if isinstance(sensor, Cell):
+            ld_kw['left_text'] = vals['qnums']
+        
+        rq_g.nodes[lev]['ld_kw'] = ld_kw
 
     # coupling settings
     for edge, vals in rq_g.edges.items():
-        ld_kw = {}
+        ld_kw = vals.get('ld_kw', {})
         if 'dipole_moment' in vals:
             ld_kw['linestyle'] = 'dashed'
         elif 'rabi_frequency' in vals:
@@ -570,7 +592,7 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
         idxs = np.argwhere(gamma_matrix != 0.0)[::-1,:]
         for idx in idxs:
 
-            ld_kw = {}
+            ld_kw = rq_g.edges[tuple(idx)].get('ld_kw', {})
 
             ld_kw['wavy'] = True
             ld_kw['deflect'] = True

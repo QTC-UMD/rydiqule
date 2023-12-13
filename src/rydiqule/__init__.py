@@ -15,4 +15,4 @@ from .rydiqule_utils import about
 
 from .slicing.slicing import compute_grid, matrix_slice, memory_size, get_slice_num, get_slice_num_t
 
-__version__ = '1.1.0'
+__version__ = '1.2.0'

@@ -40,8 +40,8 @@ Now use pip to install rydiqule and remaining dependencies.
 
   # for normal installation
   (rydiqule) ~/Rydiqule> pip install rydiqule
-  # for editable installation, so source can be modified locally
-  (rydiqule) ~/Rydiqule> pip install -e rydiqule
+  # for editable installation of cloned repo, so source can be modified locally
+  (rydiqule) ~/Rydiqule> pip install -e .
 
 Pure pip installation
 ---------------------
@@ -54,11 +54,12 @@ To install normally, run:
 
 This command will use pip to install all necessary dependencies.
 
-To install in an editable way (which allows edits of the source code), run:
+To install in an editable way (which allows edits of the source code), 
+run the following from the root directory of the cloned repository:
 
 .. code-block:: shell
 
-  pip install -e rydiqule
+  pip install -e .
 
 Confirm installation
 --------------------
@@ -73,8 +74,8 @@ Proper installation can be confirmed by executing the following commands in a py
           Rydiqule
       ================
 
-  Rydiqule Version:     1.0.0
-  Installation Path:    C:\Users\naqsL\Miniconda3\envs\rydiqule\lib\site-packages\rydiqule
+  Rydiqule Version:     1.1.0
+  Installation Path:    ~\Miniconda3\envs\rydiqule\lib\site-packages\rydiqule
 
         Dependencies
       ================
@@ -84,7 +85,7 @@ Proper installation can be confirmed by executing the following commands in a py
   Matplotlib Version:   3.7.1
   ARC Version:          3.3.0
   Python Version:       3.9.16
-  Python Install Path:  C:\Users\naqsL\Miniconda3\envs\rydiqule
+  Python Install Path:  ~\Miniconda3\envs\rydiqule
   Platform Info:        Windows (AMD64)
   CPU Count:            12
   Total System Memory:  128 GB
@@ -93,7 +94,8 @@ Updating an existing installation
 ---------------------------------
 
 Upgrading an existing installation is simple.
-Simply run the pip installation commands described above with the update flag.
+Simply run the pip installation commands described above.
+Optionally, include the update flag to greedily update dependencies as well.
 
 .. code-block:: shell
 
@@ -102,11 +104,11 @@ Simply run the pip installation commands described above with the update flag.
 This command will also install any new dependencies that are required.
 
 If using an editable install, simply replacing the files in the same directory is sufficient.
-Though it is recommended to also run the appropriate pip update command as well.
+Though it is recommended to also run the appropriate pip update command as well to capture updated depedencies.
 
 .. code-block:: shell
 
-  pip install -U -e rydiqule
+  pip install -U -e .
 
 
 Dependencies

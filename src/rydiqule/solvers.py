@@ -150,7 +150,7 @@ def solve_steady_state(
     spatial_dim = sensor.spatial_dim()
 
     # initialize doppler-related quantities
-    doppler_axis_shape: Iterable[int] = ()
+    doppler_axis_shape: Tuple[int, ...] = ()
     dop_classes = None
     doppler_shifts = None
     doppler_axes: Iterable[slice] = ()
@@ -203,17 +203,17 @@ def solve_steady_state(
     # save results to Solution object
     solution.rho = sols
     # specific to observable calculations
-    solution.eta = sensor.eta
-    solution.kappa = sensor.kappa
-    solution.cell_length = sensor.cell_length
-    solution.beam_area = sensor.beam_area
-    solution.probe_freq = sensor.probe_freq
-    solution.probe_tuple = sensor.probe_tuple
+    solution._eta = sensor.eta
+    solution._kappa = sensor.kappa
+    solution._cell_length = sensor.cell_length
+    solution._beam_area = sensor.beam_area
+    solution._probe_freq = sensor.probe_freq
+    solution._probe_tuple = sensor.probe_tuple
     if sensor.probe_tuple is not None:
         probe_rabi = sensor.get_coupling_rabi(sensor.probe_tuple)
-        solution.probe_rabi = probe_rabi
+        solution._probe_rabi = probe_rabi
     else:
-        solution.probe_rabi = None
+        solution._probe_rabi = None
 
     solution.couplings = sensor.get_couplings()
     solution.axis_labels = ([f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler]
@@ -221,8 +221,8 @@ def solve_steady_state(
                             + ["density_matrix"])
     solution.axis_values = ([dop_classes for i in range(spatial_dim) if not sum_doppler]
                             + [val for _,_,val in sensor.variable_parameters()]
-                            + [sensor.basis()])
-    solution.basis = sensor.basis()
+                            + [sensor.dm_basis()])
+    solution.dm_basis = sensor.dm_basis()
     solution.rq_version = version("rydiqule")
     solution.doppler_classes = dop_classes
 

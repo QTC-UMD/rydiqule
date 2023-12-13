@@ -1,6 +1,30 @@
 Changelog
 =========
 
+v1.2.0
+------
+
+Improvements
+++++++++++++
+
+- Level diagrams now use `Sensor.get_rotating_frames` to provide better plotting of energy ordering of levels.
+- Level diagrams now allow for optional control of plotting parameters by manually specifying `ld_kw` options on nodes and edges.
+- Added the ability to specify energy level shifts (additional Hamiltonian digonal terms) not accounted for by the coupling infrastructure.
+
+
+Bug Fixes
++++++++++
+
+- `Sensor.make_real` now returns correct sized `const` array when ground is not removed.
+- Many updates to type hints to improve their accuracy.
+
+Deprecations
+++++++++++++
+
+- Remove `Solution._variable_parameters` in favor of property checking the observable parameters.
+- Renamed `Sensor.basis()` and `Solution.basis` to `Sensor.dm_basis()` and `Solution.dm_basis`
+  to disambiguate physical basis from computational basis.
+
 v1.1.0
 ------
 

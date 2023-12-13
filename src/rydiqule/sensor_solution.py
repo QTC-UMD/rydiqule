@@ -3,7 +3,7 @@ Bunch-like object use to store aspects of a solution when calling rydiule.solve(
 Adds essential keys with "None" entries
 """
 from __future__ import annotations
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import copy
 
@@ -14,6 +14,8 @@ import warnings
 # have to import this way to prevent circular imports
 from rydiqule import sensor_utils
 
+Result = Union[float, np.ndarray]
+ComplexResult = Union[complex, np.ndarray]
 
 class Solution(dict):
     """
@@ -26,25 +28,25 @@ class Solution(dict):
     # common attributes
     rho: np.ndarray
     """numpy.ndarray : Solutions returned by the solver."""
-    eta: Optional[float]
+    _eta: Optional[float]
     """float, optional : Eta constant from the Cell.
     Not generally defined when using a Sensor."""
-    kappa: Optional[float]
+    _kappa: Optional[float]
     """float, optional : Kappa constant from the Cell.
     Not generally defined when using a Sensor."""
-    probe_tuple: Optional[Tuple[int, int]]
+    _probe_tuple: Optional[sensor_utils.States]
     """Coupling edge corresponding to probing field.
     Not generally defined when using a Sensor."""
-    probe_freq: Optional[float]
+    _probe_freq: Optional[float]
     """Probing transition frequency, in rad/s.
     Not generally defined when using a Sensor."""
-    probe_rabi: Optional[Union[float, np.ndarray]]
+    _probe_rabi: Optional[Union[float, np.ndarray]]
     """Probe Rabi frequency, in Mrad/s.
     Not generally defined when using a Sensor."""
-    cell_length: Optional[float]
+    _cell_length: Optional[float]
     """Optical path length of the medium, in meters.
     Not generally defined when using a Sensor."""
-    beam_area: Optional[float]
+    _beam_area: Optional[float]
     """Cross-sectional area of the probing beam, in square meters.
     Not generally defined when using a Sensor."""
 
@@ -58,7 +60,7 @@ class Solution(dict):
     If doppler averaging but not summing, doppler classes in internal units are added."""
     rq_version: str
     """str : Version of rydiqule that created the Solution."""
-    basis: list[str]
+    dm_basis: np.ndarray
     """list of str: The list of density matrix elements in the order they appear in the solution.
     See :meth:`Sensor.basis` for details."""
 
@@ -79,7 +81,79 @@ class Solution(dict):
         super().__init__(**kwargs)
         self.__dict__ = self
 
-    def rho_ij(self, i: int, j: int) -> np.ndarray:
+
+    # property attributes
+    @property
+    def eta(self) -> float:
+        """Eta constant from the Cell.
+        Not generally defined when using a Sensor."""
+        if self._eta is None:
+            raise AttributeError("eta not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._eta
+        
+
+    @property
+    def kappa(self) -> float:
+        """Kappa constant from the Cell.
+        Not generally defined when using a Sensor."""
+        if self._kappa is None:
+            raise AttributeError("kappa not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._kappa
+        
+    
+    @property
+    def probe_tuple(self) -> sensor_utils.States:
+        """Coupling edge corresponding to probing field.
+        Not generally defined when using a Sensor."""
+        if self._probe_tuple is None:
+            raise AttributeError("probe_tuple not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._probe_tuple
+        
+    
+    @property
+    def probe_freq(self) -> float:
+        """Probing transition frequency, in rad/s.
+        Not generally defined when using a Sensor."""
+        if self._probe_freq is None:
+            raise AttributeError("probe_freq not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._probe_freq
+        
+
+    @property
+    def probe_rabi(self) -> Union[complex, np.ndarray]:
+        """Probe Rabi frequency, in Mrad/s.
+        Not generally defined when using a Sensor."""
+        if self._probe_rabi is None:
+            raise AttributeError("probe_rabi not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._probe_rabi
+        
+
+    @property
+    def cell_length(self) -> float:
+        """Optical path length of the medium, in meters.
+        Not generally defined when using a Sensor."""
+        if self._cell_length is None:
+            raise AttributeError("cell_length not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._cell_length
+        
+
+    @property
+    def beam_area(self) -> float:
+        """Cross-sectional area of the probing beam, in square meters.
+        Not generally defined when using a Sensor."""
+        if self._beam_area is None:
+            raise AttributeError("beam_area not defined. "
+                                 "Please define in Sensor and redo calculation")
+        return self._beam_area
+
+
+    def rho_ij(self, i: int, j: int) -> ComplexResult:
         """
         Gets the i,j element(s) of the density matrix solutions.
 
@@ -94,13 +168,13 @@ class Solution(dict):
 
         Returns
         -------
-        numpy.ndarray
-            `[i,j]` elments of the density matrix
+        complex or numpy.ndarray
+            `[i,j]` elment(s) of the density matrix
         """
 
         return sensor_utils.get_rho_ij(self.rho, i, j)
     
-    def get_solution_element(self, idx: int) -> np.ndarray:
+    def get_solution_element(self, idx: int) -> Result:
         """
         Return a slice of an n_dimensional matrix of solutions of shape (...,n^2-1),
         where n is the basis size of the quantum system.
@@ -112,7 +186,7 @@ class Solution(dict):
 
         Returns
         -------
-        numpy.ndarray
+        float or numpy.ndarray
             Slice of solutions corresponding to index idx. For example,
             if sols has shape (..., n^2-1), sol_slice will have shape (...).
 
@@ -141,7 +215,7 @@ class Solution(dict):
 
         return sol_slice
     
-    def get_susceptibility(self) -> np.ndarray:
+    def get_susceptibility(self) -> ComplexResult:
         """
         Return the atomic susceptibility on the probe transition.
 
@@ -149,7 +223,7 @@ class Solution(dict):
 
         Returns
         -------
-        numpy.ndarray
+        complex or numpy.ndarray
             Susceptibility of the density matrix solution.
 
         Examples
@@ -164,9 +238,6 @@ class Solution(dict):
         (1.9046090082907774e-05+0.0003680924230367812j)
 
         """
-        #transition_frequency: Optional[float] = None
-        
-        self._variables_defined('probe_rabi', 'kappa', 'probe_freq')
             
         probe_rabi = self.probe_rabi*1e6 #rad/s
         kappa = self.kappa
@@ -178,7 +249,7 @@ class Solution(dict):
         # See Steck for last factor of 2.  Comes from Steck QO Notes page
         return kappa * (rho_probe * 2*c) / (probe_freq * (probe_rabi/2))
 
-    def get_OD(self) -> np.ndarray:
+    def get_OD(self) -> Result:
         """
         Calculates the optical depth from the solution.  This equation comes from
         Steck's Quantum Optics Notes Eq. 6.74.
@@ -189,7 +260,7 @@ class Solution(dict):
 
         Returns
         -------
-        OD: numpy.ndarray
+        OD: float or numpy.ndarray
             Optical depth of the sample
 
         Warns
@@ -213,7 +284,6 @@ class Solution(dict):
         Integrated results are likely invalid.
 
         """
-        self._variables_defined('probe_freq', 'cell_length')
 
         probe_wavelength = np.abs(c/(self.probe_freq/(2*np.pi))) #meters
         probe_wavevector = 2*np.pi/probe_wavelength #1/meters
@@ -226,7 +296,7 @@ class Solution(dict):
 
         return OD
 
-    def get_transmission_coef(self) -> np.ndarray:
+    def get_transmission_coef(self) -> Result:
         """
         Extract the transmission term from a solution.
 
@@ -234,7 +304,7 @@ class Solution(dict):
 
         Returns
         -------
-        numpy.ndarray
+        float or numpy.ndarray
             Numerical value of the probe absorption in fractional units
             (P_out/P_in).
 
@@ -254,7 +324,7 @@ class Solution(dict):
         transmission_coef = np.exp(-OD)
         return transmission_coef
     
-    def get_phase_shift(self) -> np.ndarray:
+    def get_phase_shift(self) -> Result:
         """
         Extract the phase shift from a solution.
 
@@ -262,7 +332,7 @@ class Solution(dict):
 
         Returns
         -------
-        numpy.ndarray
+        float or numpy.ndarray
             Probe phase in radians.
 
         Examples
@@ -276,7 +346,6 @@ class Solution(dict):
         (3,)
         80.52949114644437
         """
-        self._variables_defined('probe_rabi', 'kappa', 'cell_length')
         
         # reverse probe tuple order to get correct sign of imag
         # not actually necessary for this function since only need real part
@@ -292,28 +361,4 @@ class Solution(dict):
         return copy.copy(self)
     
     def deepcopy(self):
-        return copy.deepcopy(self)
-    
-    def _variables_defined(self, *var_names):
-        """Check if provided experimental parameter variables are defined.
-        
-        Parameters
-        ----------
-        var_names: str
-            Parameter names to check if not None
-
-        Raises
-        ------
-        AttributeError
-            If one or more parameters are not defined.
-        """
-
-        undef_vars = []
-        for var in var_names:
-            if self[var] is None:
-                undef_vars.append(var)
-        
-        if len(undef_vars):
-            raise AttributeError(f'Required parameters not defined: {undef_vars}\n'
-                                 'Please define in Sensor and redo calculation.')
-                                 
+        return copy.deepcopy(self)                                 

@@ -8,7 +8,7 @@ from .solvers import solve_steady_state
 import numpy as np
 import warnings
 
-from typing import Tuple
+from typing import Tuple, List
 
 
 def get_transmission_coef(*args, **kwargs):
@@ -66,7 +66,7 @@ def get_snr(sensor: Sensor,
             phase_quadrature: bool = False,
             diff_nearest: bool = False,
             **kwargs
-            ) -> Tuple[np.ndarray, Tuple[np.ndarray, ...]]:
+            ) -> Tuple[np.ndarray, List[np.ndarray]]:
     """
     Calculate a Sensor's signal-to-noise ratio in standard deviation,
     in a 1Hz bandwidth,
@@ -161,7 +161,6 @@ def get_snr(sensor: Sensor,
                                   'results may not be as expected.'))
 
     full_sols = solve_steady_state(sensor, **kwargs)
-    full_sols._variables_defined('cell_length', 'eta', 'kappa')
     rhos_ij = full_sols.rho_ij(*full_sols.probe_tuple)
 
     _ = full_sols.get_OD()

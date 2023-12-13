@@ -25,6 +25,31 @@ For more details, see the :doc:`overview`.
 
 For detailed usage examples, see the :doc:`_intro_nbs/Introduction_To_Rydiqule/Introduction_To_Rydiqule` Jupyter notebook.
 
+If you use rydiqule in your work, please cite as
+
+.. raw:: html
+
+   <details>
+     <summary>B. N. Miller, <em>et. al.</em>, <u><a href="https://doi.org/10.1016/j.cpc.2023.108952">RydIQule: A Graph-based paradigm for modeling Rydberg and atomic sensors</a>,</u> <em>Computer Physics Communications</em> <b>294</b>, 108952 (2024). arXiv:<a href="http://arxiv.org/abs/2307.15673">2307.15673</a>.</summary>
+
+.. code-block:: bibtex
+
+   @article{rydiqule_2024,
+      author = {Miller, B. N. and Meyer, D. H. and Virtanen, T. and O'Brien, C. M. and Cox, K. C.},
+      title = {RydIQule: A Graph-based paradigm for modeling Rydberg and atomic sensors},
+      journal = {Computer Physics Communications},
+      volume = {294},
+      pages = {108952},
+      year = {2024},
+      doi = {10.1016/j.cpc.2023.108952},
+      url = {https://doi.org/10.1016/j.cpc.2023.108952},
+      eprint = {https://doi.org/10.1016/j.cpc.2023.108952}
+   }
+
+.. raw:: html
+
+   </details>
+
 .. toctree::
    :maxdepth: 2
    :hidden:

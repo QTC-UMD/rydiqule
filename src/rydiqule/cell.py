@@ -10,8 +10,9 @@ import scipy.constants
 from scipy.constants import Boltzmann, e
 
 # rydiqule imports
-from .sensor import Sensor, ScannableParameter
+from .sensor import Sensor
 from .sensor_utils import scale_dipole
+from .sensor_utils import ScannableParameter, QState, States
 from .atom_utils import ATOMS, calc_kappa, calc_eta
 
 from typing import Literal, Optional, Sequence, List, Tuple, Callable, Union
@@ -19,8 +20,6 @@ from typing import Literal, Optional, Sequence, List, Tuple, Callable, Union
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
 
 AtomFlags = Literal['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs']
-QState = Sequence  # TODO: consider using named tuples here
-States = Tuple[int, ...]
 
 
 class Cell(Sensor):
@@ -118,10 +117,10 @@ class Cell(Sensor):
     
     def set_experiment_values(self, probe_tuple: Tuple[int,int],
                               probe_freq: float,
-                              cell_length: float,
-                              beam_area: float,
-                              eta: float,
-                              kappa: float):
+                              kappa: float,
+                              eta: Optional[float] = None,
+                              cell_length: Optional[float] = None,
+                              beam_area: Optional[float] = None):
         """`Sensor` specific method. Do not use with `Cell`.
 
         This function does not do anything as Cell automatically handles 
@@ -328,6 +327,37 @@ class Cell(Sensor):
         return kappa
 
 
+    @kappa.setter
+    def kappa(self, value: float):
+        """Setter for the kappa attribute.
+
+        Updates the self._kappa class attribute.
+
+        Parameters
+        ----------
+        value : float
+            The floating-point value to set as the eta parameter for the system.
+        """
+        self._kappa = value
+
+
+    @kappa.deleter
+    def kappa(self):
+        """Setter for the kappa attribute.
+
+        Removes the self._kappa class attribute.
+
+        Raises
+        ------
+        AttributeError:
+            If kappa has not been set.
+        """
+        try:
+            del self._kappa
+        except AttributeError:
+            raise AttributeError("The \"kappa\" attribute has not been set")
+    
+
     @property
     def eta(self):
         """Get the eta value for the system.
@@ -368,22 +398,8 @@ class Cell(Sensor):
         eta = calc_eta(omega_rad, dipole_moment, self.beam_area)
 
         return eta
-
-
-    @kappa.setter
-    def kappa(self, value: float):
-        """Setter for the kappa attribute.
-
-        Updates the self._kappa class attribute.
-
-        Parameters
-        ----------
-        value : float
-            The floating-point value to set as the eta parameter for the system.
-        """
-        self._kappa = value
-
     
+
     @eta.setter
     def eta(self, value):
         """Setter for the eta attribute.
@@ -397,23 +413,6 @@ class Cell(Sensor):
         """
         self._eta = value
 
-
-    @kappa.deleter
-    def kappa(self):
-        """Setter for the kappa attribute.
-
-        Removes the self._kappa class attribute.
-
-        Raises
-        ------
-        AttributeError:
-            If kappa has not been set.
-        """
-        try:
-            del self._kappa
-        except AttributeError:
-            raise AttributeError("The \"kappa\" attribute has not been set")
-    
 
     @eta.deleter
     def eta(self):
@@ -430,7 +429,8 @@ class Cell(Sensor):
             del self._eta
         except AttributeError:
             raise AttributeError("The \"eta\" attribute has not been set")
-        
+
+
     @property
     def probe_freq(self):
         """Get the probe transition frequency, in rad/s
@@ -513,7 +513,7 @@ class Cell(Sensor):
             self, states: States, rabi_frequency: Optional[ScannableParameter] = None,
             detuning: Optional[ScannableParameter] = None,
             transition_frequency: Optional[float] = None,
-            phase: Optional[ScannableParameter] = 0, kvec: Tuple[float,float,float] = (0,0,0),
+            phase: ScannableParameter = 0, kvec: Tuple[float,float,float] = (0,0,0),
             time_dependence: Optional[Callable[[float],float]] = None, label: Optional[str] = None,
             e_field: Optional[ScannableParameter] = None, beam_power: Optional[float] = None,
             beam_waist: Optional[float] = None,
@@ -974,8 +974,10 @@ class Cell(Sensor):
         """
         if isinstance(state, int):
             try:
-                state = self.couplings.nodes[state]["qnums"]
+                qnums = self.couplings.nodes[state]["qnums"]
             except KeyError:
                 raise ValueError(f"Cell basis is smaller that state {state}")
+        else:
+            qnums = state
     
-        return self._validate_qnums(state)
+        return self._validate_qnums(qnums)

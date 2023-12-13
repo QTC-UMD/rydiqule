@@ -49,7 +49,9 @@ def about(obscure_paths: bool = True):
 
     """
     home = Path.home()
-    rydiqule_install_path = Path(inspect.getsourcefile(rydiqule)).parent
+    install_path = inspect.getsourcefile(rydiqule)
+    assert install_path is not None
+    rydiqule_install_path = Path(install_path).parent
     try:
         ryd_path = '~' / rydiqule_install_path.relative_to(home)
     except ValueError:

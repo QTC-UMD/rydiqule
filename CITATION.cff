@@ -1,0 +1,95 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it using the preferred article citation.
+title: RydIQule
+abstract: >-
+  The Rydberg Interactive Quantum module is a modeling library designed to simulate the response of Rydberg atoms to arbitrary input RF waveforms.
+  It functions as a general master equation solver for quantum systems based on the semi-classical density matrix method.
+authors:
+  - family-names: Miller
+    given-names: Benjamin N
+    orcid: 'https://orcid.org/0000-0003-0017-1355'
+  - family-names: Meyer
+    given-names: David H
+    orcid: 'https://orcid.org/0000-0003-2452-2017'
+  - family-names: Virtanen
+    given-names: Teemu
+  - family-names: O'Brien
+    given-names: Christopher M
+    orcid: 'https://orcid.org/0000-0003-2974-0531'
+  - family-names: Cox
+    given-names: Kevin C
+    orcid: 'https://orcid.org/0000-0001-5049-3999'
+
+version: 1.1.0
+date-released: "2023-10-11"
+license: Apache-2.0
+repository-code: "https://github.com/QTC-UMD/rydiqule"
+url: "https://doi.org/10.1016/j.cpc.2023.108952"
+
+identifiers:
+  - description: Journal article describing the software
+    doi: 10.1016/j.cpc.2023.108952
+
+preferred-citation:
+  type: article
+  title: "RydIQule: A Graph-based paradigm for modeling Rydberg and atomic sensors"
+  authors:
+    - family-names: Miller
+      given-names: Benjamin N
+    - family-names: Meyer
+      given-names: David H
+      orcid: 'https://orcid.org/0000-0003-2452-2017'
+    - family-names: Virtanen
+      given-names: Teemu
+    - family-names: O'Brien
+      given-names: Christopher M
+    - family-names: Cox
+      given-names: Kevin C
+  doi: "10.1016/j.cpc.2023.108952"
+  journal: "Computer Physics Communications"
+  month: 1
+  year: 2024
+  start: 108952 # page number
+  issue: 294
+
+references:
+  - type: software
+    title: ARC (Alkali.ne Rydberg Calculator)
+    authors:
+      - family-names: Šibalić
+        given-names: Nikola
+    repository-code: "https://github.com/nikolasibalic"
+    url: "http://arc-alkali-rydberg-calculator.readthedocs.io/"
+  - type: software
+    title: NetworkX
+    repository-code: "https://github.com/networkx/networkx"
+    url: "https://networkx.org"
+  - type: software
+    title: NumPy
+    repository-code: "https://github.com/numpy/numpy"
+    url: "https://numpy.org"
+  - type: software
+    title: SciPy
+    repository-code: "https://github.com/scipy/scipy"
+    url: "https://scipy.org"
+  - type: software
+    title: numbakit-ode
+    authors:
+      - family-names: Grecco
+        given-names: Hernan E
+    repository-code: "https://github.com/hgrecco/numbakit-ode"
+    url: "https://numbakit-ode.readthedocs.io/en/latest/index.html"
+  - type: software
+    title: CyRK
+    authors:
+      - family-names: Renaud
+        given-names: Joe P
+    repository-code: "https://github.com/jrenaud90/CyRK"
+  - type: software
+    title: leveldiagram
+    authors:
+      - family-names: Meyer
+        given-names: David H
+    repository-code: "https://github.com/dihm/leveldiagram"
+    url: "https://leveldiagram.readthedocs.io/en/latest"
+    

@@ -34,7 +34,7 @@ class DirectMethod(TypedDict, total=False):
     doppler_velocities: Union[np.ndarray, Sequence]
 
 
-MeshMethod = Union[UniformMethod, SplitMethod, DirectMethod]
+MeshMethod = Union[UniformMethod, IsoPopMethod, SplitMethod, DirectMethod]
 
 
 def get_doppler_equations(base_eoms: np.ndarray,
