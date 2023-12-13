@@ -5,7 +5,7 @@ Solvers for time domain analysis with an arbitrary RF field
 import numpy as np
 from importlib.metadata import version
 
-from .sensor_utils import _hamiltonian_term, generate_eom, make_real
+from .sensor_utils import _hamiltonian_term, generate_eom, make_real, TimeFunc
 from .sensor_solution import Solution
 from .sensor import Sensor  # only needing for type hinting
 from .slicing.slicing import matrix_slice, get_slice_num_t
@@ -17,12 +17,12 @@ from rydiqule.stack_solvers.nbkode_solver import nbkode_solve
 from rydiqule.stack_solvers.cyrk_solver import cyrk_solve
 from rydiqule.stack_solvers.nbrk_solver import nbrk_solve
 
-from typing import Optional, Tuple, Iterable, List, Callable, Literal, Union
+from typing import Optional, Tuple, List, Callable, Literal, Union, Dict
 
-stack_solvers = {"scipy": scipy_solve,
-                 "nbkode": nbkode_solve,
-                 "cyrk": cyrk_solve,
-                 "nbrk": nbrk_solve}
+stack_solvers: Dict[str, Callable] = {"scipy": scipy_solve,
+                                      "nbkode": nbkode_solve,
+                                      "cyrk": cyrk_solve,
+                                      "nbrk": nbrk_solve}
 
 solver_type = Union[Callable, Literal['scipy', 'nbkode', 'cyrk', 'nbrk']]
 
@@ -145,7 +145,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
                 f"{solver} is not a built-in solver."
                 f" Supported built-in solvers are {list(stack_solvers.keys())}")
     
-    if not isinstance(solver, Callable):
+    if not callable(solver):
         raise ValueError("Solvers must be callable functions")
     
     solution = Solution()
@@ -160,11 +160,11 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     t_eval = np.linspace(*time_range, num=num_pts, dtype=np.float64)
 
     # initialize doppler-related quantities
-    doppler_axis_shape: Iterable[int] = ()
+    doppler_axis_shape: Tuple[int, ...] = ()
     dop_classes = None
     doppler_shifts = None
-    out_doppler_axes: Iterable[slice] = ()
-    doppler_axes: Iterable[slice] = ()
+    out_doppler_axes: Tuple[slice, ...] = ()
+    doppler_axes: Tuple[slice, ...] = ()
 
     # update doppler-related values
     if doppler:
@@ -198,10 +198,10 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     
     n_slices_true = sum(1 for _ in matrix_slice(gamma, n_slices=n_slices))
 
-    for i, (idx, H, G, *time_hams), in enumerate(matrix_slice(hamiltonians, gamma,
-                                                              *hamiltonians_time,
-                                                              *hamiltonians_time_i,
-                                                              n_slices=n_slices)):
+    for i, (idx, H, G, *time_hams) in enumerate(matrix_slice(hamiltonians, gamma,
+                                                             *hamiltonians_time,
+                                                             *hamiltonians_time_i,
+                                                             n_slices=n_slices)):
         
         if n_slices_true > 1:
             print(f"Solving equation slice {i+1}/{n_slices_true}", end='\r')
@@ -222,25 +222,25 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     # save results to the Solution
     solution.rho = sols
     # specific to observable calculations
-    solution.eta = sensor.eta
-    solution.kappa = sensor.kappa
-    solution.cell_length = sensor.cell_length
-    solution.beam_area = sensor.beam_area
-    solution.probe_freq = sensor.probe_freq
-    solution.probe_tuple = sensor.probe_tuple
+    solution._eta = sensor.eta
+    solution._kappa = sensor.kappa
+    solution._cell_length = sensor.cell_length
+    solution._beam_area = sensor.beam_area
+    solution._probe_freq = sensor.probe_freq
+    solution._probe_tuple = sensor.probe_tuple
     if sensor.probe_tuple is not None:
         probe_rabi = sensor.get_coupling_rabi(sensor.probe_tuple)
-        solution.probe_rabi = probe_rabi
+        solution._probe_rabi = probe_rabi
     else:
-        solution.probe_rabi = None
+        solution._probe_rabi = None
 
     solution.axis_labels = ([f'doppler_{i:d}' for i in range(spatial_dim) if not sum_doppler]
                             + sensor.axis_labels()
                             + ["time", "density_matrix"])
     solution.axis_values = ([dop_classes for i in range(spatial_dim) if not sum_doppler]
                             + [val for _,_,val in sensor.variable_parameters()]
-                            + [t_eval, sensor.basis()])
-    solution.basis = sensor.basis()
+                            + [t_eval, sensor.dm_basis()])
+    solution.dm_basis = sensor.dm_basis()
     solution.rq_version = version("rydiqule")
     solution.doppler_classes = dop_classes
     # time solver specific
@@ -252,7 +252,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
 
 def _solve_hamiltonian_stack(hamiltonians_base: np.ndarray, hamiltonians_time: np.ndarray,
                              hamiltonians_time_i: np.ndarray, gamma_matrix: np.ndarray,
-                             time_functions: List[Callable[[float], float]], t_eval: np.ndarray,
+                             time_functions: List[TimeFunc], t_eval: np.ndarray,
                              init_cond: np.ndarray, solver, doppler: bool = False,
                              dop_classes: Optional[np.ndarray] = None, sum_doppler: bool = True,
                              weight_doppler: bool = True,
@@ -299,7 +299,7 @@ def _solve_hamiltonian_stack(hamiltonians_base: np.ndarray, hamiltonians_time: n
 def solve_eom_stack(eoms_base: np.ndarray, const: np.ndarray,
                     eom_time_r: np.ndarray, const_r: np.ndarray,
                     eom_time_i: np.ndarray, const_i: np.ndarray,
-                    time_inputs: List[Callable[[float],float]],
+                    time_inputs: List[TimeFunc],
                     t_eval: np.ndarray, init_cond: np.ndarray, solver, **kwargs
                     ) -> np.ndarray:
 

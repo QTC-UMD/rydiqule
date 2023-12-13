@@ -80,7 +80,7 @@ def test_phase_shift_with_steck():
     e_field=1e-7
 
 
-    rb_cell = rq.Sensor(basis_size = 2)
+    rb_cell = rq.Sensor(2)
     rb_cell.set_experiment_values(cell_length=cell_length, probe_freq = probe_freq,
                                   beam_area=beam_area, probe_tuple = (0,1), kappa = kappa)
     rb_cell.set_gamma_matrix(np.array([[0.23229296, 0.00000000e+00],

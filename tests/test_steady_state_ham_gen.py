@@ -22,6 +22,20 @@ def test_ladder_5_level():
     np.testing.assert_allclose(ham, expected_ham,
                                err_msg="5 Level ladder failed hamilonian generation")
 
+@pytest.mark.steady_state
+def test_mixed_state_ladder():
+
+    f1 = {'states':('g',1), 'rabi_frequency':0, 'detuning':1}
+    f2 = {'states':(1,2), 'rabi_frequency':0, 'detuning':2}
+    
+    s = Sensor(['g', 1, 2])
+    s.add_couplings(f1, f2)
+
+    expected_ham = np.diag([0, -1, -1-2])
+    ham = s.get_hamiltonian()
+    
+    np.testing.assert_allclose(ham, expected_ham,
+                               err_msg="5 Level ladder failed hamilonian generation")
 
 @pytest.mark.steady_state
 def test_lambda_4_level():
@@ -30,14 +44,24 @@ def test_lambda_4_level():
     f2 = {'states':(1,3), 'rabi_frequency':0, 'detuning':2}
     f3 = {'states':(2,3), 'rabi_frequency':0, 'detuning':4}
 
+    s_f1 = {'states':('a','b'), 'rabi_frequency':0, 'detuning':1}
+    s_f2 = {'states':('b','d'), 'rabi_frequency':0, 'detuning':2}
+    s_f3 = {'states':('c','d'), 'rabi_frequency':0, 'detuning':4}
+
     sensor = Sensor(4)
     sensor.add_couplings(f1, f2, f3)
 
+    sensor_str = Sensor(['a', 'b', 'c', 'd'])
+    sensor_str.add_couplings(s_f1, s_f2, s_f3)
+
     expected_ham = np.diag([0, -1, -1-2+4, -1-2])
     ham = sensor.get_hamiltonian()
+    ham_str = sensor.get_hamiltonian()
 
     np.testing.assert_allclose(ham, expected_ham,
                                err_msg="4 Level lambda failed hamilonian generation")
+    np.testing.assert_allclose(ham_str, expected_ham,
+                               err_msg="4 Level lambda failed ham generation with str labels")
 
 
 @pytest.mark.steady_state
@@ -79,3 +103,17 @@ def test_v_5_cell():
 
     np.testing.assert_allclose(ham, expected_ham,
                                err_msg="5 Level V cell failed hamilonian generation")
+    
+@pytest.mark.steady_state
+def test_e_shift():
+    f1 = {'states':('g',1), 'rabi_frequency':0, 'detuning':1}
+    f2 = {'states':(1,2), 'rabi_frequency':0, 'detuning':2}
+    
+    s = Sensor(['g', 1, 2])
+    s.add_couplings(f1, f2)
+    s.add_energy_shift('g', .5)
+    s.add_energy_shift(1, 1)
+    s.add_energy_shift(2, 1.5)
+
+    expected_ham = np.diag([0, -1, -1-2]) + np.diag([.5, 1, 1.5])
+    ham = s.get_hamiltonian()

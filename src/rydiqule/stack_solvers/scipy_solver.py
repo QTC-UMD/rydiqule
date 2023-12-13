@@ -2,12 +2,13 @@ import numpy as np
 
 from scipy.integrate import solve_ivp
 
-from typing import Sequence, Callable, Union, Literal
+from typing import Sequence, Callable, Literal
+from rydiqule.sensor_utils import TimeFunc
 
 def scipy_solve(eoms_base: np.ndarray, const: np.ndarray,
                 eom_time_r: np.ndarray, const_r: np.ndarray,
                 eom_time_i: np.ndarray, const_i: np.ndarray,
-                time_inputs: Sequence[Callable[[float], Union[float, complex]]],
+                time_inputs: Sequence[TimeFunc],
                 t_eval: np.ndarray, init_cond: np.ndarray,
                 eqns: Literal["loop", "comp"] = "loop",
                 **kwargs
@@ -72,7 +73,7 @@ def scipy_solve(eoms_base: np.ndarray, const: np.ndarray,
     numpy.ndarray
         The matrix solution of shape `(*l,n,n_t)`
         representing the density matrix of the system at each time t.
-    """  # noqa
+    """
     
     _derEqns = {"loop": _derEqns_loop, "comp": _derEqn_comp}
 
@@ -102,7 +103,7 @@ def scipy_solve(eoms_base: np.ndarray, const: np.ndarray,
 def _derEqns_loop(obes_base: np.ndarray, const_base: np.ndarray,
              obes_time_r: np.ndarray, const_r: np.ndarray,
              obes_time_i: np.ndarray,  const_i: np.ndarray,
-             time_inputs: Sequence[Callable[[float], Union[float, complex]]],
+             time_inputs: Sequence[TimeFunc],
              ) -> Callable[[float, np.ndarray], np.ndarray]:
     """
     Function to build the callable passed to scipy's solve_ivp in :func:`~.scipy_solve`.
@@ -138,7 +139,7 @@ def _derEqns_loop(obes_base: np.ndarray, const_base: np.ndarray,
 def _derEqn_comp(obes_base: np.ndarray, const: np.ndarray,
             obes_time_r: np.ndarray, const_r: np.ndarray,
             obes_time_i: np.ndarray,  const_i: np.ndarray,
-            time_inputs: Sequence[Callable[[float], Union[float, complex]]],
+            time_inputs: Sequence[TimeFunc],
             ) -> Callable[[float, np.ndarray], np.ndarray]:
     """
     Function to build the callable passed to scipy's solve_ivp in :func:`~.scipy_solve`.

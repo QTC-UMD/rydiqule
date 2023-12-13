@@ -10,13 +10,14 @@ except ImportError as e:
     cyrk_available = False
     cyrk_import_error = e
 
-from typing import Sequence, Callable, Union, Tuple
+from typing import Sequence, Callable
+from rydiqule.sensor_utils import TimeFunc
 
 
 def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
                eom_time_r: np.ndarray, const_r: np.ndarray,
                eom_time_i: np.ndarray, const_i: np.ndarray,
-               time_inputs: Sequence[Callable[[float], Union[float, complex]]],
+               time_inputs: Sequence[TimeFunc],
                t_eval: np.ndarray, init_cond: np.ndarray,
                **kwargs
                ) -> np.ndarray:
@@ -83,7 +84,7 @@ def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
     OverflowError: If system size exceeds cyrk backend limit of 65535 equations.
         If we see this error a lot, consider getting CyRK project to increase it
         by changing type of `y_size` from unisgned short.
-    """  # noqa
+    """
 
     if not cyrk_available:
         raise ImportError('CyRK backend not installed') from cyrk_import_error
@@ -121,7 +122,7 @@ def cyrk_solve(eoms_base: np.ndarray, const_base: np.ndarray,
 def _derEqns(obes_base: np.ndarray, const_base: np.ndarray,
              obes_time_r: np.ndarray, const_r: np.ndarray,
              obes_time_i: np.ndarray, const_i: np.ndarray,
-             time_inputs: Tuple[Callable[[float], Union[float, complex]]]
+             time_inputs: Sequence[TimeFunc]
              ) -> Callable[[float, np.ndarray, np.ndarray], None]:
     """
     Function to build the callable passed to CyRK's cyrk_ode cython solver.

@@ -10,13 +10,14 @@ except ImportError as e:
     nbkode_available = False
     nbkode_import_error = e
 
-from typing import Sequence, Tuple, Callable, Union
+from typing import Sequence, Callable
+from rydiqule.sensor_utils import TimeFunc
 
 
 def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
                  eom_time_r: np.ndarray, const_r: np.ndarray,
                  eom_time_i: np.ndarray, const_i: np.ndarray,
-                 time_inputs: Sequence[Callable[[float], Union[float, complex]]],
+                 time_inputs: Sequence[TimeFunc],
                  t_eval: np.ndarray, init_cond: np.ndarray, **kwargs
                  ) -> np.ndarray:
     """
@@ -76,7 +77,7 @@ def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
     numpy.ndarray
         The matrix solution of shape `(*l,n,n_t)`
         representing the density matrix of the system at each time t.
-    """  # noqa
+    """
 
     if not nbkode_available:
         raise ImportError('numbakit-ode backend not installed') from nbkode_import_error
@@ -111,7 +112,7 @@ def nbkode_solve(eoms_base: np.ndarray, const_base: np.ndarray,
 def _derEqns(obes_base: np.ndarray, const_base: np.ndarray,
              obes_time_r: np.ndarray, const_r: np.ndarray,
              obes_time_i: np.ndarray,  const_i: np.ndarray,
-             time_inputs: Tuple[Callable[[float], Union[float, complex]]]
+             time_inputs: Sequence[TimeFunc]
              ) -> Callable[[float, np.ndarray], np.ndarray]:
     """
     Function to build the callable passed to nbkode numba solver.

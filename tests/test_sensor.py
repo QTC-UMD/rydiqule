@@ -89,13 +89,26 @@ def test_states_validation():
         # too many labels passed
         s._states_valid((0,1,2))
 
-    with pytest.raises(TypeError, match='must be an integer'):
-        # non-integer inputs
-        s._states_valid('01')
-
-    with pytest.raises(ValueError, match='outside the basis size'):
+    with pytest.raises(ValueError, match='not a state in the basis'):
         # outside basis
         s._states_valid((0,2))
+
+
+@pytest.mark.exception
+def test_basis_exception():
+    '''Assures that invalid bases are correctly caught'''
+    #bad state type 
+    with pytest.raises(ValueError, match="must be integers or strings"):
+        s = rq.Sensor(['g', 'e', None])
+    
+    #double state labels
+    with pytest.raises(ValueError, match="All state labels must be unique"):
+        s = rq.Sensor(['g', 'e', 'e'])
+
+    #bad basis type
+    with pytest.raises(TypeError, match="must be an integer or iterable"):
+        l = lambda x: x
+        s = rq.Sensor(l)
 
 
 @pytest.mark.exception

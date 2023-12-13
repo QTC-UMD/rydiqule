@@ -8,10 +8,10 @@ import itertools
 
 import numpy as np
 
-from typing import Tuple, Iterator, Union, List
+from typing import Tuple, Union, Optional, Iterable
 
 
-def compute_grid(stack_shape: np.ndarray, n_slices: int):
+def compute_grid(stack_shape: Tuple[int, ...], n_slices: int):
     """Calculate the bin edges to break a given stack shape into at least a certain number of pieces
 
     Works by iterating first over a number of slices per axis (N=1,2,3),
@@ -26,7 +26,7 @@ def compute_grid(stack_shape: np.ndarray, n_slices: int):
 
     Parameters
     ----------
-    stack_shape : np.ndarray
+    stack_shape : tuple of int
         The shape of the stack to be sliced.
         Does not include Hamiltonian or matrix equation dimensions,
         so for a hamiltonain stack of shape `(*l,n,n)`, `stack_shape` will be `*l`.
@@ -68,10 +68,11 @@ def compute_grid(stack_shape: np.ndarray, n_slices: int):
     
     return [np.linspace(0,stack_shape[i], n_ax_slices[i]+1, dtype=int) for i in range(total_axes)]
 
-
+# in python 3.11+ return should be Iterator[tuple[tuple[slice, ...], *tuple[np.ndarray]]]
 def matrix_slice(*matrices: np.ndarray,
-                 edges:Union[List, None]=None,
-                 n_slices:Union[int, None]=None) -> Iterator[Tuple[tuple, np.ndarray]]:
+                 edges: Optional[Iterable] = None,
+                 n_slices: Optional[int] = None
+                 ): # type: (...) -> Iterator[Tuple[Tuple[slice, ...], Unpack[Tuple[np.ndarray,...]]]]
     """
     Generator that returns parts of a stack of matrices.
 
@@ -89,17 +90,19 @@ def matrix_slice(*matrices: np.ndarray,
         broadcast by numpy's broadcasting rules, with the additional restriction that all matrices
         must have the same number of dimensions, even if some dimensions are of size 1. For example,
         matrices of sizes `(10,1,4,4)` and `(1,20,4,4)` can be sliced together. 
-    edges: list(iterable)
+    edges: iterable, optional
         The values along each axis that define the edges of bins on an n-dimensional grid.
         For example, to slice a grid of hamiltonians with stack_shape `(10,10)` into 4 pieces,
         `edges` could be defined as `[0,5,10]` for each of the 2 stack axes. 
-    n_slices : int or None 
+    n_slices : int, optional
         The number of slices into which to break the matrix stack. Ignored if the
         `edges` parameter is not `None`. Must be specified as an integer value if `edges` is `None`,
         ignored otherwise. Defaults to None. 
 
     Yields
     ------
+    tuple of slices
+        slicing for each corresponding matrix
     numpy.ndarray
         Slice of hamiltonian stack
         
@@ -141,11 +144,13 @@ def matrix_slice(*matrices: np.ndarray,
         return
     #Build the grid if only the number of slices is specified. 
     if edges is None:
-        if n_slices in (1,None):
+        if n_slices is None or n_slices == 1:
             yield (), *matrices
             return
-        elif n_slices>1:
+        elif n_slices > 1:
             edges = compute_grid(stack_shape, n_slices)
+        else:
+            raise ValueError("n_slices must be positive int if specified")
 
     #check that the bins slice each axis appropriately
     for i,e in enumerate(edges):
