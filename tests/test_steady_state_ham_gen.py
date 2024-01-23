@@ -103,7 +103,7 @@ def test_v_5_cell():
 
     np.testing.assert_allclose(ham, expected_ham,
                                err_msg="5 Level V cell failed hamilonian generation")
-    
+  
 @pytest.mark.steady_state
 def test_e_shift():
     f1 = {'states':('g',1), 'rabi_frequency':0, 'detuning':1}
@@ -117,3 +117,6 @@ def test_e_shift():
 
     expected_ham = np.diag([0, -1, -1-2]) + np.diag([.5, 1, 1.5])
     ham = s.get_hamiltonian()
+
+    np.testing.assert_allclose(ham, expected_ham,
+                               err_msg='State shifts failed hamiltonian generation')
