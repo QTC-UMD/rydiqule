@@ -1,6 +1,13 @@
 Changelog
 =========
 
+v1.2.1
+------
+
+Bug Fixes
++++++++++
+- Fixed bug in energy level shifts where shifts overwrote detunings instead of adding.
+
 v1.2.0
 ------
 

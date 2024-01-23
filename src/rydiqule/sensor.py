@@ -1274,7 +1274,7 @@ class Sensor():
             shift_state = int_states[state1]
             idx = (..., shift_state, shift_state)
 
-            hamiltonian[idx] = shift
+            hamiltonian[idx] += shift
         
         self.couplings = base_couplings
         return hamiltonian
