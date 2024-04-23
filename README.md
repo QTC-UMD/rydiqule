@@ -5,6 +5,7 @@ the response of Rydberg atoms to arbitrary input RF waveforms.
 It also functions as a general master equation solver based on the semi-classical density matrix method.
 
 [![PyPI](https://img.shields.io/pypi/v/rydiqule.svg)](https://pypi.org/project/rydiqule)
+[![Conda Version](https://img.shields.io/conda/v/rydiqule/rydiqule)](https://anaconda.org/rydiqule/rydiqule)
 [![Python Version](https://img.shields.io/pypi/pyversions/rydiqule.svg)](https://python.org)
 [![License](https://img.shields.io/pypi/l/rydiqule.svg)](https://github.com/QTC-UMD/rydiqule/raw/main/LICENSE)
 [![Docs](https://readthedocs.org/projects/rydiqule/badge/?version=latest)](https://rydiqule.readthedocs.io/en/latest)
