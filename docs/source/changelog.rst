@@ -1,6 +1,21 @@
 Changelog
 =========
 
+v1.2.2
+------
+
+Improvements
+++++++++++++
+
+- Now also distribute rydiqule via an `anaconda channel <https://anaconda.org/rydiqule/repo>`_.
+
+Bug Fixes
++++++++++
+
+- Fixed bug where t=0 time-dependent hamiltonians calculated in `solve_steady_state`
+  were double counted if more than one time-dependent coupling was present.
+
+
 v1.2.1
 ------
 

@@ -176,9 +176,9 @@ def solve_steady_state(
     hamiltonians_time_r, hamiltonians_time_i = sensor.get_time_couplings()
     time_functions = sensor.get_time_dependence()
     hamiltonians_time = np.zeros_like(hamiltonians_time_i)
-    for func, htr, hti in zip(time_functions, hamiltonians_time_r, hamiltonians_time_i):
+    for i, (func, htr, hti) in enumerate(zip(time_functions, hamiltonians_time_r, hamiltonians_time_i)):
         f0 = func(0)
-        hamiltonians_time += f0.real*htr + f0.imag*hti
+        hamiltonians_time[i] += f0.real*htr + f0.imag*hti
     hamiltonians_total = hamiltonians + np.sum(hamiltonians_time, axis=0)
     # get decoherence matrix
     gamma = sensor.decoherence_matrix()
