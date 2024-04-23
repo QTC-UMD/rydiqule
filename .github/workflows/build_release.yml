@@ -7,6 +7,14 @@ on:
 
 env:
   PACKAGE_NAME: rydiqule
+  ANACONDA_USER: rydiqule
+
+  # Configuration for a package with no extensions and the same dependencies on all
+  # platforms and Python versions. For this configuration you should comment out all but
+  # the first entry in the job matrix of the build job since multiple platforms are not
+  # needed.
+  # Assumes the package is pure (ie does not have compiled extensions)
+  NOARCH: true
 
 jobs:
   build:
@@ -15,10 +23,10 @@ jobs:
     if: github.repository_owner == 'QTC-UMD'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
@@ -34,11 +42,40 @@ jobs:
         run: |
           python -m build -w .
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload Artifact (pip)
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: ./dist
+
+      - name: Set Variables for Conda Build
+        shell: bash
+        run: |
+          if [ $NOARCH == true ]; then
+              CONDA_BUILD_ARGS="--noarch"
+          else
+              CONDA_BUILD_ARGS=""
+          fi
+          echo "CONDA_BUILD_ARGS=$CONDA_BUILD_ARGS" >> $GITHUB_ENV
+
+      - name: Install Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: 3.10
+          miniconda-version: "latest"
+
+      - name: Conda package (Unix)
+        shell: bash -l {0}
+        run: |
+          conda install -c labscript-suite setuptools-conda
+          setuptools-conda build $CONDA_BUILD_ARGS .
+
+      - name: Upload Artifact (conda)
+        uses: actions/upload-artifact@v4
+        with:
+          name: conda_packages
+          path: ./conda_packages
 
   github-release:
     name: Github Release
@@ -49,11 +86,17 @@ jobs:
       packages: read
       contents: write
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v3
+      - name: Download Artifact (pip)
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: ./dist
+
+      - name: Download Artifact (conda)
+        uses: actions/download-artifact@v4
+        with:
+          name: conda_packages
+          path: ./conda_packages
 
       - name: Get Version Number
         run: |
@@ -80,11 +123,17 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v3
+      - name: Download Artifact (pip)
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: ./dist
+
+      - name: Download Artifact (conda)
+        uses: actions/download-artifact@v4
+        with:
+          name: conda_packages
+          path: ./conda_packages
 
       - name: Publish on TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -93,4 +142,26 @@ jobs:
 
       - name: Publish on PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Install Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: 3.10
+          miniconda-version: "latest"
+
+      - name: Install Anaconda cloud client
+        shell: bash -l {0}
+        run: conda install anaconda-client
+
+      - name: Publish to Anaconda channel
+        shell: bash -l {0}
+        run: |
+          anaconda \
+            --token ${{ secrets.ANACONDA_API_TOKEN }}
+            upload \
+            --user $ANACONDA_USER \
+            conda_packages/*/*
+
+
         
