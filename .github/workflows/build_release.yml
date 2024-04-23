@@ -117,7 +117,7 @@ jobs:
     name: PyPI Release
     runs-on: ubuntu-latest
     if: github.repository_owner == 'QTC-UMD'
-    needs: [build]
+    needs: [build, conda-release]
     environment:
       name: pypi
       url: https://pypi.org/p/${{ env.PACKAGE_NAME }}
@@ -142,7 +142,7 @@ jobs:
     name: Conda Release
     runs-on: ubuntu-latest
     if: github.repository_owner == 'QTC-UMD'
-    needs: [build, pypi-release]
+    needs: [build]
     steps:
       - name: Download Artifact (conda)
         uses: actions/download-artifact@v4
@@ -165,7 +165,7 @@ jobs:
         shell: bash -l {0}
         run: |
           anaconda \
-            --token ${{ secrets.ANACONDA_API_TOKEN }}
+            --token ${{ secrets.ANACONDA_API_TOKEN }} \
             upload \
             --user $ANACONDA_USER \
             conda_packages/*/*
