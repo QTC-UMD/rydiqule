@@ -113,7 +113,7 @@ jobs:
           prerelease: ${{ contains(github.event.ref, 'rc') }}
           files: ./dist/${{ env.PACKAGE_NAME }}-${{ env.VERSION }}.tar.gz
 
-  release:
+  pypi-release:
     name: PyPI Release
     runs-on: ubuntu-latest
     if: github.repository_owner == 'QTC-UMD'
@@ -130,12 +130,6 @@ jobs:
           name: dist
           path: ./dist
 
-      - name: Download Artifact (conda)
-        uses: actions/download-artifact@v4
-        with:
-          name: conda_packages
-          path: ./conda_packages
-
       - name: Publish on TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -143,6 +137,18 @@ jobs:
 
       - name: Publish on PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  conda-release:
+    name: Conda Release
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'QTC-UMD'
+    needs: [build, pypi-release]
+    steps:
+      - name: Download Artifact (conda)
+        uses: actions/download-artifact@v4
+        with:
+          name: conda_packages
+          path: ./conda_packages
 
       - name: Install Miniconda
         uses: conda-incubator/setup-miniconda@v3
@@ -163,6 +169,4 @@ jobs:
             upload \
             --user $ANACONDA_USER \
             conda_packages/*/*
-
-
         
