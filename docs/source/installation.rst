@@ -1,47 +1,60 @@
 Installation
 ============
 
-Presently, installation is done via pip.
+Installation is done via pip or conda.
 See below for detailed instructions.
 
 In all cases, it is highly recommended to install rydiqule in a virtual environment.
 
-Conda/pip installation
-----------------------
+Conda installation
+------------------
 
-If using a conda to provide the virtual environmnet,
-it can often be advantageous to install as many packages as possible via conda before running the pip installation command.
+Installation via conda is recommended for rydiqule.
+It handles dependency installation as well as a virtual environment to ensure packages do not conflict with other usages on the same system.
+Finally, the `numpy` provided by anaconda has been compiled against optimized BLAS/LAPACK implementations, which results in much better performance in rydiqule itself.
 
 Assuming you have not already created a separate environment for RydIQule (recommended), run the following to create a new environment:
 
 .. code-block:: shell
 
-  (base) ~/> conda create -n rydiqule python=3.9
+  (base) ~/> conda create -n rydiqule python=3.11
   (base) ~/> conda activate rydiqule
 
 RydIQule currently requires python >3.8.
+For a new installation, it is recommended to use the newest supported python.
 
-Now install dependencies that are available via conda.
-To capture as many dependencies as possible,
-we will add the `conda-forge` channel at a lower priority.
-
-.. code-block:: shell
-
-  (rydiqule) ~/> conda config --env --append channels conda-forge
-  (rydiqule) ~/> conda config --set channel_priority strict
-  (rydiqule) ~/> conda install numpy scipy matplotlib networkx numba psutil
-  # ARC specific dependencies available via conda
-  (rydiqule) ~/> conda install sympy asteval lmfit uncertainties
-
-
-Now use pip to install rydiqule and remaining dependencies.
+Now install via rydiqule's anaconda channel.
+This channel provides rydiqule as well as its dependencies that are not available in the default anaconda channel.
+If one of these dependencies is outdated, please raise an issue with the 
+`vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
 
 .. code-block:: shell
 
-  # for normal installation
-  (rydiqule) ~/Rydiqule> pip install rydiqule
-  # for editable installation of cloned repo, so source can be modified locally
-  (rydiqule) ~/Rydiqule> pip install -e .
+  (rydiqule) ~/> conda install -c rydiqule rydiqule
+
+
+If you would like to install rydiqule in editable mode to locally modify its source,
+this must be done using pip.
+Follow the above to install rydiqule and its dependencies,
+then run the following to uninstall rydiqule as provided by conda
+and install the editable local repository.
+
+.. code-block:: shell
+
+  (rydiqule) ~/> conda remove rydiqule --force
+  # following must be run from root of local repository
+  (rydiqule) ~/> pip install -e .
+
+Note that editable installations require `git`.
+This can be provided by a system-wide installation or via conda in the virtual environment (`conda install git`).
+
+.. note::
+
+    While rydiqule is a pure python package (ie it is platform independent), its core dependency ARC is not.
+    If a pre-built package of ARC is not available for your platform in our anaconda channel,
+    you will need to install ARC via `pip` to build it locally before installing `rydiqule`.
+    To see what architectures are supported, please see the 
+    `vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
 
 Pure pip installation
 ---------------------
@@ -60,6 +73,8 @@ run the following from the root directory of the cloned repository:
 .. code-block:: shell
 
   pip install -e .
+
+Editable installtion requires `git` to be installed.
 
 Confirm installation
 --------------------
@@ -94,7 +109,15 @@ Updating an existing installation
 ---------------------------------
 
 Upgrading an existing installation is simple.
-Simply run the pip installation commands described above.
+Simply run the appropriate upgrade command for the installation method used.
+
+For conda installations, run the following command to upgrade rydiqule
+
+.. code-block:: shell
+
+  conda upgrad rydiqule
+
+For `pip`, you can use the same installation command to upgrade.
 Optionally, include the update flag to greedily update dependencies as well.
 
 .. code-block:: shell
@@ -117,7 +140,7 @@ Dependencies
 This package requires installation of the excellent `ARC <https://github.com/nikolasibalic/ARC-Alkali-Rydberg-Calculator>`_ 
 package, which is used to get Rydberg atomic properties. 
 It also requires other standard computation dependenices, such as `numpy`, `scipy`, `matplotlib`, etc.
-These will be automatically installed by pip if not already present.
+These will be automatically installed if not already present.
 
 .. note::
 
@@ -135,3 +158,9 @@ They can be installed automatically via the optional extras specification for th
 .. code-block:: shell
 
   pip install rydiqule[backends]
+
+For conda installations, these dependencies must be installed manually
+
+.. code-block:: shell
+
+  conda install -c rydiqule CyRK numbakit-ode
