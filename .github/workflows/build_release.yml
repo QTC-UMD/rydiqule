@@ -105,7 +105,7 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create Github Release and Upload Release Asset
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.ref }}
           name: ${{ env.PACKAGE_NAME }} ${{ env.VERSION }}
