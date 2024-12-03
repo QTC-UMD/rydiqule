@@ -120,7 +120,7 @@ jobs:
     needs: [build, conda-release]
     environment:
       name: testpypi
-      url: https://pypi.org/p/${{ env.PACKAGE_NAME }}
+      url: https://test.pypi.org/p/${{ env.PACKAGE_NAME }}
     permissions:
       id-token: write
     steps:
