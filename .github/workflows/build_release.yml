@@ -112,6 +112,7 @@ jobs:
           draft: true
           prerelease: ${{ contains(github.event.ref, 'rc') }}
           files: ./dist/${{ env.PACKAGE_NAME }}-${{ env.VERSION }}.tar.gz
+          generate_release_notes: true
 
   test-pypi-release:
     name: TestPyPI Release
