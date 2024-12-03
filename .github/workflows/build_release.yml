@@ -113,13 +113,13 @@ jobs:
           prerelease: ${{ contains(github.event.ref, 'rc') }}
           files: ./dist/${{ env.PACKAGE_NAME }}-${{ env.VERSION }}.tar.gz
 
-  pypi-release:
-    name: PyPI Release
+  test-pypi-release:
+    name: TestPyPI Release
     runs-on: ubuntu-latest
     if: github.repository_owner == 'QTC-UMD'
     needs: [build, conda-release]
     environment:
-      name: pypi
+      name: testpypi
       url: https://pypi.org/p/${{ env.PACKAGE_NAME }}
     permissions:
       id-token: write
@@ -134,6 +134,23 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+
+  pypi-release:
+    name: PyPI Release
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'QTC-UMD'
+    needs: [build, test-pypi-release, conda-release]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ env.PACKAGE_NAME }}
+    permissions:
+      id-token: write
+    steps:
+      - name: Download Artifact (pip)
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: ./dist
 
       - name: Publish on PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
