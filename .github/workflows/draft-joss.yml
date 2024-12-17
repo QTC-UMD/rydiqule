@@ -22,3 +22,9 @@ jobs:
         with:
           name: joss-paper-v2
           path: paper/rq_v2_paper.pdf
+      - name: (debug) see where the paper was put
+        uses: jaywcjlove/github-action-folder-tree@main
+        with:
+          exclude: ".git|docs"
+          path: ./
+          depth: 5
