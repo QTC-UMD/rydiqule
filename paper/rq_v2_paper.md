@@ -110,7 +110,7 @@ Other tools that implement this type of simulation for specific types of problem
 Ultimately, the goal of RydIQule has not been to develop a new modeling technique,
 but rather to make a common, flexible, and most importantly efficient tool that solves a ubiquitous problem.
 
-RydIQule's version 2 release is specifically designed to capture the functionality of the Atomic Density Matrix (ADM) package [@rochester_atomicdensitymatrix_nodate] written in Mathematica.
+RydIQule's version 2 release is specifically designed to capture the functionality of the Atomic Density Matrix (ADM) package [@rochester_atomicdensitymatrix_2008] written in Mathematica.
 While very capable, it suffers from a couple of limitations.
 Firstly, it is built on a proprietary platform requiring a paid license.
 Second, since mathematica is an interpreted language,
