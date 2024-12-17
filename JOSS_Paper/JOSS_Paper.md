@@ -8,14 +8,18 @@ tags:
   - Quantum
   - Graph
 authors:
-  - name: Ben Miller
+  - name: Benjamin N. Miller
     orcid: 0000-0003-0017-1355
     equal-contrib: true
     affiliation: 1 
-  - name: David Meyer
-    orcid: 0000-0000-0000-0000
+  - name: David H. Meyer
+    orcid: 0000-0003-2452-2017
     equal-contrib: true
     affiliation: 1
+affiliations:
+  - index: 1
+    name: DEVCOM Army Research Laboratory, 2800 Powder Mill Rd, Adelphi, MD, 20783, USA
+    ror: 011hc8f90
 
 date: 11 Dec 2024
 bibliography: paper.bib
@@ -28,7 +32,7 @@ The Rydberg Interactive Quantum Module (RydIQule) is a Python package which uses
 
 # Statement of Need
 
-The unique quantum properties of Rydberg atoms offer distinct advantages in the fields of sensing, communication, and quantum information which make them distinct from any classical analogue. (should have references?). The initial release of RydIQule (cite) in early 2024 built the foundational structure of generating differential equations from graph. While technically capable of modelling a huge variety of systems, it was missing functionality both in easy of use and capabilities in some more complex systems. The version 2 release of RydIQule introduces a new paradigm for labeling states by their quantum number, which trivializes creation systems with huge numbers of states, and can automatically calculate dipole moments for allowed transitions in real atoms such as Rubidium and Cesium. 
+The unique quantum properties of Rydberg atoms offer distinct advantages in the fields of sensing, communication, and quantum information which make them distinct from any classical analogue [@adams_rydberg_2019]. The initial release of RydIQule in early 2024 [@miller_rydiqule_2024] built the foundational structure of generating differential equations from graph. While technically capable of modelling a huge variety of systems, it was missing functionality both in easy of use and capabilities in some more complex systems. The version 2 release of RydIQule introduces a new paradigm for labeling states by their quantum number, which trivializes creation systems with huge numbers of states, and can automatically calculate dipole moments for allowed transitions in real atoms such as Rubidium and Cesium. 
 
 Many atomic systems have their levels divided into magnetic sublevels, which enable types of experiments not possible without them (example?). While many such systems could in principle be modeled with RydIQule's initial release, practical limitations would arise from accounting for systems which could quickly reach dozens or even hundreds of quantum states. For example, in accounting for nuclear magnetic splitting, users would have no choice but to individually add each state and coupling, making RydIQule of little functional use for modelling such systems. The primary goal of RydIQle version 2 is to allow modelling such effects with little additional code beyond what was required to solve very simple systems in Version 1. 
 
@@ -40,11 +44,11 @@ RydIQule v2 handles this sublevel structure by expanding the way nodes are label
 
 # Related Packages and Work
 
-RydIQule, especially in its v2 realease, is designed to capture the functionality of the Atomic Density Matrix (ADM) package written in Mathematica. While very capable, and used by many labs as a modelling aid, it suffers from a couple of limitations. Firstly, it is built on a proprietary platform requiring a paid license. Second, since mathematica is a completely interpreted language, it lacks the speed that complied libraries like numpy enable, especially when exploring a large parameter space.
+RydIQule, especially in its v2 realease, is designed to capture the functionality of the Atomic Density Matrix (ADM) package [@rochester_atomicdensitymatrix_nodate] written in Mathematica. While very capable, and used by many labs as a modelling aid, it suffers from a couple of limitations. Firstly, it is built on a proprietary platform requiring a paid license. Second, since mathematica is a completely interpreted language, it lacks the speed that complied libraries like numpy enable, especially when exploring a large parameter space.
 
-Calculation of physical properties of real atoms is handled by the ARC Rydberg package [@sibalic_arc_2017]. Once calculated, RydIQule populates these values where appropriate onto its own graph model.
+Calculation of physical properties of real atoms is handled by the ARC Rydberg package [@sibalic_arc_2017, @robertson_arc_2021]. Once calculated, RydIQule populates these values where appropriate onto its own graph model.
 
-Additionally, RydIQule version 1 has been used as a modelling aid in several recent publications (add)
+Additionally, RydIQule version 1 has been used as a modelling aid in several recent publications [@santamaria-botello_comparison_2022, @elgee_satellite_2023, @richardson_study_2023, @backes_performance_2024, @su_two-photon_2024, @gokhale_deep_2024]
 
 # Acknowledgements
 
