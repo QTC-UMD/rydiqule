@@ -91,7 +91,7 @@ RydIQule's internals have been overhauled to not only ensure that all relevant s
 ## Improved Calculation of Atomic Properties
 
 Version 2 of RydIQule also completely overhauls the `Cell` class, which provides automatic calculation of atomic properties of alkali atoms
-using the Alkali.ne Rydberg Calculator (ARC) package [@sibalic_arc_2017, @robertson_arc_2021].
+using the Alkali.ne Rydberg Calculator (ARC) package [@sibalic_arc_2017; @robertson_arc_2021].
 In version 1, this class could only handle simplified atomic models that treated manifolds of atomic sublevels as a single approximate state.
 Though this type of model is very fast and can be effective in many situtations,
 it breaks down for systems in the presence of magnetic fields (including those as weak as Earth's background magnetic field)
@@ -117,8 +117,8 @@ Second, since mathematica is an interpreted language,
 it lacks the speed that complied libraries like NumPy enable, especially when exploring a large parameter space.
 
 Since RydIQule version 1 has been publically released,
-it has been used in several recent publications to model both general Rydberg atom physics [@backes_performance_2024, @su_two-photon_2024,]
-as well as Rydberg sensor development [@santamaria-botello_comparison_2022, @elgee_satellite_2023, @richardson_study_2023, @gokhale_deep_2024].
+it has been used in several recent publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024]
+as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024].
 
 # Acknowledgements
 
