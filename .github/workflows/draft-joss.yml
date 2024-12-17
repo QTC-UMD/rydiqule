@@ -1,24 +1,24 @@
 name: Draft JOSS pdf
 on:
-    push:
-        paths:
-            - JOSS_Paper/**
-            - .github/workflows/draft-joss.yml
+  push:
+    paths:
+      - paper/**
+      - .github/workflows/draft-joss.yml
 
 jobs:
-    paper:
-        runs-on: ubuntu-latest
-        name: JOSS Draft
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-            - name: Build rydiqule v2 pdf
-              uses: openjournals/openjournals-draft-action@master
-              with:
-                journal: joss
-                paper-path: JOSS_Paper/JOSS_Paper.md
-            - name: Upload Artifact
-              uses: actions/upload-artifact@v4
-              with:
-                name: joss-paper-v2
-                path: JOSS_Paper/JOSS_Paper.pdf
+  paper:
+    runs-on: ubuntu-latest
+    name: JOSS Draft
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build rydiqule v2 pdf
+        uses: openjournals/openjournals-draft-action@master
+        with:
+          journal: joss
+          paper-path: paper/rq_v2_paper.md
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: joss-paper-v2
+          path: paper/rq_v2_paper.pdf
