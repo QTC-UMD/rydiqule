@@ -8,10 +8,13 @@ import itertools
 
 import numpy as np
 
-from typing import Tuple, Union, Optional, Iterable
+from typing import Tuple, Union, Optional, Iterable, Iterator, List
+from typing_extensions import Unpack
+
+from ..exceptions import RydiquleError, RydiquleWarning
 
 
-def compute_grid(stack_shape: Tuple[int, ...], n_slices: int):
+def compute_grid(stack_shape: Tuple[int, ...], n_slices: int) -> List[np.ndarray]:
     """Calculate the bin edges to break a given stack shape into at least a certain number of pieces
 
     Works by iterating first over a number of slices per axis (N=1,2,3),
@@ -42,15 +45,17 @@ def compute_grid(stack_shape: Tuple[int, ...], n_slices: int):
         
     Examples
     --------
+    >>> import rydiqule.slicing.slicing as slicing
     >>> stack_shape=(10,10)
-    >>> print(compute_grid(stack_shape, 4))
+    >>> print(slicing.compute_grid(stack_shape, 4))
     [array([ 0,  5, 10]), array([ 0,  5, 10])]
-    >>> print(compute_grid(stack_shape, 6))
+    >>> print(slicing.compute_grid(stack_shape, 6))
     [array([ 0,  3,  6, 10]), array([ 0,  5, 10])]
+    
     """
     
     if n_slices > np.prod(stack_shape):
-        raise ValueError(f"Too many slices ({n_slices}) for stack of shape {stack_shape}")
+        raise RydiquleError(f"Too many slices ({n_slices}) for stack of shape {stack_shape}")
     
     n_ax_slices = np.ones_like(stack_shape)
     
@@ -72,7 +77,7 @@ def compute_grid(stack_shape: Tuple[int, ...], n_slices: int):
 def matrix_slice(*matrices: np.ndarray,
                  edges: Optional[Iterable] = None,
                  n_slices: Optional[int] = None
-                 ): # type: (...) -> Iterator[Tuple[Tuple[slice, ...], Unpack[Tuple[np.ndarray,...]]]]
+                 ) -> Iterator[Tuple[Tuple[slice, ...], Unpack[Tuple[np.ndarray, ...]]]]:
     """
     Generator that returns parts of a stack of matrices.
 
@@ -108,35 +113,30 @@ def matrix_slice(*matrices: np.ndarray,
         
     Examples
     --------
-    >>> import numpy as np
-    >>> import rydiqule as rq
-
     >>> M1 = np.ones((1,20,4,4))
     >>> M2 = np.ones((20,1,4,4))
     >>> M3 = np.ones((20,20,4,4))
-    
     >>> axis0_edges = np.array([0,10,20])
     >>> axis1_edges = np.array([0,10,20])
-    
-    >>> for idx,m1,m2, m3 in rq.matrix_slice(M1, M2, M3, edges=[axis0_edges, axis1_edges]):
-    >>>     print(m1.shape, m2.shape, m3.shape)
-    
+    >>> for idx,m1,m2, m3 in rq.slicing.slicing.matrix_slice(M1, M2, M3, edges=[axis0_edges, axis1_edges]):
+    ...     print(m1.shape, m2.shape, m3.shape)
     (1, 10, 4, 4) (10, 1, 4, 4) (10, 10, 4, 4)
     (1, 10, 4, 4) (10, 1, 4, 4) (10, 10, 4, 4)
     (1, 10, 4, 4) (10, 1, 4, 4) (10, 10, 4, 4)
     (1, 10, 4, 4) (10, 1, 4, 4) (10, 10, 4, 4)
+
     """
     #catch input shape errors and raise more useful errors
     shapes = [m.shape for m in matrices]
     if len(matrices) == 0:
-        raise ValueError("Must provide at least 1 matrix for slicing")
+        raise RydiquleError("Must provide at least 1 matrix for slicing")
     if matrices[0].ndim < 2:
-        raise ValueError("Must have at least 2d matrices to slice")
+        raise RydiquleError("Must have at least 2d matrices to slice")
 
     try:
         stack_shape = np.broadcast_shapes(*shapes)[:-2]
-    except ValueError:
-        raise ValueError(f"Incompatiple input shapes {shapes}")
+    except ValueError as err:
+        raise RydiquleError(f"Incompatiple input shapes {shapes}") from err
     
     # handle the trivial case of a single hamiltonian
     if len(stack_shape) == 0:
@@ -150,12 +150,12 @@ def matrix_slice(*matrices: np.ndarray,
         elif n_slices > 1:
             edges = compute_grid(stack_shape, n_slices)
         else:
-            raise ValueError("n_slices must be positive int if specified")
+            raise RydiquleError("n_slices must be positive int if specified")
 
     #check that the bins slice each axis appropriately
     for i,e in enumerate(edges):
         if e[0] != 0 or e[-1] != stack_shape[i]:
-            raise ValueError(
+            raise RydiquleError(
                 f"slices must start at 0 and end at the axis length ({stack_shape[i]} for axis {i})"
                 )
 
@@ -239,8 +239,8 @@ def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int
 
     Raises
     ------
-    MemoryError: If there isn't enough memory to solve the system
-    MemoryError: If `sum_doppler=False` and full solution does not fit in memory.
+    RydiquleError: If there isn't enough memory to solve the system
+    RydiquleError: If `sum_doppler=False` and full solution does not fit in memory.
 
     """
     # set the initial number of slices to 1 if None are specified
@@ -324,8 +324,8 @@ def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int
         print(f'\tFull output solution size: {output_sol_size/1024**3:.5g} GiB')
         print(f'Available memory for sliced solves: {available_mem/1024**3:.5g} GiB')
 
-    if (total_mem - min_sol_mem) <= 0:
-        raise MemoryError(f'System is too large to solve. Need at least {min_sol_mem/1024**3} GiB')
+    if (float(total_mem) - float(min_sol_mem)) <= 0:
+        raise RydiquleError(f'System is too large to solve. Need at least {min_sol_mem/1024**3} GiB')
     
     compare_vals = np.array([np.ceil(single_eom_mem*stack_factor / available_mem), n_slices],
                             dtype=float)
@@ -335,7 +335,7 @@ def get_slice_num(n: int, stack_shape: Tuple[int, ...], doppler_shape: Tuple[int
         if not sum_doppler and n_ham_slices > 1:
             msg = ("Setting 'sum_doppler=False' if full equations of motion"
                    " do not fit in memory is unsupported.")
-            raise MemoryError(msg)
+            raise RydiquleError(msg)
 
     if debug:
         print(f'Number of stack slices to be used: {n_ham_slices:d}')
@@ -392,11 +392,11 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
 
     Raises
     ------
-    MemoryError: If `sum_doppler=False` and full solution does not fit in memory.
+    RydiquleError: If `sum_doppler=False` and full solution does not fit in memory.
 
     Warns
     -----
-    UserWarning: If there is unlikely to be enough memory to solve the system.
+    RydiquleWarning: If there is unlikely to be enough memory to solve the system.
 
     """
     # get total avaialable memory for the system
@@ -482,9 +482,10 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
         print(f'\tFull output solution size: {output_sol_size/1024**3:.5g} GiB')
         print(f'Available memory for sliced solves: {available_mem/1024**3:.5g} GiB')
 
-    if (total_mem - min_sol_mem) <= 0:
+    if (float(total_mem) - float(min_sol_mem)) <= 0:
         warnings.warn(
-            f'System is likely too large to solve. Need at least {min_sol_mem/1024**3} GiB')
+            f'System is likely too large to solve. Need at least {min_sol_mem/1024**3} GiB',
+            RydiquleWarning)
 
     #array of the minimum necessary slices and the specified number of slices
     compare_vals = np.array([np.ceil(single_eom_mem*stack_factor / available_mem), n_slices],
@@ -495,7 +496,7 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
         if not sum_doppler and n_ham_slices > 1:
             msg = ("Setting 'sum_doppler=False' if full equations of motion"
                    " do not fit in memory is unsupported.")
-            raise MemoryError(msg)
+            raise RydiquleError(msg)
 
     if debug:
         print(f'Number of stack slices to be used: {n_ham_slices:d}')

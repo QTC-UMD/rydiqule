@@ -10,55 +10,7 @@ import warnings
 
 from typing import Tuple, List
 
-
-def get_transmission_coef(*args, **kwargs):
-    """
-    Deprecated. Please use :meth:`.Solution.get_transmission_coef`.
-    """
-    
-    raise RuntimeError('rq.get_transmission_coef is deprecated '
-                       'in favor of Solution.get_transmission_coef. '
-                       'Note that arugments have also changed.')
-
-
-def get_OD(*args, **kwargs):
-    """
-    Deprecated. Please use :meth:`.Solution.get_OD`
-    """
-    
-    raise RuntimeError('rq.get_OD is deprecated '
-                       'in favor of Solution.get_OD. '
-                       'Note that arugments have also changed.')
-
-
-def get_phase_shift(*args, **kwargs):
-    """
-    Deprecated. Please use :meth:`.Solution.get_phase_shift`
-    """
-    
-    raise RuntimeError('rq.get_phase_shift is deprecated '
-                       'in favor of Solution.get_phase_shift. '
-                       'Note that arugments have also changed.')
-
-
-def get_susceptibility(*args, **kwargs):
-    """
-    Deprecated. Please use :meth:`.Solution.get_susceptibility`
-    """
-    
-    raise RuntimeError('rq.get_susceptibility is deprecated '
-                       'in favor of Solution.get_susceptibility. '
-                       'Note that arugments have also changed.')
-
-
-def get_solution_element(*args, **kwargs):
-    """
-    Deprecated. Please use :meth:`.Solution.get_solution_element`.
-
-    """
-    
-    raise RuntimeError('rq.get_solution_element is deprecated '
-                       'in favor of Solution.get_solution_element')
+from .exceptions import RydiquleError, TimeDependenceWarning
 
 
 def get_snr(sensor: Sensor,
@@ -127,18 +79,21 @@ def get_snr(sensor: Sensor,
 
     Raises
     ------
-    ValueError
+    RydiquleError
         If the specified param_label is not in `Sensor.axis_labels()`
 
     Examples
     --------
-    >>> c = rq.Sensor('Rb85', *rq.D2_states('Rb85'))
-    >>> c.add_coupling(states=(0,1), rabi_frequency=np.linspace(1e-6, 1, 5), detuning=1)
-    >>> snr, mesh = rq.get_snr(c, 0.01, '(0,1)_rabi_frequency')
-    >>> print(snr)
-    >>> print(mesh)
-    [     0. 3422.56 6843.41 10260.86 13673.19]
-    [array([0., 0.25, 0.50, 0.75, 1.])]
+    >>> atom = "Rb85"
+    >>> [g,e] = rq.D2_states("Rb85")
+    >>> c = rq.Cell('Rb85', [g,e], cell_length=0.0001)
+    >>> c.add_coupling(states=(g,e), rabi_frequency=np.linspace(1e-6, 1, 5), detuning=1, label="probe")
+    >>> snr, mesh = rq.get_snr(c, 'probe_rabi_frequency')
+    >>> print(snr) 
+    [       0.       13947396.7 27887614.4 41813486.6
+     55717871.1]
+    >>> print(mesh) # doctest: +SKIP
+    [array([0.      , 0.25    , 0.499999, 0.749999, 0.999999])]
 
     References
     ----------
@@ -152,16 +107,16 @@ def get_snr(sensor: Sensor,
     labels = sensor.axis_labels()
     try:
         sensitivity_axis = labels.index(param_label)
-    except ValueError:
-        raise ValueError(f"{param_label} label is not in sensor.axis_labels()")
+    except ValueError as err:
+        raise RydiquleError(f"{param_label} label is not in sensor.axis_labels()") from err
     
     if len(sensor.couplings_with('time_dependence')):
-        warnings.warn(UserWarning('At least one coupling has time dependence. '
-                                  'get_snr() only solves in steady-state; '
-                                  'results may not be as expected.'))
+        warnings.warn(TimeDependenceWarning('At least one coupling has time dependence. '
+                                            'get_snr() only solves in steady-state; '
+                                            'results may not be as expected.'))
 
     full_sols = solve_steady_state(sensor, **kwargs)
-    rhos_ij = full_sols.rho_ij(*full_sols.probe_tuple)
+    rhos_ij = full_sols.coupling_coefficient_observable()
 
     _ = full_sols.get_OD()
     

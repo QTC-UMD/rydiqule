@@ -74,13 +74,7 @@ instance/
 
 # Sphinx documentation
 docs/source/api/_autosummary
-docs/source/_examples
-docs/source/_intro_nbs
-# track the output pdf
 docs/build/*
-!docs/build/latex
-docs/build/latex/*
-!docs/build/latex/rydiqule.pdf
 
 # PyBuilder
 target/
@@ -166,3 +160,4 @@ Untitled.ipynb
 profiling
 *.pkl
 sensor_inventory/*.pkl
+.vscode/settings.json

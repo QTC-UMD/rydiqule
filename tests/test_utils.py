@@ -1,6 +1,7 @@
 import numpy as np
+import rydiqule as rq
 from rydiqule.doppler_utils import gaussian3d, doppler_classes, doppler_mesh
-from rydiqule import matrix_slice
+from rydiqule.slicing.slicing import matrix_slice
 import pytest
 
 
@@ -65,3 +66,20 @@ def test_matrix_slice():
         total_size_calc += np.prod(np.broadcast_shapes(m1.shape,m2.shape,m3.shape))
 
     assert total_size_calc == total_size_true
+
+
+@pytest.mark.util
+def test_density_matrix_conversions():
+    '''Tests density matrix conversions between computational and complex bases.'''
+
+    test_dms = np.array([[[0.1 , 0.  , 0.  , 0.25, 0.  , 0.  , 0.  , 0.25],
+                          [0.1 , 0.  , 0.  , 0.25, 0.2 , 0.  , 0.  , 0.25]],
+                         [[0. , 0. , 0.1, 0.5, 0.2, 0. , 0. , 0.5],
+                          [0. , 0. , 0.1, 0.5, 0.2, 0. , 0.1, 0.5]]],
+                          dtype=float)
+
+    complex_dms = rq.sensor_utils.convert_dm_to_complex(test_dms)
+
+    converted_dms = rq.sensor_utils.convert_complex_to_dm(complex_dms)
+
+    np.testing.assert_allclose(test_dms, converted_dms)

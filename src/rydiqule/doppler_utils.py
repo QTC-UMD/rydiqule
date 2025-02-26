@@ -6,30 +6,32 @@ import numpy as np
 from scipy import special
 
 from .sensor_utils import _hamiltonian_term, make_real, remove_ground
+from .exceptions import RydiquleError
 
 from typing import Tuple, Optional, TypedDict, Union, Literal, Sequence
+from typing_extensions import Required
 
 
 class UniformMethod(TypedDict, total=False):
-    method: Literal['uniform']
+    method: Required[Literal['uniform']]
     width_doppler: float
     n_uniform: int
 
 
 class IsoPopMethod(TypedDict, total=False):
-    method: Literal['isopop']
+    method: Required[Literal['isopop']]
     n_isopop: int
 
 
 class SplitMethod(TypedDict, total=False):
-    method: Literal['split']
+    method: Required[Literal['split']]
     width_doppler: float
     n_doppler: int
     width_coherent: float
     n_coherent: int
 
 
-class DirectMethod(TypedDict, total=False):
+class DirectMethod(TypedDict, total=True):
     method: Literal['direct']
     doppler_velocities: Union[np.ndarray, Sequence]
 
@@ -141,7 +143,7 @@ def gaussian3d(Vs: np.ndarray) -> np.ndarray:
     """
     spatial_dim = Vs.shape[0]
     if spatial_dim > 3:
-        raise ValueError(f"Too many axes supplied: {spatial_dim}")
+        raise RydiquleError(f"Too many axes supplied: {spatial_dim}")
 
     prefactor = np.power(1/(np.pi),spatial_dim*0.5)
 
@@ -226,7 +228,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
     The defaults will sample more densely near the center of the distribution,
     (the "split" method) with a total of 561 classes.
 
-    >>> classes = rq.doppler_classes() #use the default values
+    >>> classes = rq.doppler_utils.doppler_classes() #use the default values
     >>> print(classes.shape)
     (561,)
 
@@ -234,7 +236,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
     classes by default.
 
     >>> m = {"method":"uniform"}
-    >>> classes = rq.doppler_classes(method=m)
+    >>> classes = rq.doppler_utils.doppler_classes(method=m)
     >>> print(classes.shape)
     (1601,)
 
@@ -242,14 +244,14 @@ def doppler_classes(method: Optional[MeshMethod] = None
     of the velocity distribution.
 
     >>> m = {"method":"uniform", "n_uniform":801}
-    >>> classes = rq.doppler_classes(method=m)
+    >>> classes = rq.doppler_utils.doppler_classes(method=m)
     >>> print(classes.shape)
     (801,)
 
     The "split" method also has further specifications
 
     >>> m = {"method":"split", "n_coherent":301, "n_doppler":501}
-    >>> classes = rq.doppler_classes(method=m)
+    >>> classes = rq.doppler_utils.doppler_classes(method=m)
     >>> print(classes.shape)
     (701,)
 
@@ -264,13 +266,12 @@ def doppler_classes(method: Optional[MeshMethod] = None
     if method is None:
         method = SplitMethod(method="split")
 
-    assert method is not None
     implemented_methods = ["uniform","isopop","split","direct"]
     try:
         if method["method"] not in implemented_methods:
-            raise ValueError(f"Method {method['method']} is not a recognized meshing method.")
-    except KeyError:
-        raise KeyError("Meshing method must be a dictionary with at least key 'method'")
+            raise RydiquleError(f"Method {method['method']} is not a recognized meshing method.")
+    except KeyError as err:
+        raise RydiquleError("Meshing method must be a dictionary with at least key 'method'") from err
 
     if method["method"] == "uniform":
         # use default options if not provided
@@ -282,7 +283,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
         n_isopop = method.get("n_isopop", 400)
         bin_edges = np.linspace(0, 1.0, n_isopop+1)
         bin_centers = (bin_edges - bin_edges[1]/2)[1:]
-        doppler_velocities = special.erfinv(2*bin_centers-1)*np.sqrt(2)
+        doppler_velocities: np.ndarray = special.erfinv(2*bin_centers-1)*np.sqrt(2)
     elif method["method"] == "split":
         # use default options if not provided
         width_doppler = method.get("width_doppler",2.0)
@@ -299,15 +300,13 @@ def doppler_classes(method: Optional[MeshMethod] = None
                                         range_coherent)
     elif method["method"] == "direct":
         try:
-            doppler_velocities = method["doppler_velocities"]  # type: ignore[assignment]
-        except KeyError:
-            raise KeyError("Method 'direct' must specify a 'doppler_velocities' config parameter")
-        if not isinstance(doppler_velocities,np.ndarray):
-            doppler_velocities = np.array(doppler_velocities)  # type: ignore[unreachable]
-        # ensure numpy array, then assert shape is 1-D
+            doppler_velocities = np.asarray(method["doppler_velocities"])
+        except KeyError as err:
+            raise RydiquleError("Method 'direct' must specify a 'doppler_velocities' config parameter") from err
+        # assert shape is 1-D
         assert len(doppler_velocities.shape) == 1, "doppler_velocities must be 1-D"
 
-    return doppler_velocities
+    return doppler_velocities  # pyright: ignore[reportPossiblyUnboundVariable]
 
 
 def doppler_mesh(doppler_velocities: np.ndarray, spatial_dim: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -333,13 +332,13 @@ def doppler_mesh(doppler_velocities: np.ndarray, spatial_dim: int) -> Tuple[np.n
     Examples
     --------
     >>> m = {"method":"uniform", "n_uniform":801}
-    >>> classes = rq.doppler_classes(method=m)
-    >>> mesh, vols = rq.doppler_mesh(classes, 2)
+    >>> classes = rq.doppler_utils.doppler_classes(method=m)
+    >>> mesh, vols = rq.doppler_utils.doppler_mesh(classes, 2)
     >>> print(type(mesh), type(vols))
+    <class 'numpy.ndarray'> <class 'numpy.ndarray'>
     >>> mesh_np = np.array(mesh)
     >>> vols_np = np.array(vols)
     >>> print(mesh_np.shape, vols_np.shape)
-    <class 'numpy.ndarray'> <class 'numpy.ndarray'>
     (2, 801, 801) (2, 801, 801)
 
     """
@@ -382,15 +381,15 @@ def apply_doppler_weights(sols: np.ndarray,
 
     Raises
     ------
-    ValueError
+    RydiquleError
         If the shapes of `velocities` and `volumes` do not match.
 
     """
     spatial_dim = volumes.shape[0]
 
     if volumes.shape != velocities.shape:
-        raise ValueError((f"velocity shape {velocities.shape} does not match "
-                         f"volume shape {volumes.shape}"))
+        raise RydiquleError((f"velocity shape {velocities.shape} does not match "
+                             f"volume shape {volumes.shape}"))
 
     weights = gaussian3d(velocities)
     volumes = np.prod(volumes, axis=0)

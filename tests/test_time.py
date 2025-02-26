@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import rydiqule as rq
+from rydiqule.atom_utils import A_QState
 
 
 @pytest.mark.time
@@ -12,13 +13,13 @@ def test_rabi_flop_doppler():
     """
     def const(t):
         return 1
-    kp = 0.001*np.array([1,0,0])
+    kp = 4*np.array([1,0,0])
 
     red_rabi_freq = 4.4444
     red_laser = {'states':(0,1), 'rabi_frequency':red_rabi_freq,
                  'detuning':0, 'kvec':kp, 'time_dependence': const}
 
-    sensor = rq.Sensor(3)
+    sensor = rq.Sensor(3, vP=0.001)
 
     sensor.add_couplings(red_laser)
     gamma = np.zeros((3,3))
@@ -94,19 +95,19 @@ def test_rabi_flop():
 def test_time_match_steady():
     """Uses a single tone RF field to check if the time solver starting at zero reached steady state
     """
-    red_laser = {'states':(0,1), 'rabi_frequency':2*np.pi*4.0, 'detuning':2.0}
-    blue_laser = {'states':(1,2), 'rabi_frequency':2*np.pi*6.0, 'detuning':-1.0}
-    rf_coupling_ss = {'states': (2,3), 'rabi_frequency':2*np.pi*5.0, 'detuning': 0}
 
-    rydberg_target_state = [150, 2, 2.5, 0.5]
-    rydberg_excited_state = [149, 3, 3.5, 0.5]
+    [g, e] = rq.D2_states(5)
+    rydberg_target_state = A_QState(150, 2, 2.5)
+    rydberg_excited_state = A_QState(149, 3, 3.5)
 
-    RbSensor_ss = rq.Cell("Rb85", *rq.D2_states(5),
-                          rydberg_target_state, rydberg_excited_state,
+    red_laser = {'states':(g,e), 'rabi_frequency':2*np.pi*4.0, 'detuning':2.0}
+    blue_laser = {'states':(e,rydberg_target_state), 'rabi_frequency':2*np.pi*6.0, 'detuning':-1.0}
+    rf_coupling_ss = {'states': (rydberg_target_state,rydberg_excited_state), 'rabi_frequency':2*np.pi*5.0, 'detuning': 0}
+
+    RbSensor_ss = rq.Cell("Rb85", [g, e, rydberg_target_state, rydberg_excited_state],
                           cell_length=0,
                           gamma_transit=0.1)
-    RbSensor_t = rq.Cell("Rb85", *rq.D2_states(5),
-                         rydberg_target_state, rydberg_excited_state,
+    RbSensor_t = rq.Cell("Rb85", [g, e, rydberg_target_state, rydberg_excited_state],
                          cell_length=0,
                          gamma_transit=0.1)
 
@@ -115,15 +116,15 @@ def test_time_match_steady():
     solSize = RbSensor_ss.basis_size * RbSensor_ss.basis_size-1
     initCond = np.zeros(solSize)
 
-    [n,l,j,m] = RbSensor_ss.states_list()[2]
-    [n2, l2, j2, m2] = RbSensor_ss.states_list()[3]
+    (n, l, j, _, _, _) = RbSensor_ss.states[2]
+    (n2, l2, j2, _, _, _) = RbSensor_ss.states[3]
 
-    rf_freq = RbSensor_ss.atom.getTransitionFrequency(n2,l2,j2,n,l,j)*1E-6
+    rf_freq = RbSensor_ss.atom.arc_atom.getTransitionFrequency(n2,l2,j2,n,l,j)*1E-6
 
     def rf_carrier(t):
         return np.cos(2*np.pi*rf_freq*t)
 
-    rf_coupling_t = {'states': (2,3), 'rabi_frequency':2*np.pi*5.0, 'time_dependence': rf_carrier}
+    rf_coupling_t = {'states': (rydberg_target_state, rydberg_excited_state), 'rabi_frequency':2*np.pi*5.0, 'time_dependence': rf_carrier}
     RbSensor_t.add_couplings(red_laser, blue_laser, rf_coupling_t)
 
     sampleNum = 10000
@@ -195,19 +196,19 @@ def test_time_complex_match_steady():
 def test_time_rwa():
 
     n = 159
-    RydbergTargetState = [n+1, 2, 2.5, 0.5]  # states labeled n, l, j, m_j
-    RydbergExcitedState = [n, 3, 3.5, 0.5]
+    [g, e] = rq.D2_states(5)
+    RydbergTargetState = A_QState(n+1, 2, 2.5)  # states labeled n, l, j
+    RydbergExcitedState = A_QState(n, 3, 3.5)
 
-    RbSensor_rwa = rq.Cell("Rb85", *rq.D2_states(5),
-                           RydbergTargetState, RydbergExcitedState,
+    RbSensor_rwa = rq.Cell("Rb85", [g, e, RydbergTargetState, RydbergExcitedState],
                            cell_length=0,
                            gamma_transit=2*np.pi*1)
-    RbSensor_norwa = rq.Cell("Rb85", *rq.D2_states(5),
-                             RydbergTargetState, RydbergExcitedState,
+    RbSensor_norwa = rq.Cell("Rb85", [g, e, RydbergTargetState, RydbergExcitedState],
                              cell_length=0,
                              gamma_transit=2*np.pi*1)
 
-    rf_freq = RbSensor_norwa.atom.getTransitionFrequency(n+1, 2, 2.5, n, 3, 3.5)*1E-6
+    rf_freq = RbSensor_norwa.atom.arc_atom.getTransitionFrequency(n+1, 2, 2.5, n, 3, 3.5)#*1E-6
+    
     field = 0.0006  # V/m
 
     def rf_fun(omega_0, omega_mod,factor):
@@ -218,13 +219,16 @@ def test_time_rwa():
     rf_norwa = rf_fun(2*np.pi*rf_freq, 2*np.pi*5,2)
     rf_rwa = rf_fun(0, 2*np.pi*5,1)
 
-    red_laser = {'states':(0,1), 'rabi_frequency':2*np.pi*0.6, 'detuning':0}
-    blue_laser = {'states':(1,2), 'rabi_frequency':2*np.pi*1.0, 'detuning':0}
-    RFrwa = {'states': (2,3), 'rabi_frequency':2*np.pi*0.6, "detuning":0, 'time_dependence': rf_rwa}
-    RFno = {'states': (2,3), 'rabi_frequency':2*np.pi*0.6, 'time_dependence': rf_norwa}
+    red_laser = {'states':(g,e), 'rabi_frequency':2*np.pi*0.6, 'detuning':0}
+    blue_laser = {'states':(e,RydbergTargetState), 'rabi_frequency':2*np.pi*1.0, 'detuning':0}
+    RFrwa = {'states': (RydbergTargetState,RydbergExcitedState), 'rabi_frequency':2*np.pi*0.6, "detuning":0, 'time_dependence': rf_rwa}
+    RFno = {'states': (RydbergTargetState,RydbergExcitedState), 'rabi_frequency':2*np.pi*0.6, 'time_dependence': rf_norwa}
 
     RbSensor_rwa.add_couplings(red_laser, blue_laser,RFrwa)
     RbSensor_norwa.add_couplings(red_laser, blue_laser,RFno)
+
+    RbSensor_rwa.add_transit_broadening(RbSensor_rwa.gamma_transit)
+    RbSensor_norwa.add_transit_broadening(RbSensor_norwa.gamma_transit)
 
     endTime = 5
     sampleNum = 1000000

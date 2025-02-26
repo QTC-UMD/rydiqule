@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import rydiqule as rq
 
+from rydiqule.atom_utils import A_QState
+
 from scipy.constants import c
 
 
@@ -13,9 +15,7 @@ def test_calculate_snr():
     and in the limit of small Rabi frequencies, that the optimum probe Rabis is sqrt(2) lower
     than the coupling.  Note that this test does not check the overal scalling of the SNR.
     """
-
-
-
+    
     kappa = 28759.120135025692
     eta = 0.0013537502717366691
     probe_freq = 2*np.pi*c/(780e-9)
@@ -23,9 +23,9 @@ def test_calculate_snr():
 
     red_rabi = np.linspace(0.1,4,100)
     blue_rabi = 1
-    
+
     Rb_sensor = rq.Sensor(4)
-    Rb_sensor.set_experiment_values(probe_tuple = (0,1), kappa = kappa, eta = eta,
+    Rb_sensor.set_experiment_values(kappa = kappa, eta = eta,
                           cell_length = cell_len, probe_freq = probe_freq)
 
     rf_rabi_step = np.array([0.1, 0.101])
@@ -58,13 +58,18 @@ def test_calculate_snr():
         'SNR with sensor does not match theory approximation'
 
     # Now check with a Cell to confirm general operation
-    r1 = [50, 2, 2.5, 0.5]
-    r2 = [51, 1, 1.5, 0.5]
+    [ground, D2e] = rq.D2_states("Rb85")
+    r1 = A_QState(50, 2, 2.5)
+    r2 = A_QState(51, 1, 1.5)
 
-    Rb_cell = rq.Cell('Rb85', *rq.D2_states("Rb85"), r1, r2,
-                      gamma_transit=0, beam_area=1e-6, cell_length = cell_len)
+    Rb_cell = rq.Cell('Rb85', [ground, D2e, r1, r2],
+                      gamma_transit=0, gamma_mismatch="ground", beam_area=1e-6, cell_length = cell_len)
 
-    Rb_cell.add_couplings(probe, couple, rf)
+    cell_probe = {'states': (ground, D2e), 'rabi_frequency': red_rabi, 'detuning': 0, 'label': 'probe'}
+    cell_couple = {'states': (D2e, r1), 'rabi_frequency': blue_rabi, 'detuning': 0, 'label':'couple'}
+    cell_rf = {'states': (r2,r1), 'rabi_frequency': rf_rabi_step, 'detuning':30, 'label': 'rf'}
+
+    Rb_cell.add_couplings(cell_probe, cell_couple, cell_rf)
 
     snrs, param_mesh = rq.get_snr(Rb_cell, param_label='rf_rabi_frequency',
         phase_quadrature=True,

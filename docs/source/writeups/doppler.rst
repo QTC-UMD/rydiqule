@@ -1,5 +1,5 @@
-Introduction
-============
+Doppler Averaging
+=================
 
 This document discusses the methods rydiqule uses to implement doppler-averaging of modelling results.
 The theoretical background is provided for completeness,
@@ -28,7 +28,7 @@ The basic process under these assumptions is as follows:
 Note that rydiqule assumes a three dimensional distribution of velocities, as is the case for a vapor.
 
 Choosing Velocity Classes to Calculate
-======================================
+--------------------------------------
 
 The primary influence of doppler velocities on the atomic physics is via Doppler shifts of the applied optical fields:
 defined as :math:`\Delta = \vec{k}\cdot\vec{v}`, where :math:`\vec{k}=2\pi/\lambda\cdot\hat{k}` is the k-vector of the the optical field
@@ -40,7 +40,7 @@ In the simplest case, all optical fields are colinear,
 meaning all Doppler shifts are due to velocities projected along a single axis.
 
 Choosing which velocity classes to calculate when performing doppler averaging is a fairly complex meshing problem.
-Our ultimate goal is to numerically approximate a continuous integratal in one to three dimensions using a discrete sum approximation.
+Our ultimate goal is to numerically approximate a continuous integral in one to three dimensions using a discrete sum approximation.
 For thermal vapors, where the spread of doppler velocities is large,
 resulting in Doppler shifts much greater than other detunings, linewidths, or Rabi frequenices in the problem,
 most velocity classes only contribute minor incoherent absorption to the final result.
@@ -55,7 +55,7 @@ which contains options for complete user specification of all classes,
 as well as some convenience distributions that can be specified via a few parameters.
 
 Maxwell-Boltzmann Distribution
-==============================
+------------------------------
 
 Given that rydiqule gives single-atom solutions,
 the total atomic response for a given set of parameters is directly proportional to the total number of atoms represented by those parameters.
@@ -94,8 +94,8 @@ This allows us to readily produce the appropriate weighting distribution for 1, 
 without having to perform redundant calculations of distributions where the density matrices to be averaged do not depend on a particular :math:`v_i`.
 This function is implemented in :func:`gaussian3d`.
 
-Doppler Averaging
-=================
+Averaging Velocity Classes
+--------------------------
 
 Given the above assumptions, the doppler average of the density matrix solutions is given by the integral
 
@@ -118,7 +118,7 @@ We again note that when all k-vectors along a particular axis are zero,
 and assumed to sum to unity due to normalization of the weighting distribution along each dimension.
 
 Rydiqule's Implementation
-=========================
+-------------------------
 
 Rydiqule's implementation of Doppler averaging is optimized to minimize duplicate calculations and fully leverage numpy's vectorized and broadcasting operations.
 The general steps are are follows:
@@ -126,26 +126,37 @@ The general steps are are follows:
 #. Choose the doppler velocities to use for the mesh in the average.
 #. Generate the Equations of Motion (EOMs) for the base zero velocity class using the machinery described in :doc:`Equations of Motion Generation <eom_notes>`.
 #. Generate the part of the EOMs that are proportional to the atomic velocity components :math:`v_i`.
-   This is done by generating EOMs for the system with all parameters set to zero except for the optical detunings with associated non-zero k-vector components :math:`k_i`.
-#. Generate the complete set of EOMs for all velocity classes via a broadcasting sum of the base EOMs with the Doppler EOMs multiplied by the velocity classes along each axis.
+   This is done by generating EOMs for the system with all parameters set to zero except for the optical detunings with associated non-zero k-vector components :math:`k_i`,
+   multiplied by :math:`v_P` to give the most probable Doppler shifts.
+#. Generate the complete set of EOMs for all velocity classes via a broadcasting sum of the base EOMs with the Doppler EOMs multiplied by the normalized velocity classes along each axis.
    Each non-zero spatial axis that is to be summed over is pre-pended as an axis to the EOM tensor, as described in :doc:`Stacking Conventions <stacking_conventions>`.
 #. Solve the entire stack of EOMs.
 #. Weight the EOMs according to their velocity classes via the Maxwell-Boltzmann distribution and the discrete velocity volume element, as described above.
 #. Sum the solutions along the velocity axes.
 
-Of particular note is the somewhat unconventional definition that Rydiqule uses for the "k-vector" of each optical field.
-To begin, all quantities in the EOMs are given in units of Mrad/s, so the "k-vector" must be defined so that multiplication by the velocity in m/s will produce these scaled units.
-Second, the "k-vector" defined for each coupling is *not* the optical k-vector, but rather the associated vector of most probable Doppler shift.
+Internally, rydiqule defines the necessary components for Doppler averaging via three quantities:
 
-.. math:: K_i = k_i v_p
+- the normalized velocity classes :math:`d`, provided by :func:`~.doppler_classes`
+- the most probable speed :math:`v_P` (in m/s), provided by the user as a class attribute
+- the optical k-vector :math:`\vec{k} = 2\pi /\lambda\cdot\hat{k}` in (Mrad/m), provided for each coupling that has Doppler shifts to be averaged over
 
-where :math:`k_i` is the optical k_vector component along the :math:`i`-th axis, :math:`v_p` is the most probable speed.
-The Doppler shift is found by multiplying :math:`K_i` by :math:`d_i`, the normalized velocity along the :math:`i`-th axis.
-The velocity along the :math:`i`-th axis is given by :math:`v_i = v_p d_i`.
-
-This construction has two benefits.
-First, it allows for meshes (ie velocity classes) to be defined in a general way relative to the distribution width :math:`v_p`,
+This construction has the benefit of allowing for meshes (ie velocity classes) to be defined in a general way relative to the distribution width :math:`v_P`,
 making them easily re-usable for any velocity distribution that obeys the Maxwell-Boltzmann distribution.
-Second, it allows the user the flexibility to define non-symmetric Doppler distributions, such as would be found in an atomic beam.
-This is done by defining the optical field "k-vectors" as :math:`K_i = k_i v_{p_i}`, where :math:`v_{p_i}` is the most probable speed along each axis.
-When doing this, the prefactor applied to the sum in :func:`gaussian3d` will need to be modified for quantitative accuracy.
+
+.. _kvec update:
+
+Migrating Doppler averaging from v1 to v2
++++++++++++++++++++++++++++++++++++++++++
+
+With the release of v2 of rydiqule, how the user provides the above quantities has changed for both :class:`~.Sensor` and :class:`~.Cell`.
+
+In v1, the `'kvec'` parameter of the coupling was defined as the most probable Doppler shift vector (ie :math:`\vec{k}*v_P`).
+This has been changed in v2 such that `'kvec'` is now defined as the optical k-vector only (in units of Mrad/m),
+and :math:`v_P` is provided separately at :class:`~.Sensor` instantiation or by manually updating the :attr:`~.Sensor.vP`.
+Put simply, moving :class:`~.Sensor` simulations from v1 to v2 means no longer multiplying the k-vector by :math:`v_P`,
+and providing the :attr:`~.Sensor.vP` attribute.
+
+For :class:`~.Cell`, v1 code followed the same old convention.
+Now that :class:`~.Cell` has improved :doc:`ARC integration <nlj>`,
+couplings in :class:`~.Cell` take the `'kunit'` argument which defines the unit propagation axis only.
+The :math:`v_P` and :math:`2\pi/\lambda` factors are calculated automatically and applied to any coupling with `'kunit'` defined.

@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import rydiqule as rq
 
+from rydiqule.atom_utils import A_QState
+
 @pytest.mark.structure
 @pytest.mark.time
 def test_sensor_signs_ladder():
@@ -156,7 +158,8 @@ def test_cell_signs_higher():
     sample_num = 10
 
     atom = "Rb85"
-    r_target = [150, 2, 2.5, 0.5]
+    [g, e1] = rq.D2_states(atom)
+    r_target = A_QState(150, 2, 2.5)
     
     rf_detuning = 8  # MHz
     rf_rabi = 4
@@ -165,19 +168,18 @@ def test_cell_signs_higher():
     dets = np.linspace(-1,1,21)
 
     # couple to higher energy state
-    r_couple = [149, 3, 3.5, 0.5]
-    c = rq.Cell(atom, *rq.D2_states(atom),
-                r_target, r_couple,
+    r_couple = A_QState(149, 3, 3.5)
+    c = rq.Cell(atom, [*rq.D2_states(atom), r_target, r_couple],
                 cell_length=0,
                 gamma_transit=2*np.pi*0.2)
     
-    rf_freq = np.abs(c.get_cell_tansition_frequency(2,3)*1e-6)
+    rf_freq = np.abs(c.atom.get_transition_frequency(r_target,r_couple)*1e-6)
     def rf_field(t):
         return np.cos(2*np.pi*(rf_freq+rf_detuning)*t)
 
-    p = {'states':(0,1), 'rabi_frequency':2*np.pi*0.1, 'detuning':0}
-    d = {'states':(1,2), 'rabi_frequency':2*np.pi*1.0, 'detuning':2*np.pi*dets}
-    rf = {'states':(2,3), 'rabi_frequency':2*np.pi*rf_rabi, 'time_dependence': rf_field}
+    p = {'states':(g,e1), 'rabi_frequency':2*np.pi*0.1, 'detuning':0}
+    d = {'states':(e1,r_target), 'rabi_frequency':2*np.pi*1.0, 'detuning':2*np.pi*dets}
+    rf = {'states':(r_target, r_couple), 'rabi_frequency':2*np.pi*rf_rabi, 'time_dependence': rf_field}
     c.add_couplings(p,d,rf)
 
     time_sols_up = rq.solve_time(c, end_time, sample_num)
@@ -207,7 +209,12 @@ def test_cell_signs_lower():
     sample_num = 10
 
     atom = "Rb85"
-    r_target = [150, 2, 2.5, 0.5]
+
+    [D1g, D1e] = rq.D2_states(atom)
+
+    r_target = A_QState(150, 2, 2.5)
+    # couple to lower energy state
+    r_couple = A_QState(151, 1, 1.5)
     
     rf_detuning = 8  # MHz
     rf_rabi = 4
@@ -215,20 +222,18 @@ def test_cell_signs_lower():
     
     dets = np.linspace(-1,1,21)
 
-    # couple to lower energy state
-    r_couple = [151, 1, 1.5, 0.5]
-    c = rq.Cell(atom, *rq.D2_states(atom),
-                r_target, r_couple,
+
+    c = rq.Cell(atom, [*rq.D2_states(atom), r_target, r_couple],
                 cell_length=0,
                 gamma_transit=2*np.pi*0.2)
     
-    rf_freq = np.abs(c.get_cell_tansition_frequency(2,3)*1e-6)
+    rf_freq = np.abs(c.atom.get_transition_frequency(r_target,r_couple)*1e-6)
     def rf_field(t):
         return np.cos(2*np.pi*(rf_freq+rf_detuning)*t)
 
-    p = {'states':(0,1), 'rabi_frequency':2*np.pi*0.1, 'detuning':0}
-    d = {'states':(1,2), 'rabi_frequency':2*np.pi*1.0, 'detuning':2*np.pi*dets}
-    rf = {'states':(3,2), 'rabi_frequency':2*np.pi*rf_rabi, 'time_dependence': rf_field}
+    p = {'states':(D1g,D1e), 'rabi_frequency':2*np.pi*0.1, 'detuning':0}
+    d = {'states':(D1e,r_target), 'rabi_frequency':2*np.pi*1.0, 'detuning':2*np.pi*dets}
+    rf = {'states':(r_couple,r_target), 'rabi_frequency':2*np.pi*rf_rabi, 'time_dependence': rf_field}
     c.add_couplings(p,d,rf)
 
     time_sols_down = rq.solve_time(c, end_time, sample_num)

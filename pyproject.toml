@@ -1,3 +1,173 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=64", "wheel", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[project]
+name = "rydiqule"
+description = "Rydberg Sensor Interactive Quantum Physics Module"
+authors = [{name = "ARL and NAWCWD"}]
+keywords = [
+    "rydberg",
+    "atomic-physics",
+    "quantum-optics",
+    "atomic-sensors",
+    "electrometry",
+]
+license = {text = "Apache"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">= 3.8"
+dependencies = [
+    "arc-alkali-rydberg-calculator>=3.5.0",
+    "numpy",
+    "scipy>=0.19.1",
+    "leveldiagram>=0.3.1",
+    "networkx",
+    "psutil",
+    "typing-extensions",
+]
+dynamic = ["version"]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.optional-dependencies]
+backends = [
+    "numba",
+    "cyrk>=0.12.1",
+]
+docs = [
+    "Sphinx==7.2.6",
+    "furo==2024.8.6",
+    "myst-nb",
+    "sphinx-copybutton",
+    "sphinxext-opengraph",
+    "sphinx-inline-tabs",
+]
+tests = [
+    "pytest",
+    "coverage",
+    "pytest-cov",
+]
+mypy = [
+    "mypy",
+    "numpy>=1.21",
+    "lxml",
+    "types-networkx",
+    "types-psutil",
+]
+linter = ["ruff"]
+dev = ["setuptools-scm"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+# global additions
+extend-select = ["RUF100"]
+
+# global ignores
+ignore = ["E231", "E741"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E501", "F401"]
+"src/rydiqule/solvers.py" = ["F403", "F405"]
+"src/rydiqule/timesolvers.py" = ["F403", "F405"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--doctest-modules"
+markers = [
+    "slow: Marks a test as taking a long time to run, and so can be skipped with `pytest -m \"not slow\"`.",
+    "high_memory: Marks a test as needing a lot of RAM",
+    "steady_state: Marks a test as using the steady-state solver.",
+    "time: Marks a test as using the time solver.",
+    "doppler: Marks a test as incorporating Doppler averaging.",
+    "experiments: Marks test of experiments.py",
+    "util: Marks a test of the ancillary utilities.",
+    "structure: Marks a test of the definition of the atomic system.",
+    "exception: Marks a test of error handling.",
+    "backend: Marks a test that uses an optional backend",
+    "dev: Used to temporarily mark a test as being developed so it can be run independently of the rest of the suite.",
+]
+doctest_optionflags = [
+    "NUMBER",
+    "ELLIPSIS",
+    "IGNORE_EXCEPTION_DETAIL",
+    "NORMALIZE_WHITESPACE",
+]
+testpaths = [
+    "tests",
+    "src/rydiqule",
+]
+
+[tool.mypy]
+# global options
+warn_return_any = false
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+show_error_codes = true
+allow_redefinition = true
+files = ["src/**/*.py"]
+plugins = ["numpy.typing.mypy_plugin"]
+
+# import ignores
+[[tool.mypy.overrides]]
+module = [
+    "matplotlib.*",
+    "arc.*",
+    "scipy.*",
+    "numba.*",
+    "CyRK.*",
+    "leveldiagram.*",
+    "IPython.*",
+    "setuptools_scm.*"
+]
+ignore_missing_imports = true
+
+[tool.pyright]
+include = ["src"]
+typeCheckingMode = "standard"
+
+stubPath = "./typings"
+
+reportMissingImports = "error"
+reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = "warning"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryIsInstance = "information"
+reportUnnecessaryComparison = "information"
+reportUnnecessaryContains = "information"
+reportUnusedExpression = "warning"
+reportIncompatibleMethodOverride = "information"
+reportIncompatibleVariableOverride = "information"
+
+pythonVersion = "3.11"
+
+executionEnvironments = [
+    { root = "src"},
+]

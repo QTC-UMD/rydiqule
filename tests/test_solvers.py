@@ -109,7 +109,8 @@ def test_Dop_AT_couple(find_zero_crossings, rf_rabi):
     """
 
     basis_size = 4
-    s = rq.Sensor(basis_size)
+    vP = 242.387  # Rb85
+    s = rq.Sensor(basis_size, vP=vP)
     transit = 100e-3
     gamma = 6.0666
     ryd_lifetime = 1e-3
@@ -125,14 +126,11 @@ def test_Dop_AT_couple(find_zero_crossings, rf_rabi):
     kcmag = 2*np.pi/480e-3
     kp = kpmag*np.array([1,0,0])
     kc = kcmag*np.array([-1,0,0])
-    vP = 242.387  # Rb85
-    wPp = kp*vP
-    wPc = kc*vP
 
     detunings = np.linspace(-15, 15, 301)
-    probe = {'states':(0,1), 'rabi_frequency':2*np.pi*1.5, 'detuning':0, 'kvec':wPp}
+    probe = {'states':(0,1), 'rabi_frequency':2*np.pi*1.5, 'detuning':0, 'kvec':kp}
     coupling = {'states':(1,2), 'rabi_frequency': 2*np.pi*4.0, 'detuning':2*np.pi*detunings,
-                'kvec':wPc}
+                'kvec':kc}
     rf = {'states':(2,3), 'rabi_frequency': 2*np.pi*rf_rabi, 'detuning':0}
 
     s.add_couplings(probe,coupling,rf)
@@ -163,7 +161,8 @@ def test_Dop_AT_probe(find_zero_crossings, rf_rabi):
     """
 
     basis_size = 4
-    s = rq.Sensor(basis_size)
+    vP = 242.387
+    s = rq.Sensor(basis_size, vP=vP)
     transit = 100e-3
     gamma = 6.0666
     ryd_lifetime = 1e-3
@@ -179,13 +178,10 @@ def test_Dop_AT_probe(find_zero_crossings, rf_rabi):
     kcmag = 2*np.pi/480e-3
     kp = kpmag*np.array([1,0,0])
     kc = kcmag*np.array([-1,0,0])
-    vP = 242.387
-    wPp = kp*vP
-    wPc = kc*vP
 
     detunings = np.linspace(-15, 15, 301)
-    probe = {'states':(0,1), 'rabi_frequency':2*np.pi*1.5,'detuning':2*np.pi*detunings, 'kvec':wPp}
-    coupling = {'states':(1,2), 'rabi_frequency': 2*np.pi*4.0, 'detuning':0, 'kvec':wPc}
+    probe = {'states':(0,1), 'rabi_frequency':2*np.pi*1.5,'detuning':2*np.pi*detunings, 'kvec':kp}
+    coupling = {'states':(1,2), 'rabi_frequency': 2*np.pi*4.0, 'detuning':0, 'kvec':kc}
     rf = {'states':(2,3), 'rabi_frequency': 2*np.pi*rf_rabi, 'detuning':0}
 
     s.add_couplings(probe,coupling,rf)
@@ -230,22 +226,21 @@ def test_Dop_2level():
 
     # define out 2-level system
     basis_size = 2
-    s = rq.Sensor(basis_size)
+    vP = np.sqrt(2*k*T/mRb85)
+    s = rq.Sensor(basis_size, vP=vP)
     gam = np.zeros((s.basis_size,s.basis_size),dtype=np.float64)
     gam[1,0] = gamma
     s.set_gamma_matrix(2*np.pi*gam)
 
     kpmag = 2*np.pi/780.241e-3  # sets end units correctly to Mrad/s
     kp = kpmag*np.array([1,0,0])
-    vP = np.sqrt(2*k*T/mRb85)
-    wPp = kp*vP
 
     # calculate the theoretical doppler width for this transition, in MHz
     actualWidth = vP*np.sqrt(4*np.log(2)/c**2)*f0*1e-6
 
     # calculate the doppler absorption profile
     detunings = np.linspace(-750, 750, 301)
-    probe = {'states':(0,1), 'rabi_frequency':2*np.pi*1.5,'detuning':2*np.pi*detunings,'kvec':wPp}
+    probe = {'states':(0,1), 'rabi_frequency':2*np.pi*1.5,'detuning':2*np.pi*detunings,'kvec':kp}
 
     s.add_couplings(probe)
     sols = rq.solve_steady_state(s,doppler=True,
@@ -263,23 +258,34 @@ def test_Dop_2level():
 
     # confirm measured width is within 2% of theorectical
     assert measuredWidth == pytest.approx(actualWidth,rel=2e-2), \
-        f'Doppler width of Rb85 D2 transition not correct'
+        'Doppler width of Rb85 D2 transition not correct'
 
 
 @pytest.mark.exception
 def test_solve_memory_fits():
     '''Confirms that checks for EOMs fitting in memory fail when appropriate.'''
 
-    with pytest.raises(MemoryError, match='sum_doppler=False'):
+    with pytest.raises(rq.RydiquleError, match='sum_doppler=False'):
         # We do not support sum_doppler=False when full solve does not fit in memory
         n = 4
         stack = (101, 101)
         doppler_stack = (561, 561)
-        rq.get_slice_num(n, stack, doppler_stack, sum_doppler=False, weight_doppler=True)
+        rq.slicing.slicing.get_slice_num(n, stack, doppler_stack, sum_doppler=False, weight_doppler=True)
 
-    with pytest.raises(MemoryError, match='System is too large'):
+    with pytest.raises(rq.RydiquleError, match='System is too large'):
         # this system requires 335.4 GiB
         n = 4
         stack = (101, 101)
         doppler_stack = (561, 561, 561)
-        rq.get_slice_num(n, stack, doppler_stack, sum_doppler=True, weight_doppler=True)
+        rq.slicing.slicing.get_slice_num(n, stack, doppler_stack, sum_doppler=True, weight_doppler=True)
+
+@pytest.mark.exception
+def test_init_cond_valid():
+    '''Confirms the timesolver throws and error if init_cond are not physical'''
+
+    s = rq.Sensor(3)
+    s.add_coupling((0,1), detuning=0, rabi_frequency=1)
+    s.add_coupling((1,2), detuning=0, rabi_frequency=1, time_dependence=lambda t:1)
+
+    with pytest.raises(rq.RydiquleError, match='not positive semi-definite'):
+        rq.solve_time(s, 10, 100, init_cond=np.array([1,0,0,0,0,0,0,0]))

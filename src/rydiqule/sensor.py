@@ -4,37 +4,42 @@ Sensor objects that control solvers.
 
 import numpy as np
 import networkx as nx
-import re
 import warnings
 
 import itertools
 
-from .sensor_utils import _combine_parameter_labels
-from .sensor_utils import ScannableParameter, CouplingDict, State, States, TimeFunc
+from .sensor_utils import (ScannableParameter, CouplingDict, State, States, StateSpec, StateSpecs, TimeFunc,
+                           match_states, _squeeze_dims, expand_statespec, state_tuple_to_str)
+from .exceptions import RydiquleError, CouplingNotAllowedError
+from .exceptions import RWAWarning, PopulationNotConservedWarning, RydiquleWarning, debug_state
 
-from typing import List, Tuple, Dict, Literal, Callable, Optional, Union, Sequence, cast
+from typing import List, Tuple, Dict, Literal, Callable, Optional, Union, Sequence, Iterable, Sized, cast
+# generic type for working around homogeneous Dict[key,val] hints in zip_parameters
+_ZP = Dict[Union[States,str], str]
 
-BASE_SCANNABLE_KEYS = ["detuning", 
-                       "rabi_frequency", 
-                       "phase", 
-                       "transition_frequency",
+BASE_SCANNABLE_KEYS = ["detuning",
+                       "rabi_frequency",
+                       "phase",
                        "e_shift"]
 """Reference list of all coherent coupling keys that support rydiqules stacking convention.
 Note that all decoherence keys (keys beginning with `gamma_`) are supported, but handled separately.
 """
 
 BASE_EDGE_KEYS = ["states",
-                   "detuning", 
+                   "detuning",
                    "rabi_frequency",
                    "transition_frequency",
                    "phase",
                    "kvec",
                    "time_dependence",
                    "label",
-                   "dipole_moment"]
-"""Reference list of all keys that can be specified with values in a coherenct coupling.
+                   "dipole_moment",
+                   "coherent_cc"]
+"""Reference list of all keys that can be specified with values in a coheroaddenct coupling.
 Subclasses which inherit from :class:`~.Sensor` should override the `valid_parameters` attribute,
 NOT this list. The `valid_parameters` attribute is initialized as a copy of `BASE_EDGE_KEYS`."""
+
+PROTECTED_LABELS = ["gamma", "kvec"]
 
 class Sensor():
     """
@@ -44,7 +49,7 @@ class Sensor():
     It requires nearly complete, explicit specification of inputs.
     This allows for very fine control of the solvers,
     including the ability to solve systems that are not entirely physical.
-    
+
     """
 
     eta: Optional[float] = None
@@ -57,9 +62,9 @@ class Sensor():
     Must be specified when using :class:`Sensor`.
     Automatically calculated when using :class:`Cell`."""
 
-    probe_tuple: Optional[States] = None
-    """Coupling edge that corresponds to the probing field.
-    Defaults to `(0,1)` in :class:`Cell`."""
+    _probe_tuple: Optional[StateSpecs] = None
+
+    _vP: Optional[float] = None
 
     probe_freq: Optional[float] = None
     """Probing transition frequency, in rad/s."""
@@ -70,30 +75,49 @@ class Sensor():
     beam_area: Optional[float] = None
     """Cross-sectional area of the probing beam, in square meters."""
 
-    def __init__(self, basis: Union[int, List[Union[int, str]]],
-                 *couplings: CouplingDict) -> None:
+    v_th: Optional[float] = None
+    """Thermal velocity of the atoms in vapor cell, in meters per second."""
+
+    temp: Optional[float] = None
+    """Temperature of the vapor cell, in Kelvin."""
+
+    atom_mass: Optional[float] = None
+    """Mass of an atom in the vapor cell, in kilograms."""
+
+    def __init__(self, states: Union[int, Sequence[StateSpec]],
+                 *couplings: CouplingDict,
+                 vP: Optional[float] = None) -> None:
         """
         Initializes the Sensor with the specified basis .
 
-        Can be specified as either an integer number of states (which will automatically 
-        label the states `[0,...,basis_size]`) or list of state labels. 
+        Can be specified as either an integer number of states (which will automatically
+        label the states `[0,...,basis_size]`) or list of valid state specifications.
+
 
         Parameters
         ---------
-        basis: int or list of int, str
-            The specification of the basis size and labelling for a new `Sensor`. Can be specified 
-            by either a integer or a list. If specified as an integer `n`, the created `Sensor` 
-            will have `n` states labelled as `0,...n`. In the case of a list, a number of states 
-            equal to the length of the list will be created in the sensor, indexed by the integer 
-            or string values of the nodes.
-        *couplings : tuple(dict) 
+        states: int or list of statespec
+            The specification of the basis size and labelling for a new `Sensor`. Can be
+            either a integer or a list of valid state specifications. If specified as an integer
+            `n`, the created `Sensor` will have `n` states labelled as `0,...n`. Valid state
+            specifications are tuples containing either numbers or strings, optionally a list of
+            the same.
+            In the case of a list, the tuple will be converted into a list of tuples with each
+            corresponding to one element in the list element element of the specification. See
+            the `Examples` section for examples on how to specify groups of states. Note that
+            with only a single statespec, it must be passed as an element of a list
+        *couplings : tuple(dict)
             Couplings dictionaries to pass to :meth:`~.add_couplings` on sensor construction.
-        
+        vP: float, optional
+            Most probable speed of the 3D Maxwell-Boltzmann distribution of the ensemble.
+            Calculated as :math:`\\sqrt{2kT/m}` and is provided in units of m/s.
+            This parameter is only necessary to perform Doppler-broadened solves.
+
         Raises
         ------
-        TypeError
+        RydiquleError
             If `basis` is not an integer or iterable.
-        TypeError
+        RydiquleError
             If any of the state label specifications of basis are the wrong type.
 
         Examples
@@ -102,93 +126,176 @@ class Sensor():
         ascending integers.
 
         >>> s = rq.Sensor(3)
-        >>> print(s.states)
+        >>> s.states
         [0, 1, 2]
 
         States can also be defined with a list of integers:
 
         >>> s = rq.Sensor([0, 1, 2])
-        >>> print(s.states) 
+        >>> s.states
         [0, 1, 2]
 
         States can also be strings
 
-        >>> s = rq.Sensor(['g', 'e1', 'e2'])
-        >>> print(s.states)
-        ['g', 'e1', 'e2']
+        >>> s = rq.Sensor([0, 'e1', 'e2'])
+        >>> s.states
+        [0, 'e1', 'e2']
 
-        Using `None` in a list will default to using the integer correspoinding to the state:
+        States can be defined with tuples. These can be thought of as quantum numbers, although
+        no physics around quantum numbers exist in `Sensor`, so the values are completely
+        general.
 
-        >>> s = rq.Sensor(['g', None, None])
-        >>> print(s.states)
-        ['g', 1, 2]
-        
+        >>> s = rq.Sensor([(1,-1),(1,1)])
+        >>> s.states
+        [(1, -1), (1, 1)]
+
+        States can be specified in groups with a "state specification", which will
+        expand lists of quantum numbers
+
+        >>> statespec = (1,[-1,0,1])
+        >>> s = rq.Sensor([(0,0), statespec])
+        >>> s.states
+        [(0, 0), (1, -1), (1, 0), (1, 1)]
+
         """
-        #if its an int, expand to variables
-        if isinstance(basis, int):
-            basis = list(range(basis))
+        #if its an int, expand to a list
+        if isinstance(states, int):
+            basis = list(range(states))
 
-        try:        
-            valid_node = [isinstance(n, (str,int)) for n in basis]
-        except TypeError:
-            raise TypeError("'basis' must be an integer or iterable")
-        
-        #ensure node types are valid
-        if not all(valid_node):
-            raise ValueError("Nodes in \'basis\' must be integers or strings")
-        
-        #ensure unique labels
+        elif isinstance(states, list):
+            basis: List[State] = []
+            for  statespec in states:
+                basis += expand_statespec(statespec)
+        else:
+            raise RydiquleError("'states' must be specified by a list of states or an integer defining their range")
+
+
         if len(basis) != len(set(basis)):
-            raise ValueError("All state labels must be unique")
-        
+            raise RydiquleError(f"All state labels must be unique, got {states}")
+
         self.valid_parameters = BASE_EDGE_KEYS.copy()
-        self.couplings = nx.DiGraph()
+        self.scannable_parameters = BASE_SCANNABLE_KEYS.copy()
+        self.protected_labels = PROTECTED_LABELS.copy()
+        self.couplings: nx.DiGraph = nx.DiGraph()
         self.couplings.add_nodes_from(basis)
+
+        self._zip_labels: List = []
+
+        if vP is not None:
+            self.vP = vP
 
         if len(couplings) > 0:
             self.add_couplings(*couplings)
 
-        self._zipped_parameters: Dict = {}
+        if debug_state():
+            print(f'Sensor initialized with {len(basis):d} states!')
+
+    #add as a property to enforce
+    @property
+    def probe_tuple(self) -> Optional[StateSpecs]:
+        """Coupling edge that corresponds to the probing field.
+        Defaults to `None` and gets set to the first coupling
+        added to the system with :meth:`~.Sensor.add_coupling`.
+        Can be modified directly."""
+
+        return self._probe_tuple
 
 
-    def set_experiment_values(self, probe_tuple: Tuple[int,int],
-                              probe_freq: float,
-                              kappa: float,
+    @probe_tuple.setter
+    def probe_tuple(self, probe_tuple: StateSpecs):
+        state1_list = self.states_with_spec(probe_tuple[0])
+        state2_list = self.states_with_spec(probe_tuple[1])
+
+        if not (len(state1_list) > 0 and len(state2_list) > 0):
+            raise ValueError(f"Probe tuple specification {probe_tuple} contains invalid state specs")
+
+        self._probe_tuple = probe_tuple
+
+    @property
+    def vP(self) -> float:
+        """Most probable speed of the 3D Maxwell-Boltzmann distribution.
+
+        This is defined as :math:`\\sqrt{2kT/m}` and is given in units of m/s.
+
+        This must be defined manually when performing Doppler-broadened solves.
+        Accessing it before definition will raise an error.
+        """
+        if self._vP is None:
+            raise RydiquleError("You must specify the attribute 'vP' before doing a Doppler broadened solve. " +
+                                "This is done with Sensor's `vP` keyword argument " +
+                                "or by setting the attribute after Sensor creation.")
+        return self._vP
+
+    @vP.setter
+    def vP(self, vP: float):
+
+        if not vP > 0.0:
+            raise ValueError('Most probable speed must be positive')
+
+        self._vP = vP
+
+
+    def set_experiment_values(self, probe_freq:float, kappa: float,
                               eta: Optional[float] = None,
                               cell_length: Optional[float] = None,
                               beam_area: Optional[float] = None,
+                              v_th: Optional[float] = None,
+                              temp: Optional[float] = None,
+                              atom_mass: Optional[float] = None
                               ):
         """Sets attributes needed for observable calculations.
-        
+
         Parameters
         ----------
-        probe_tuple: tuple of int
-            Coupling that corresponds to the probing field.
+        probe_tuple: tuple of StateSpec
+            Coupling that corresponds to the probing field. If `None`, corresponding Sensor
+            attribute remains unchanged. Defaults to `None`.
         probe_freq: float
-            Frequency of the probing transition, in Mrad/s.
+            Frequency of the probing transition, in Mrad/s. If `None`, corresponding Sensor
+            attribute remains unchanged. Defaults to `None`.
         kappa: float
             Numerical prefactor that defines susceptibility, in (rad/s)/m.
+            If `None`, corresponding Sensor  attribute remains unchanged. Defaults to `None`.
             See :func:`~.get_susceptibility` and :class:`Cell.kappa` for details.
         eta: float
-            Noise-density prefactor, in root(Hz).
+            Noise-density prefactor, in root(Hz). If `None`, corresponding Sensor
+            attribute remains unchanged. Defaults to `None`.
             See :class:`Cell.eta` for details.
         cell_length: float, optional
-            The optical path length through the medium, in meters.
+            The optical path length through the medium, in meters. If `None`, corresponding Sensor
+            attribute remains unchanged. Defaults to `None`.
         beam_area: float, optional
-            The cross-sectional area of the beam, in m^2.        
+            The cross-sectional area of the beam, in m^2. If `None`, corresponding Sensor
+            attribute remains unchanged. Defaults to `None`.
+        v_th: float, optional
+            Thermal velocity of the Maxwell-Boltzmann distribution: v_th = (k_B*T/m)^(1/2) in units of m/s.
+            Defaults to `None`.
+        temp: float, optional
+            Temperature of the vapor cell in units of Kelvin. Defaults to `None`.
+        atom_mass: float, optional.
+            Mass of a sensing atom in kg. Defaults to `None`.
         """
-
-        self.probe_tuple = self._states_valid(probe_tuple)
         self.probe_freq = probe_freq
-        self.cell_length = cell_length
-        self.beam_area = beam_area
-        self.eta = eta
         self.kappa = kappa
-    
+
+        if cell_length is not None:
+            self.cell_length = cell_length
+        if beam_area is not None:
+            self.beam_area = beam_area
+        if eta is not None:
+            self.eta = eta
+
+        if v_th is not None:
+            self.v_th = v_th
+        if temp is not None:
+            self.temp = temp
+        if atom_mass is not None:
+            self.atom_mass = atom_mass
+
 
     @property
-    def basis_size(self):
-        """Property to return the number of nodes on the Sensor graph. 
+    def basis_size(self) -> int:
+        """Property to return the number of nodes on the Sensor graph.
 
         Returns
         -------
@@ -196,10 +303,10 @@ class Sensor():
             The number of nodes on the graph, corresponding to the basis size for the system.
         """
         return len(self.couplings)
-    
+
 
     @property
-    def states(self):
+    def states(self) -> List[State]:
         """Property which gets a list of labels for the sensor in the order defined in
         :meth:`~.Sensor.__init__`. This is also the order corresponding the rows and columns
         in the system Hamiltonian and decoherence matrix.
@@ -212,39 +319,112 @@ class Sensor():
         """
 
         return list(self.couplings.nodes())
-    
 
-    def add_energy_shift(self, state: State, shift: ScannableParameter):
+
+    def add_energy_shift(self, statespec: StateSpec, shift: ScannableParameter, **kwargs):
+        """Add an energy shift to a single state or a group of states.
+
+        `statespec` can be provided either as a single state in the Sensor or as a valid
+        state specification matching a group of states. When `statespec` matches a single state,
+        :meth:`~.Sensor.add_single_energy_shift` method will be dispatched. In the case of
+        a multi-state specification, the :meth:`~.Sensor.add_energy_shift_group` method will be
+        dispatched applying an individual shift to all states with labels matching the
+        specification provided.
+
+        Note that an energy shifts are applied to the underlying graph as a self-edge connecting a
+        node to itsself, not as data on the node itsself.
+
+        Additional arguments for either dispatched function are passed normally via `**kwargs`
+
+        Parameters
+        ----------
+        state_spec : StateSpec
+            Integer or string label matching a state in the `Sensor`, or state specification
+            matchingone or more states in the `Sensor`. The number of states this corresponds
+            to will affect which internal function is dispatched.
+        shift : float or array-like
+            The energy shift to apply to the matching state or states in Mrad/s. Note that if it
+            corresponds to multiple states, the `prefactors` argument of
+            :meth:`~.Sensor.add_energy_shift_group` will be multiplied by this value for the
+            corresponding state.
+
+        Raises
+        ------
+        RydiquleError
+            If the state provided does not match any state in the `Sensor`.
+
+        Examples
+        --------
+        The basic use of `add_energy_shift` is to add terms to the diagonal of the hamiltonian.
+
+        >>> s = rq.Sensor(3)
+        >>> s.add_energy_shift(1, 1)
+        >>> s.add_energy_shift(2, 2.5)
+        >>> print(s.couplings.edges(data=True))
+        [(1, 1, {'e_shift': 1, 'label': '1'}), (2, 2, {'e_shift': 2.5, 'label': '2'})]
+        >>> print(s.get_hamiltonian())
+        [[0. +0.j 0. +0.j 0. +0.j]
+         [0. +0.j 1. +0.j 0. +0.j]
+         [0. +0.j 0. +0.j 2.5+0.j]]
+
+        `add_energy_shift` can be used with state specifications.
+
+        >>> s = rq.Sensor([(0,0), (1,[-1,0,1])])
+        >>> prefactors = {(1,i):i for i in [-1,0,1]}
+        >>> s.add_energy_shift((1, [-1,0,1]), 0.1, prefactors=prefactors)
+        >>> print(s.couplings.edges(data="e_shift"))
+        [((1, -1), (1, -1), -0.1), ((1, 0), (1, 0), 0.0), ((1, 1), (1, 1), 0.1)]
+        >>> print(s.get_hamiltonian())
+        [[ 0. +0.j  0. +0.j  0. +0.j  0. +0.j]
+         [ 0. +0.j -0.1+0.j  0. +0.j  0. +0.j]
+         [ 0. +0.j  0. +0.j  0. +0.j  0. +0.j]
+         [ 0. +0.j  0. +0.j  0. +0.j  0.1+0.j]]
+
+        """
+        states_list = self.states_with_spec(statespec)
+
+        if len(states_list) == 1:
+            self.add_single_energy_shift(states_list[0], shift, **kwargs)
+        elif len(states_list) > 1:
+            self.add_energy_shift_group(states_list, shift, **kwargs)
+        else:
+            raise RydiquleError(f"State specification {statespec} does not correspond to any states.")
+
+
+    def add_single_energy_shift(self, state: State, shift: ScannableParameter, label=None):
         """Add an energy shift to a state.
 
         First perfoms validation that the provided `state` is actually a node in the graph, then
         adds the shift specified by `shift` to a self-loop edge keyed with `"e_shift"`. This value
-        will be added to the corresponding diagonal term when the hamiltonian is generated. If
-        the provided node
+        will be added to the corresponding diagonal term when the hamiltonian is generated.
 
         Parameters
         ----------
-        state : str or int
+        state : int, str, or tuple
             The label corresponding to the atomic state to which the shift will be added.
         shift : float or list-like of float
             The magnitude of the energy shift, in Mrad/s
 
         Raises
         ------
-        KeyError
+        RydiquleError
             If the supplied `state` is not in the system.
         """
+        if label is None:
+            label = str(state)
         if not self.couplings.has_node(state):
-            raise KeyError(f"state {state} is not a node on the graph")
-        
-        self._remove_edge_data((state, state), kind="coherent")
-        self.couplings.add_edge(state, state, e_shift=shift)
-            
-    
-    def add_energy_shifts(self, shifts:dict):
-        """Add multiple energy shifts to different nodes.
+            raise RydiquleError(f"state {state} is not a node on the graph")
 
-        Shifts are specified with the `shifts` dictionary, which is keyed with states and 
+        self._remove_edge_data((state, state), kind="coherent")
+        self.couplings.add_edge(state, state, e_shift=shift, label=label)
+        if debug_state():
+            print(f'   Added energy shift for {state}')
+
+
+    def add_energy_shifts(self, shifts: dict):
+        """Wrapper for :meth:`Sensor.add_energy shift b`.
+
+        Shifts are specified with the `shifts` dictionary, which is keyed with states and
         has values corresponding to the energy shift applied to the state in Mrad/s. Error
         handling and validation is done with the :meth:`~.Sensor.add_energy_shift` function.
 
@@ -254,24 +434,234 @@ class Sensor():
             Dictionary keyed with states with values corresponding to the energy shift, in Mrad/s,
             of the corresponding state.
         """
-        
+
         try:
             shifts_items = shifts.items()
-        except AttributeError:
-            raise ValueError("Shifts parameters must be a dictionary-like object")
-        
+        except AttributeError as err:
+            raise RydiquleError("Shifts parameters must be a dictionary-like object") from err
+
         for state, shift in shifts_items:
             self.add_energy_shift(state, shift)
-        
 
-    def add_coupling(
+
+    def add_energy_shift_group(self, states: List[State], shift:ScannableParameter,
+                               prefactors:Optional[dict]=None,
+                               zip_label:Optional[str]=None):
+        """Add energy shifts to a group of states, optionally with a modifying prefactor for each.
+
+        Given a list of states, calls :meth:`~.Sensor.add_single_energy_shift` on each one with the
+        provided energy shift. Shifts are modified by a multiplicative factor defined by the
+        `prefactors` dictionary. The dictionary is keyed with states that are elements of `states`
+        with entries corresponding to a factor multiplied by the base `shift` argument for each
+        state. When energy shifts are array-like, the `e_shift` attribute corresponding to each
+        self-edge will be zipped with :meth:`~.Sensor.zip_parameters`.
+
+        Parameters
+        ----------
+        states : list of states
+            List of states to include in the group.
+        shift : float or array-like
+            The base value of the energy shift to apply the states. Will be modified by entries
+            of the `prefactors` dictionary.
+        prefactors : dict or `None`, optional
+            Dictionary of values by which to multiply the base `shift` parameter for each
+            each state. Keys are elements of the `states` list, entries are the corresponding
+            factor by which to multiply `shift` for that state. If `None`, all prefactors are
+            set to 1. If not `None`, the prefactors for any nonspecified values will be set
+            to zero. Default is `None`.
+        zip_label : str or `None`, optional
+            Label passed to :meth:`~.Sensor.zip_parameters` when the shift is provided as an
+            array-like when all states in the group are zipped together. Defaults to `None`.
+
+        Raises
+        ------
+        RydiquleError
+            If the supplied energy shift is not a float and cannot be interpreted as a numpy
+
+        Examples
+        --------
+        >>> s = rq.Sensor(['g','e1','e2'])
+        >>> factors = {'e1':1, 'e2':2}
+        >>> s.add_energy_shift_group(["e1","e2"], 0.1, prefactors=factors)
+        >>> print(s.couplings.edges(data='e_shift'))
+        [('e1', 'e1', 0.1), ('e2', 'e2', 0.2)]
+        >>> print(s.get_hamiltonian())
+        [[0. +0.j 0. +0.j 0. +0.j]
+         [0. +0.j 0.1+0.j 0. +0.j]
+         [0. +0.j 0. +0.j 0.2+0.j]]
+
+        """
+        if prefactors is None:
+            prefactors = {state: 1.0 for state in states}
+
+        for state in states:
+            self.add_single_energy_shift(state, shift * prefactors.get(state, 0.0))
+
+        if hasattr(shift, "__len__"):
+            try:
+                shift=np.array(shift, dtype=np.float64)
+            except (ValueError, TypeError):
+                raise RydiquleError(f"Shift type {type(shift)} cannot be interpreted as an array")
+
+        if isinstance(shift, np.ndarray) and len(states) > 1:
+            zip_dict: _ZP = {(s,s):"e_shift" for s in states}
+            self.zip_parameters(zip_dict, zip_label=zip_label)
+
+
+    def add_coupling(self, states: StateSpecs, **kwargs):
+        """Add a coupling between states or groups of states.
+
+        Wraps the :meth:`~.Sensor.add_single_coupling` and :meth:`~.Sensor.add_coupling_group`
+        functions, and dispatches to the appropriate one depending on the number of states in the
+        `states` argument. Additional keyword arguments will be passed unmodified to the
+        relevant method. See documentation of those functions for details on keyword argument
+        options.
+
+        If each state specification in `states` correspond to a single state, the
+        corresponding states will be passed to :meth:`~.Sensor.add_single_coupling`. If
+        either or both specifications correspond to multiple states, the corresponding lists
+        will be passed as the `states1` and `states2` lists in :meth:`~.Sensor.add_coupling_group`.
+
+        If this is the first time `add_coupling` has been called for this `Sensor`, sets the
+        `probe_tuple` attribute to the `states` specification , which is used as the default,
+        for calculating observable values, in a :class:`~.sensor_soution.Solution` after solving.
+        For this reason, this function is preferred over :meth:`~.Sensor.add_single_coupling`
+        and :meth:`~.Sensor.add_coupling_group` outside of special circumstances. If couplings
+        are added with either of the specific dispatched functions, `probe_tuple` should be set
+        manually.
+
+        Parameters
+        ----------
+        states : tuple of Statespecs
+            The states or state manifolds of the coupling. If both are integers or state
+            specifications matching a single state in the `Sensor`, :meth:`~.Sensor.add_single_coupling`
+            is dispatched. If either argument is a string pattern matching multiple states,
+            :meth:`~.Sensor.add_coupling_group` is dispatched.
+        **kwargs
+            Additional keyword argumets passed to the relevant function. See the documentation for
+            :meth:`~.Sensor.add_single_coupling` and :meth:`~.Sensor.add_coupling_group` for
+            details on valid keyword arguments.
+
+        Notes
+        -----
+        ..note:
+            Outside of specific use cases for users well-versed in the `rydiqule` code base, this
+            method is preferred over :meth:`~.Sensor.add_single_coupling` and
+            :meth:`~.Sensor.add_coupling_group` since it appropriately handles necessary
+            backend bookeeping.
+
+        Examples
+        --------
+        Couplings are added identically regardless of how states are labelled.
+
+        >>> s = rq.Sensor(2)
+        >>> s.add_coupling((0,1), detuning=1, rabi_frequency=2)
+        >>> print(s.get_hamiltonian())
+        [[ 0.+0.j  1.+0.j]
+         [ 1.-0.j -1.+0.j]]
+
+        >>> s = rq.Sensor(['g','e'])
+        >>> s.add_coupling(('g','e'), detuning=1, rabi_frequency=2)
+        >>> print(s.get_hamiltonian())
+        [[ 0.+0.j  1.+0.j]
+         [ 1.-0.j -1.+0.j]]
+
+        Couplings can have list-like parameters, in which case the resulting rydiqule will
+        compute hamiltonians for all values simultaneously. Here 101 x 21 = 2,121 2x2 Hamiltonians
+        are generated simultaneously, with one for every combination of parameters, and arranged
+        into a single array.
+
+        >>> s = rq.Sensor(2)
+        >>> det=np.linspace(-10, 10, 101)
+        >>> rabi = np.linspace(-1, 1, 21)
+        >>> s.add_coupling((0,1), detuning=det, rabi_frequency=rabi, label="laser")
+        >>> print(s.get_hamiltonian().shape)
+        (101, 21, 2, 2)
+
+        Couplings can be be defined between manifolds of states with state specifications.
+        The values for rabi frequencies of individual states are modified by the
+        `coupling_coefficients` keyword argument. To avoid cumbersome numbers of nested
+        brackets, it is advisable to name manifolds with variables. Note that `StateSpec`s
+        can be expanded with :func:`~.sensor_utils.expand_statespec` for this purpose.
+
+        >>> g = (0,0) #statespec for ground
+        >>> excited = (1,[-1,0,1]) #statespec for excited
+        >>> [e1,e2,e3] = rq.sensor_utils.expand_statespec(excited)
+        >>> cc = {
+        ...     (g, e1): 0.25,
+        ...     (g, e2): 0.5,
+        ...     (g, e3): 0.25,
+        ... } # coupling coefficiens
+        >>> s = rq.Sensor([g, excited])
+        >>> s.add_coupling((g, excited), rabi_frequency=10, detuning=1, coupling_coefficients=cc, label="laser")
+        >>> print(s.get_hamiltonian())
+        [[ 0.  +0.j  1.25+0.j  2.5 +0.j  1.25+0.j]
+         [ 1.25-0.j -1.  +0.j  0.  +0.j  0.  +0.j]
+         [ 2.5 -0.j  0.  +0.j -1.  +0.j  0.  +0.j]
+         [ 1.25-0.j  0.  +0.j  0.  +0.j -1.  +0.j]]
+
+        This function sets the `probe_tuple` for the first call, but not subsequent calls. This
+        makes it preferred over :meth:`~.Sensor.add_single_coupling` and
+        :meth:`~.Sensor.add_coupling_group`, which do not have this behavior.
+
+        >>> g = (0,0) #statespec for ground
+        >>> e1 = (1,[-1,0,1]) #statespec for 1st excited
+        >>> e2 = (2,0)
+        >>> s = rq.Sensor([g, e1, e2])
+        >>> print(s.probe_tuple)
+        None
+        >>> s.add_coupling((g, e1), rabi_frequency=10, detuning=1, label="red")
+        >>> print(s.probe_tuple)
+        ((0, 0), (1, [-1, 0, 1]))
+        >>> s.add_coupling((e1,e2), rabi_frequency=1, detuning=2, label="blue")
+        >>> print(s.probe_tuple)
+        ((0, 0), (1, [-1, 0, 1]))
+
+        For state manifolds, list-like parameters are automatically zipped. See
+        :meth:`Sensor.zip_parameters` for more details on the mechanics of zipping parameters.
+
+        >>> g = (0,0) #statespec for ground
+        >>> e1 = (1,[-1,0,1]) #statespec for 1st excited
+        >>> s = rq.Sensor([g, e1])
+        >>> det = np.linspace(-1,1,11)
+        >>> s.add_coupling((g, e1), rabi_frequency=10, detuning=det, label="red")
+        >>> print(s.couplings.edges)
+        [((0, 0), (1, -1)), ((0, 0), (1, 0)), ((0, 0), (1, 1))]
+        >>> print(s._zip_labels)
+        ['red_detuning']
+        >>> print(s.get_hamiltonian().shape)
+        (11, 4, 4)
+
+        """
+        #define as probe if this is the first coupling added
+        if len(nx.get_edge_attributes(self.couplings, "rabi_frequency"))==0 and self.probe_tuple is None:
+            self.probe_tuple = states
+
+        #get relevant states from state specifications
+        try:
+            states_list1 = self.states_with_spec(states[0])
+            states_list2 = self.states_with_spec(states[1])
+        except RydiquleError as err:
+            raise RydiquleError(f"Invalid State specifications {states}") from err
+
+        if len(states_list1) == len(states_list2) == 1:
+            self.add_single_coupling((states_list1[0], states_list2[0]), **kwargs)
+
+        elif len(states_list1) > 1 or len(states_list2) > 1:
+            self.add_coupling_group(states_list1, states_list2, **kwargs)
+
+        else:
+            raise RydiquleError("Each state specification must match at least one state.")
+
+
+    def add_single_coupling(
             self, states: States, rabi_frequency: Optional[ScannableParameter] = None,
             detuning: Optional[ScannableParameter] = None,
             transition_frequency: Optional[float] = None,
-            phase: ScannableParameter = 0,
-            kvec: Tuple[float,float,float] = (0,0,0),
-            time_dependence: Optional[Callable[[float],float]] = None,
-            label: Optional[str] = None,
+            phase: Optional[ScannableParameter] = None,
+            kvec: Sequence[float] = (0,0,0),
+            time_dependence: Optional[TimeFunc] = None,
+            label: Optional[str] = None, coherent_cc: Optional[float] = None,
             **extra_kwargs) -> None:
         """
         Adds a single coupling of states to the system.
@@ -281,146 +671,244 @@ class Sensor():
         Designed to be a user-facing wrapper for :meth:`~._add_coupling` with arguments
         for states and coupling parameters.
 
+        Note that unlike :meth:`~.Sensor.add_coupling`, this function does not set the
+        `probe_tuple` attribute, so if used to add the first coupling, `probe_tuple` must
+        be set manually.
+
         Parameters
         ----------
-        states : tuple of ints or strings of length 2
+        states : tuple of States
             The pair of states of the sensor which the state couples. Must be a tuple
-            of length 2, where each element is a string or integer corresponding to a state in the
-            Sensor as defined in the constructor. Tuple order indicates which state to has higher 
+            of length 2, where each element is a string, integer, or tuple corresponding to a state in the
+            Sensor as defined in the constructor. Tuple order indicates which state to has higher
             energy; the second state is always assumed to have higher energy.
         rabi_frequency : float or complex, or list-like of float or complex
             The rabi frequency of the field being added. Defined in units of Mrad/s. List-like
             values will invoke Rydiqule's stacking convention when relevant quantities are calculated.
-        detuning : float or list-like of floats, optional 
-            The frequency difference between the transition frequency and the field frequency in 
-            units of Mrad/s. List-like values will invoke Rydiqule's stacking convention when relevant 
-            quantities are calculated. If specified, the coupling is treated with the rotating-wave 
+        detuning : float or list-like of floats, optional
+            The frequency difference between the transition frequency and the field frequency in
+            units of Mrad/s. List-like values will invoke Rydiqule's stacking convention when relevant
+            quantities are calculated. If specified, the coupling is treated with the rotating-wave
             approximation rather than in the lab frame, and `transition_frequency` is ignored if present.
             A positive number always indicates a blue detuning, and a negative number indicates a blue
-            detuning. 
-        transition_frequency : float or list-like of floats, optional 
+            detuning.
+        transition_frequency : float, optional
             The transition frequency between a particular pair of states. Must be a positive number.
-            List-like values will invoke Rydiqule's stacking convention when relevant quantities are calculated. 
-            Only used directly in calculations if `detuning` is `None`, ignored otherwise. 
+            Only used directly in calculations if `detuning` is `None`, ignored otherwise.
             Note that on its own, it only defines the spacing between two energy levels and not the
-            field itsself. To define a field, the `time_dependence` argument must be specified, or else 
+            field itsself. To define a field, the `time_dependence` argument must be specified, or else
             the off-diagonal terms to drive transitions will not be generated in the Hamiltonian matrix.
         phase : float, optional
-            The relative phase of the field in radians. Defaults to zero.
+            Static phase offset in the rotating frame.
+            Cannot be used outside the rotating frame, ie when detuning is not defined.
+            Default is undefined, which is interpreted as 0 for couplings in the rotating frame.
         kvec : iterable, optional 
-            A three-element iterable that defines the atomic doppler shift on a particular coupling
-            field. It should have magntiude equal to the doppler shift (in the units of Mrad/s) of a
-            n atom moving at the Maxwell-Boltzmann distribution most probable speed, `vP=np.sqrt(2*kB*T/m)`. 
-            I.E. `np.linalg.norm(kvec)=2*np.pi/lambda*vP`. If equal to `(0,0,0)`, solvers will ignore 
-            doppler shifts on this field.  Defaults to `(0,0,0)`.
+            A three-element iterable that defines the k-vector of a particular coupling field.
+            It should have units of Mrad/m, such that :math:`vP*k_vec` gives the most probable doppler shift
+            along each axis.
+            Note that the `vP` class attribute must be defined to perform doppler-broadened solves.
+            If equal to `(0,0,0)`, solvers will ignore doppler shifts on this field.
+            Defaults to `(0,0,0)`.
         time_dependence : scalar function, optional
-            A scalar function specifying a time-dependent field. The time dependence function is defined 
-            as a python funtion that returns a unitless value as a function of time (in microseconds) 
-            that is multiplied by the `rabi_frequency` parameter to get a  field strength scaled to units 
+            A scalar function specifying a time-dependent field. The time dependence function is defined
+            as a python funtion that returns a unitless value as a function of time (in microseconds)
+            that is multiplied by the `rabi_frequency` parameter to get a  field strength scaled to units
             of Mrad/s.
+        coherent_cc: float, optional
+            Addtional information regarding coupling strength for the `states` coupling. Does
+            **not** modify the `rabi_frequency` before adding to the graph. Rather, when the
+            Hamiltonians and physical observables in :class:`~.sensor_solution.Solution` are
+            computed, first multiplies the `rabi_frequency` by this value. The `rabi_frequency`
+            can be thought of as a "base" field power, while this is a modification based on the
+            coupling strength. If `None`, the `coherent_cc` added to the graph will be set to 1.
+            Defaults to `None`.
         label : str or None, optional
-            Name of the coupling. This does not change any calculations, but can be used 
-            to help track individual couplings, and will be reflected in the output of 
-            :meth:`~.Sensor.axis_labels`, and to specify zipping for :meth:`~.Sensor.zip_couplings`. 
-            If `None`, the label is generated as the value of `states` cast to a string with 
+            Name of the coupling. This does not change any calculations, but can be used
+            to help track individual couplings, and will be reflected in the output of
+            :meth:`~.Sensor.axis_labels`, and to specify zipping for :meth:`~.Sensor.zip_couplings`.
+            If `None`, the label is generated as the value of `states` cast to a string with
             whitespace removed. Defaults to `None`.
 
         Raises
         ------
-        ValueError
+        RydiquleError
             If `states` cannot be interpreted as a tuple.
-        ValueError
+        RydiquleError
             If `states` does not have a length of 2.
-        ValueError
-            If the state numbers specified by `states` are beyond the basis size.
-            For example, calling this function with `states=(3,4)`
-            will raise this error if the basis size is equal to 3.
-        ValueError
+        RydiquleError
+            If the states specified in the `states` argument are not in the basis of the
+            `Sensor`
+        RydiquleError
             If both `rabi_frequency` and `dipole_moment` are specified or if
             neither are specified.
-        ValueError
+        RydiquleError
             If both detuning and transition_frequency are specified or if
             neither are specified.
+        RydiquleError
+            If a coupling is added in the non-rotating frame (detuning=None)
+            and no time dependence function is specified.
+        RydiquleError
+            If `kvec` is not a three element sequence of floats.
+
+        Warns
+        -----
+        RWAWarning
+            Raised if large `transition_frequency` is passed,
+            which can lead to very long time-dependent solves
+            and is often not intended.
+        RydiquleWarning
+            Raised if 'kvec' is likely incorrectly defined (field k-vector in Mrad/m).
+            Either by incorrect units or as most probable velocity vector (rq v1 convention).
+            Triggers if the implied wavelength is less than 210 nm or greater than 2095 nm.
 
         Examples
         --------
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=2)
+        >>> s.add_single_coupling((0,1), detuning=1, rabi_frequency=2)
+        >>> print(s.get_hamiltonian())
+        [[ 0.+0.j  1.+0.j]
+         [ 1.-0.j -1.+0.j]]
 
-        >>> s = rq.Sensor(['g', 'e'])
-        >>> s.add_coupling(('g', 'e'), detuning=1, rabi_frequency=1)
+        >>> s = rq.Sensor(['g','e'])
+        >>> s.add_single_coupling(('g','e'), detuning=1, rabi_frequency=2)
+        >>> print(s.get_hamiltonian())
+        [[ 0.+0.j  1.+0.j]
+         [ 1.-0.j -1.+0.j]]
 
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling(states=(0,1), detuning=np.linspace(-10, 10, 101), rabi_frequency=2, label="laser")
+        >>> s.add_single_coupling((0,1), detuning=np.linspace(-10, 10, 101), rabi_frequency=2, label="laser")
+        >>> print(s.get_hamiltonian().shape)
+        (101, 2, 2)
+
+        The `coherent_cc` attribute does not modify the `rabi_frequency` that is stored on the graph, but
+        rather in the computed hamiltonian
+
+        >>> s = rq.Sensor(2)
+        >>> s.add_single_coupling((0,1), detuning=1, rabi_frequency=2, coherent_cc=1/3)
+        >>> print(s.couplings.edges.data("rabi_frequency")) #shows the rabi_frequency on the graph is 2
+        [(0, 1, 2)]
+        >>> print(s.get_hamiltonian())
+        [[ 0.      +0.j  0.333333+0.j]
+         [ 0.333333-0.j -1.      +0.j]]
 
         >>> s = rq.Sensor(2)
         >>> step = lambda t: 1 if t>=1 else 0
-        >>> s.add_coupling(states=(0,1), transition_frequency=1000, rabi_frequency=2, time_dependence=step)
+        >>> s.add_single_coupling((0,1), transition_frequency=1000, rabi_frequency=2, time_dependence=step)
+        >>> print(s.get_hamiltonian())
+        [[   0.+0.j    0.+0.j]
+         [   0.+0.j 1000.+0.j]]
+        >>> print(s.get_time_hamiltonian_components()[0])
+        [array([[0.+0.j, 2.+0.j],
+               [2.-0.j, 0.+0.j]])]
 
-        >>> s = rq.Sensor(2)
-        >>> kp = 250*np.array([1,0,0])
-        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=2, kvec=kp)
+        >>> s = rq.Sensor(2, vP=10)
+        >>> kp = 25*np.array([1,0,0])
+        >>> s.add_single_coupling((0,1), detuning=1, rabi_frequency=2, kvec=kp)
+        >>> s.get_hamiltonian()
+        array([[ 0.+0.j,  1.+0.j],
+               [ 1.-0.j, -1.+0.j]])
 
         """
         #ensure states are unique
         if states[0] == states[1]:
-            raise ValueError(f'{states}: Coherent coupling must couple different states.')
+            raise RydiquleError(f'{states}: Coherent coupling must couple different states.')
 
-        suppress_rwa = extra_kwargs.pop("suppress_rwa_warn", False)
+        if coherent_cc is None:
+            coherent_cc = 1.0
 
-        field_params = {k:v for k,v in locals().items()
-                        if k in self.valid_parameters
-                        and v is not None}
+        if 'suppress_rwa_warn' in extra_kwargs:
+            warnings.warn(("The 'suppress_rwa_warn' kwarg is Deprecated. "
+                           "Use warnings.simplefilter('ignore', rq.RWAWarning)"),
+                           FutureWarning)
+
+        if (phase is None) and (detuning is not None):
+            phase = 0
+        elif (phase is not None) and (transition_frequency is not None):
+            raise RydiquleError(f"{states}: Cannot specify rotating frame phase offset "
+                                "for coupling not in the rotating frame. "
+                                "Incorporate phase offsets into the time-dependence.")
+
+        if detuning is None and time_dependence is None:
+            raise RydiquleError(f"Got rotating frame but no time dependence for coupling {states}")
         
+        if len(kvec) != 3:
+            raise RydiquleError('kvec must be a three-element sequence of floats')
+        k_mag_sq = np.sum(np.asarray(kvec)**2)
+        if not np.isclose(k_mag_sq, 0,0) and (k_mag_sq < 9 or k_mag_sq > 900):
+            # implied lambda is > 2095nm or < 210nm
+            warnings.warn((f"Coupling {states} has kvec = {kvec} " +
+                           f"with |kvec|={np.sqrt(k_mag_sq):.3g}. " +
+                           "This is likely unphysical as 'kvec' has been redefined " +
+                           "to be the field k-vector, not the most probable velocity vector."),
+                          RydiquleWarning)
+
+        field_params = dict(
+            states=states,
+            rabi_frequency=rabi_frequency,
+            detuning=detuning,
+            transition_frequency=transition_frequency,
+            phase=phase,
+            kvec=kvec,
+            time_dependence=time_dependence,
+            label=label,
+            coherent_cc=coherent_cc
+        )
+        field_params_trimmed = {k:v for k,v in field_params.items() if v is not None}
+
+        full_edge_data = {
+            param: np.array(val)
+            if param in self.scannable_parameters and hasattr(val, "__len__")
+            else val
+            for (param, val) in {**field_params_trimmed, **extra_kwargs}.items()
+        }
+
         if not (detuning is not None) ^ (transition_frequency is not None):
-            raise ValueError(f"{states}: Please specify \'detuning\' for a field under the RWA"
-                            " or \'transition_frequency\' for a coupling without the approximation,"
-                            " but not both.")
-        
+            raise RydiquleError(f"{states}: Please specify \'detuning\' for a field under the RWA"
+                                " or \'transition_frequency\' for a coupling without the approximation,"
+                                " but not both.")
+
         if transition_frequency is not None:
             if transition_frequency < 0:
-                raise ValueError(f"{states}: \'transition_frequency\' must be positive.")
-            elif transition_frequency > 5000 and not suppress_rwa:
+                raise RydiquleError(f"{states}: \'transition_frequency\' must be positive.")
+            elif transition_frequency > 5000:
                 msg = (f"{states}: Not using the rotating wave approximation"
                     " for large transition frequencies can result in "
                     "prohibitively long computation times. Specify detuning to use "
-                    "the rotating wave approximation or pass \"suppress_rwa_warn=True\" "
-                    "to add_coupling() to suppress this warning.")
+                    "the rotating wave approximation or suppress with "
+                    "\'warnings.simplefilter('ignore', rq.RWAWarning)\'")
 
-                with warnings.catch_warnings():
-                    warnings.simplefilter("always")
-                    warnings.warn(msg, stacklevel=2)
+                warnings.warn(msg, RWAWarning)
 
-        self._add_coupling(**field_params, **extra_kwargs)
+        self._add_coherent_data(**full_edge_data)
+        if debug_state():
+            print(f' Added coupling for {states}')
 
 
     def add_couplings(self, *couplings: CouplingDict,
                         **extra_kwargs) -> None:
         """
         Add any number of couplings between pairs of states.
-        
+
         Acts as an alternative to calling :meth:`~.Sensor.add_coupling`
-        individually for each pair of states.
-        Can be used interchangably up to preference,
+        individually for each pair of states. Can be used interchangably up to preference,
         and all of keyword :meth:`~.Sensor.add_coupling` are supported dictionary
         keys for dictionaries passed to this function.
+
+        Note that since this function wraps :meth:`~.Sensor.add_coupling`, the first
+        element of `couplings` will be used to set `probe_tuple`.
 
         Parameters
         ----------
         couplings : tuple of dicts
-            Any number of dictionaries, each specifying the parameters of a single field 
-            coupling 2 states. For more details on the keys of each dictionry see the arguments 
-            for :meth:`~.Sensor.add_coupling`. Equivalent to passing each dictiories keys and 
+            Any number of dictionaries, each specifying the parameters of a single field
+            coupling 2 states. For more details on the keys of each dictionry see the arguments
+            for :meth:`~.Sensor.add_coupling`. Equivalent to passing each dictiories keys and
             values to :meth:`~.Sensor.add_coupling` individually.
         **extra_kwargs : dict
             Additional keyword-only arguments to pass to the relevant `add_coupling` method.
             The same arguments will be passed to each call of :meth:`~.Sensor.add_coupling`.
             Often used for warning suppression.
-
-        Raises
-        ------
-        ValueError
-            If the `states` parameter is missing.
+            Can also be used to define a common coupling parameter for each coupling.
 
         Examples
         --------
@@ -428,28 +916,233 @@ class Sensor():
         >>> blue = {"states":(0,1), "rabi_frequency":1, "detuning":2}
         >>> red = {"states":(1,2), "rabi_frequency":3, "detuning":4}
         >>> s.add_couplings(blue, red)
-        >>> print(s.couplings.edges(data=True))
-        [(0, 1, {'rabi_frequency': 1, 'detuning': 2, 'phase': 0, 'kvec': (0, 0, 0)}),
-        (1, 2, {'rabi_frequency': 3, 'detuning': 4, 'phase': 0, 'kvec': (0, 0, 0)})]
+        >>> print(s)
+        <class 'rydiqule.sensor.Sensor'> object with 3 states and 2 coherent couplings.
+        States: [0, 1, 2]
+        Coherent Couplings:
+            (0,1): {rabi_frequency: 1, detuning: 2, phase: 0, kvec: (0, 0, 0), coherent_cc: 1.0, label: (0,1)}
+            (1,2): {rabi_frequency: 3, detuning: 4, phase: 0, kvec: (0, 0, 0), coherent_cc: 1.0, label: (1,2)}
+        Decoherent Couplings:
+            None
+        Energy Shifts:
+            None
 
         """
         for c in couplings:
-            c_copy = c.copy()
+            self.add_coupling(**c, **extra_kwargs)
+
+
+    def add_coupling_group(self, states1: List[State], states2: List[State], label:str,
+                           rabi_frequency: Optional[ScannableParameter]=None,
+                           detuning: Optional[ScannableParameter]=None,
+                           transition_frequency: Optional[float]=None,
+                           coupling_coefficients: Optional[dict]=None,
+                           time_dependence: Union[Callable, Dict[States, Optional[Callable]], None]=None,
+                           **kwargs):
+        """Adds a group of couplings to a Sensor.
+
+        Given 2 lists of states, iterates over each combination of states in the two lists,
+        add performs the :meth:`~.Sensor.add_single_coupling` on that pair of states. All
+        additional parameters are passed directly to the `add_single_coupling` function.
+
+        Additionally, a multiplicative factor can be applied to the rabi frequency of each coupling
+        (i.e. Clebsch-Gordon coefficients). These factors are provided by the `cc`(coupling
+        coefficient) parameter as a dictionary
+        with keys corresponding to state pairs in the groups,
+        and the value being the multiplicative factor applied to `rabi_frequency`
+        when the Hamiltonian is generated. Note that these `cc` values cannot be arrays.
+        The corrollary for state energy (e.g. for `detuning` or `transition_frequency`)
+        is handled via :meth:`~.Sensor.add_energy_shifts`. If no dictionary is supplied for
+        for `coherent_cc`, *all* coupling coefficients are set to 1.0, effectively meaning that
+        the base `rabi_frequency` supplied is what is added to the Hamiltonian. If a
+        dictionary is supplied, any couplings whose coefficient is not specified by the dictionary
+        will be left off the graph.
+
+        If any of the parameters are specified as arrays, the associated
+        couplings will be applied to all couplings and automatically zipped together with
+        the label specified by `label`. For the purposes of axis labelling, the parameters
+        will be zipped in the order`rabi_frequency`, `detuning`, `transition_frequency`.
+
+        Note that unlike :meth:`~.Sensor.add_coupling`, this function does not set the
+        `probe_tuple` attribute, so if used to add the first coupling, `probe_tuple` must
+        be set manually.
+
+        Parameters
+        ----------
+        states1 : list[str or int]
+            List of states in the lower energy group of states. Must be integers or string
+            values which correspond to states in the Sensor.
+        states2 : list[str or int]
+            List of states in the higher energy group of states. Must be integers or string
+            values which correspond to states in the Sensor.
+        label : str
+            Required string label denoting what the group of couplings is called. Used to
+            apply a label in :meth:`~.Sensor.zip_parameters`.
+        rabi_frequency : ScannableParameter, optional
+            Floating point value or list of values for the base rabi frequency of the coupling
+            group. Multiplied by values specified in `cc` for individual couplings,
+            often accounting for variations in dipole moment. Default is None.
+        detuning : ScannableParameter, optional
+            Base detuning for the coupling group. If specified, every coupling in the group will
+            be treated in the rotating frame. Can be modified through energy level shifts on
+            individual states specified by :meth:`~.Sensor.add_energy_shift`. Default is None.
+        transition_frequency : float, optional
+            Base transition frequency for the coupling group.
+            Individual states can be shifted via :meth:`~.Sensor.add_energy_shift`.
+            Default is None.
+        coupling_coefficients : dict, optional
+            Individual coupling coeffients passed to the :meth:`~.Sensor.add_single_coupling`
+            method. If provided, defined by a dictionary keyed with tuples of states corresponding
+            to couplings in this group, with values equal to the coupling coeffient to be passed
+            to the `add_single_coupling` call for that coupling. If any entries are absent in the
+            provided dictionary, they are assumed to not be coupled, and no coupling will be added
+            for that transition. If `None`, defaults to a dictionary containing every coupling in
+            coupling in the group with `None` for all values (defaulting to 1.0 when passed to
+            `add_single coupling`). Defaults to `None`.
+        time_dependence : scalar function or dict of scalar functions, optional
+            Time-dependendent scalar factor that is multiplied by the rabi frequency in Hamiltonian
+            generation. Can be specified as a single function, in which case the function will be
+            used as the `time_dependence` argument for each coupling in the group
+            (see :meth:`~.Sensor.add_single_coupling`),  Can also bespecified as a dictionary
+            mapping state pairs in the coupling to individual functionswhich will be applied to
+            the associated coupling in the same manner. In the case of a dictionary specification,
+            each unspecified coupling will default to `time_dependence=None`.
+
+        Raises
+        ------
+        RydiquleError
+            If `states1` and `states2` only have one state. Use :meth:`~.Sensor.add_coupling` instead.
+
+        Note
+        ----
+        .. note::
+            The :meth:`~.Sensor.add_coupling` is typically preferred over this method, since it allows
+            for shorthand specification of groups, and sets the :attr:`Sensor.probe_tuple` attribute.
+
+        .. note::
+            If a :class:`~.CouplingNotAllowedError` is raised while adding the individual couplings
+            for the group, couplings that raised the error will be ignored.
+
+
+        Examples
+        --------
+        Energy shifts added to remove degenerate energy levels.
+        If no clebsch-gordon coefficients are supplied, ALL default to 1
+
+        >>> s = rq.Sensor(['a1', 'a2', 'b1', 'b2'])
+        >>> s.add_energy_shifts({'a2':0.1, 'b2':0.1})
+        >>> s.add_coupling_group(['a1','a2'], ['b1','b2'], detuning=1, rabi_frequency=1, label='example')
+        >>> s.get_hamiltonian()
+        array([[ 0. +0.j,  0. +0.j,  0.5+0.j,  0.5+0.j],
+               [ 0. +0.j,  0.1+0.j,  0.5+0.j,  0.5+0.j],
+               [ 0.5-0.j,  0.5-0.j, -1. +0.j,  0. +0.j],
+               [ 0.5-0.j,  0.5-0.j,  0. +0.j, -0.9+0.j]])
+
+        If the cc dictionary is specified, any unspecified terms are skipped on the graph. Note that
+        although `(0,3)` is in the coupling group, it is omitted from the graph since it is
+        not in `coupling_coeffiecients`.
+
+        >>> s = rq.Sensor(4)
+        >>> cc = {(0,1):0.5, (0,2):0.5}
+        >>> s.add_coupling_group([0],[1,2,3], detuning=1, rabi_frequency=1, coupling_coefficients=cc, label='foo')
+        >>> print(s)
+        <class 'rydiqule.sensor.Sensor'> object with 4 states and 2 coherent couplings.
+        States: [0, 1, 2, 3]
+        Coherent Couplings:
+            (0,1): {rabi_frequency: 1, detuning: 1, phase: 0, kvec: (0, 0, 0), label: foo_0, coherent_cc: 0.5}
+            (0,2): {rabi_frequency: 1, detuning: 1, phase: 0, kvec: (0, 0, 0), label: foo_1, coherent_cc: 0.5}
+        Decoherent Couplings:
+            None
+        Energy Shifts:
+            None
+
+        For list-like parameters, the couplings are treated as originating from a single laser and
+        that parameter is zipped across all couplings in the group.
+
+        >>> g = (0,0) #statespec for ground
+        >>> e1 = (1,[-1,0,1]) #statespec for 1st excited
+        >>> s = rq.Sensor([g, e1])
+        >>> det = np.linspace(-1,1,11)
+        >>> s.add_coupling_group([(0,0)], [(1,-1), (1,0), (1,1)],
+        ...                       rabi_frequency=10, detuning=det, label="red")
+        >>> print(s)
+        <class 'rydiqule.sensor.Sensor'> object with 4 states and 3 coherent couplings.
+        States: [(0, 0), (1, -1), (1, 0), (1, 1)]
+        Coherent Couplings:
+            ((0, 0),(1, -1)): {rabi_frequency: 10, detuning: <parameter with 11 values>, phase: 0, kvec: (0, 0, 0), label: red_0, coherent_cc: 1.0, red_detuning: detuning}
+            ((0, 0),(1, 0)): {rabi_frequency: 10, detuning: <parameter with 11 values>, phase: 0, kvec: (0, 0, 0), label: red_1, coherent_cc: 1.0, red_detuning: detuning}
+            ((0, 0),(1, 1)): {rabi_frequency: 10, detuning: <parameter with 11 values>, phase: 0, kvec: (0, 0, 0), label: red_2, coherent_cc: 1.0, red_detuning: detuning}
+        Decoherent Couplings:
+            None
+        Energy Shifts:
+            None
+        Zip Labels:
+            ['red_detuning']
+        >>> print(s.get_hamiltonian().shape)
+        (11, 4, 4)
+
+        """
+        labels: List[str] = []
+        if coupling_coefficients is None:
+            coupling_coefficients = {(s1,s2):None for s1, s2 in itertools.product(states1, states2)}
+
+        if callable(time_dependence) or time_dependence is None:
+            time_dependence_full = {(s1, s2): time_dependence for s1, s2 in itertools.product(states1, states2)}
+        else:
+            time_dependence_full = time_dependence
+
+        if len(states1) == len(states2) == 1:
+            raise RydiquleError("Both states groups only have one state. Use add_coupling instead.")
+
+        if hasattr(rabi_frequency, "__len__"):
+            # must be numpy array to multiply scaling factors
+            rabi_frequency = np.asarray(rabi_frequency)
+
+        #iterate over combinations of states, and add a coupling for each
+        for s1, s2 in itertools.product(states1, states2):
+            label_full = label + "_" + str(len(labels))
+
+            #skip if no coupling coefficient is supplied
             try:
-                states = self._states_valid(c_copy.pop('states'))
+                coherent_cc = coupling_coefficients[(s1, s2)]
             except KeyError:
-                raise ValueError("\'states\' parameter must be specified for any field")
+                continue
 
-            self.add_coupling(states=states, **c_copy, **extra_kwargs)
+            #get the relevant time_dependence
+            try:
+                single_time_dependence = time_dependence_full.get((s1,s2))
+            except AttributeError:
+                raise RydiquleError("'time_dependence' must be a callable or dict of callables")
+
+            try:
+                self.add_single_coupling((s1, s2), rabi_frequency=rabi_frequency, detuning=detuning,
+                                transition_frequency=transition_frequency, label=label_full,
+                                time_dependence=single_time_dependence, coherent_cc=coherent_cc,
+                                **kwargs)
+                labels.append(label_full)
+
+            except CouplingNotAllowedError:
+                if debug_state():
+                    print(f'\tCoupling {(s1, s2)} in \'{label:s}\' skipped as not allowed')
+                continue
 
 
-    def _add_coupling(self, states: States, **field_params) -> None:
+        scannable_group_params = ['rabi_frequency', 'detuning']
+        for param in scannable_group_params:
+
+            # if param is array-like, zip all couplings together on that param
+            if hasattr(locals()[param], "__len__"): #this is a little janky but probably fine
+                zip_labels: _ZP = {l:param for l in labels}
+                self.zip_parameters(zip_labels, zip_label=label+"_"+param)
+
+
+    def _add_coherent_data(self, states: States, **field_params) -> None:
         """
         Function for internal use which will ensure the supplied couplings is valid,
-        add the field to self.couplings. 
-        
+        add the field to self.couplings.
+
         Exists to abstract away some of the internally necessary bookkeeping functionality from
-        user-facing classes. 
+        user-facing classes.
 
         Parameters
         ----------
@@ -464,54 +1157,63 @@ class Sensor():
 
         # if label not provided, set to default value of states tuple as a str
         if field_params.get("label") is None:
-            field_params["label"] = str(states).replace(" ","")
+            field_params["label"] = state_tuple_to_str(states)
 
         # remove all coherent data in both directions on the graph
         # this prevents adding coherent couplings in both directions between 2 nodes
         self._remove_edge_data(states, 'coherent')
-        self._remove_edge_data(states[::-1], 'coherent')
+        self._remove_edge_data(states[::-1], 'coherent')  # pyright: ignore[reportArgumentType]
+
+        coupling_labels = [l for _,_,l in self.couplings.edges(data="label")]
+        if isinstance(field_params.get("label"), str) and field_params["label"] in coupling_labels + self._zip_labels:
+            raise ValueError(f"Label {field_params['label']} is already on a sensor coupling or zip")
 
         self.couplings.add_edge(*states, **field_params)
 
 
-    def zip_parameters(self, *parameters: str,  zip_label: Optional[str]=None):
+    def zip_parameters(self, parameters: Dict[Union[States, str], str],  zip_label: Optional[str]=None):
         """
         Define 2 scannable parameters as "zipped" so they are scanned in parallel.
 
         Zipped parameters will share an axis when quantities relevant to the equations of
-        motion, such as the `gamma_matrix` and `hamiltonian` are generated. Note that calling
-        this function does not affect internal quanties directly, but adds their labels together
-        in the internal `self._zipped_parameters` dict, and they are zipped at calculation time
-        for `hamiltonian` and `decoherence_matrix`.
+        motion, such as the `gamma_matrix` and `hamiltonian` are generated. So for 2 list-like
+        parameters, the first elements in each are solved at the same time, then the second, etc
+        Note that calling
+        this function does not affect internal quanties directly, but flags them to be zipped
+        at calculation time for relevant quantities.
+
+        Internally, adds the `label` value to the internal list of zipped parameter labels, and
+        adds a flag in the form of `<label>:<parameter_name>` to each edge of the graph.
 
         Parameters
         ----------
-        parameters : str
-            Parameter labels to scan together. Parameter labels are strings of the form 
-            `"<coupling_label>_<parameter_name>"`, such as `"(0,1)_detuning"`.
-            Must be at least 2 labels to zip. Note that couplings are specified in the 
-            :meth:`~.Sensor.add_coupling` function. If unspecified in this function, the 
-            pair of states in the coupling cast to a string will be used.
-
-        
+        parameters : dict
+            Parameter labels to scan together. Parameters are specified with a dictionary keyed by
+            the either pair of states defining the coupling (e.g. `(0,1)`) or a previously
+            specified label (e.g. `"probe"`) with items corresponding to the
+            respective parameter name (e.g. `"detuning"`).
         zip_label : optional, str
             String label shorthand for the zipped parameters. The label for the axis of these
             parameters in :meth:`~.Sensor.axis_labels()`. Does not affect functionality of the
-            Sensor. If unspecified, the label used will be `"zip_" + <number>`.
+            Sensor. If `None` (the default), the label used will be `"zip_" + <number>`, where <number>
+            is the one index beyond the current length of the zip_parameters list.
 
         Raises
         ------
-        ValueError
+        RydiquleError
             If fewer than 2 labels are provided.
-        ValueError
+        RydiquleError
             If any of the 2 labels are the same.
-        ValueError
+        RydiquleError
+            If the label contains the substring `"gamma"`, as this is used internally
+            for decoherence matrix generation.
+        RydiquleError
             If any elements of `labels` are not labels of couplings in the sensor.
-        ValueError
+        RydiquleError
             If any of the parameters specified by labels are already zipped.
-        ValueError
+        RydiquleError
             If any of the parameters specified are not list-like.
-        ValueError
+        RydiquleError
             If all list-like parameters are not the same length.
 
         Notes
@@ -519,15 +1221,15 @@ class Sensor():
         .. note::
             This function should be called last after all Sensor couplings and dephasings
             have been added. Changing a coupling that has already been zipped removes it from
-            the `self.zipped_parameters` list. 
-            
-        .. note::
-            Modifying the `Sensor.zipped_parameters` attribute directly can break some functionality
-            and should be avoided. Use this function or :meth:`~.Sensor.unzip_parameters` instead. 
+            the `self.zipped_parameters` list.
 
         .. note::
-            When defining the zip strings for states labelled with strings, be sure to additional 
-            `'` or `"` characters on either side of the labels, as demonstrated in the second 
+            Modifying the `Sensor._zip_labels` attribute directly can break some functionality
+            and should be avoided. Use this function or :meth:`~.Sensor.unzip_parameters` instead.
+
+        .. note::
+            When defining the zip strings for states labelled with strings, be sure to additional
+            `'` or `"` characters on either side of the labels, as demonstrated in the second
             example below.
 
         Examples
@@ -536,169 +1238,429 @@ class Sensor():
         >>> det = np.linspace(-1,1,11)
         >>> s.add_coupling(states=(0,1), detuning=det, rabi_frequency=1, label="probe")
         >>> s.add_coupling(states=(1,2), detuning=det, rabi_frequency=1)
-        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning", zip_label="demo_zip")
-        >>> print(s._zipped_parameters) #NOT modifying directly
-        {'demo_zip': ['(1,2)_detuning', 'probe_detuning']}
+        >>> s.zip_parameters({"probe":"detuning", (1,2):"detuning"}, zip_label="detunings")
+        >>> print(s._zip_labels) #NOT modifying directly
+        ['detunings']
+        >>> print(s.couplings.edges(data="detunings"))
+        [(0, 1, 'detuning'), (1, 2, 'detuning')]
+        >>> print(s.get_hamiltonian().shape)#zipped parameters share an axis
+        (11, 3, 3)
 
-        Make sure to add the appropriate additional string markings when the states are strings. 
+        Especially when states are labelled with tuples, specifying zips parameters with the
+        states they couple can be cumbersome. In this case, it can be useful to either assign
+        variables to the tuples defining the states, or to label the couplings.
 
-        >>> s = rq.Sensor(['g', 'e1', 'e2'])
-        >>> det = np.linspace(-1,1,11)
-        >>> s.add_coupling(states=('g','e1'), detuning=det, rabi_frequency=1, label="probe")
-        >>> s.add_coupling(states=('e1','e2'), detuning=det, rabi_frequency=1)
-        >>> s.zip_parameters("probe_detuning", "('e1','e2')_detuning", zip_label="demo_zip")
-        >>> print(s._zipped_parameters) #NOT modifying directly
-        {'demo_zip': ["('e1','e2')_detuning", 'probe_detuning']}
+        >>> g = (0,0)
+        >>> e1, e2 = (1,-1), (1, 1)
+        >>> s = rq.Sensor([g, e1, e2])
+        >>> arr = np.linspace(-1,1,11)
+        >>> s.add_coupling((g,e1), detuning=arr, rabi_frequency=1, label="probe")
+        >>> s.add_coupling((e1,e2), detuning=arr, rabi_frequency=1, label="coupling")
+        >>> s.zip_parameters({((0,0),(1,-1)):"detuning", ((1,-1), (1, 1)):"detuning"}, zip_label="foo") #clunky
+        >>> print(s._zip_labels)
+        ['foo']
+        >>> s.unzip_parameters("foo")
+        >>> s.zip_parameters({"probe":"detuning", "coupling":"detuning"}, zip_label="bar") #readable
+        >>> print(s._zip_labels)
+        ['bar']
+
+        For maximum flexibility, any parameters specified as arrays with matching lengths can
+        be zipped. This should be used with care, as some parameter combinations can be
+        nonsensical.
+
+        >>> s = rq.Sensor(3)
+        >>> arr = np.linspace(-1,1,11)
+        >>> s.add_energy_shift(0, 0.5*arr)
+        >>> s.add_coupling(states=(0,1), detuning=arr, rabi_frequency=1, label="probe")
+        >>> s.add_coupling(states=(1,2), detuning=arr, rabi_frequency=1)
+        >>> s.add_decoherence((1,0), 0.1*arr)
+        >>> s.zip_parameters({(0,0):"e_shift", "probe":"detuning", (1,2):"detuning", (1,0):"gamma"}, zip_label="foo")
+        >>> print(s._zip_labels) #NOT modifying directly
+        ['foo']
+        >>> print(s.couplings.edges(data="foo"))
+        [(0, 0, 'e_shift'), (0, 1, 'detuning'), (1, 2, 'detuning'), (1, 0, 'gamma')]
+        >>> print(s.get_hamiltonian().shape)
+        (11, 3, 3)
 
         """
         #give a dummy label if not provided
         if zip_label is None:
-            zip_label = "zip_" + str(len(self._zipped_parameters))
+            zip_label = "zip_" + str(len(self._zip_labels))
+
+        #check for protected label
+        for protected_label in self.protected_labels:
+            if zip_label.find(protected_label) > -1:
+                raise RydiquleError(f"Label {zip_label} contains protected string {protected_label}")
+
+        #check for protected label
+        for protected_label in self.scannable_parameters:
+            if zip_label == protected_label:
+                raise RydiquleError(f"Label {zip_label} is protected and cannot be a zip label")
 
         #ensure zip label does not already exist
-        if zip_label in self._zipped_parameters.keys():
-            raise ValueError(f"Parameters already zipped with label {zip_label}."
-                             "Please use a unique label.")
+        if zip_label in self._zip_labels:
+            raise RydiquleError(f"Parameters already zipped with label {zip_label}. "
+                                "Zip labels must be unique.")
 
         # check for at least 2 labels
         if len(parameters) < 2:
-            raise ValueError(("Please provide at least 2 parameter labels "
-                              f"to zip (only provided {len(parameters)})"))
-            
+            raise RydiquleError(("Please provide at least 2 parameter labels "
+                                 f"to zip (only provided {len(parameters)})"))
+
         #check that all labels are unique
         if len(parameters) != len(set(parameters)): #set will be shorter if there are duplicates
-            raise ValueError("parameters cannot be zipped to themselves")
-        
+            raise RydiquleError("parameters cannot be zipped to themselves")
+
         #check if any labels are already zipped
-        current_zips = [self._zipped_parameters.values()]
-        for l1, l2 in itertools.product(current_zips, parameters):
-            if l1 == l2:
-                raise ValueError(f"Parameter {l1} already zipped!")
+        if any([l1==l2 for l1, l2 in itertools.product(self._zip_labels, parameters)]):
+            raise RydiquleError("Parameter already zipped!")
 
         #ensure provided labels are valid for zipping
         previous_len = 0
-        for l in parameters:
-            
-            # divide coupling from parameter
-            # check if parameter exists done later
-            split = l.split('_')
-            if len(split) < 2:
-                raise ValueError(f"Invalid parameter label {l}")
-            try:
-                # incoherent parameter
-                gi = split.index('gamma')
-                coupling = '_'.join(split[:gi])
-                param = '_'.join(split[gi:])
-            except ValueError:
-                # coherent parameter
-                if split[-1] in BASE_SCANNABLE_KEYS:
-                    coupling = '_'.join(split[:-1])
-                    param = split[-1]
-                else:
-                    coupling = '_'.join(split[:-2])
-                    param = '_'.join(split[-2:])
-            
+        for coupling, p in parameters.items():
+
             #make sure the label exists
             try:
                 states = self._coupling_with_label(coupling)
-            except ValueError:
-                raise ValueError(f"{coupling} is not a label of any coupling in this sensor")
-            
+            except RydiquleError:
+                raise RydiquleError(f"{coupling} is not a label of any coupling in this sensor")
+
             #make sure parameter exists and is an array
             try:
-                _ = self.couplings.edges[states][param]
-            except KeyError:
-                raise ValueError(f"Coupling {coupling} has no parameter {param}")
-            if not hasattr(param, "__len__"):
-                raise ValueError(f"Parameter {l} is not list-like and cannot be zipped")
-            
+                parameter_val = self.couplings.edges[states][p]
+            except KeyError as err:
+                raise RydiquleError(f"Coupling {coupling} has no parameter {p}") from err
+
             #make sure array-defined parameters are the same length
-            current_len = len(self.couplings.edges[states][param])
+            try:
+                current_len = len(parameter_val)
+            except TypeError:
+                raise RydiquleError(f"Parameter {coupling}:{p} is not an array and cannot be zipped")
+
             if previous_len > 0 and current_len != previous_len:
-                raise ValueError(
-                    f"Got length {current_len} for parameter \"{l}\", "
-                    f"but \"{parameters[0]}\" is length {previous_len}")
-            
+
+                raise RydiquleError(
+                    f"Got length {current_len} for parameter \"{coupling}\":\" {p}\", "
+                    f"but should be length {previous_len}")
+
             previous_len = current_len
-                        
-        parameters = list(parameters)
-        parameters.sort()
-        self._zipped_parameters[zip_label] = parameters
+
+            self.couplings.edges[states][zip_label] = p
 
 
-    def unzip_parameters(self, zip_label, verbose=True):
-        
-        """
-        Remove a set of zipped parameters from the internal zipped_parameters list.
+        self._zip_labels.append(zip_label)
 
-        If an element of the internal `_zipped_parameters` array matches ALL labels provided,
-        removes it from the internal `zipped_parameters` method. If no such element is
-        in `_zipped_parameters`, does nothing.
+
+    def zip_zips(self, *zip_labels: str, new_label: Optional[str]=None):
+        """Combine multiple parameter zips into a single zip.
+
+        Given any number of labels of zips in the sensor, combines them so that they will
+        all share a single axis in the stack. Note that this will override all previous
+        zips in `zip_labels`, and they cannot be recovered.
 
         Parameters
         ----------
-        zip_label : str 
-            The string label corresponding the key to be deleted in the `_zipped_parameters`
-            attribute. 
-        
+        new_label : string, optional
+            Label for the new zip that will replace the ones provided in `zip_labels`.
+            If None, will be generated by joining all the strings of `zip_labels` with
+            a "_" character, by default None.
+
+        Raises
+        ------
+        RydiquleError
+            If any of `zip_labels` do not exist in the `Sensor`.
+        RydiquleError
+            If `new_label` contains a protected substring (such as "gamma").
+        RydiquleError
+            If any of `zip_labels` are the same.
+        RydiquleError
+            If any of the dimensions of the axes specified by `zip_labels` do not match.
+
+        Examples
+        --------
+        >>> s = rq.Sensor(5)
+        >>> det = np.linspace(-1, 1, 11)
+        >>> s.add_coupling((0, [1,2]), rabi_frequency=1, detuning=det, label="foo")
+        >>> s.add_coupling((0, [3,4]), rabi_frequency=1, detuning=det, label="bar")
+        >>> print(s.get_hamiltonian().shape)
+        (11, 11, 5, 5)
+        >>> print(s.axis_labels())
+        ['bar_detuning', 'foo_detuning']
+        >>> s.zip_zips("foo_detuning", "bar_detuning", new_label="foobar_detuning")
+        >>> print(s.get_hamiltonian().shape)
+        (11, 5, 5)
+        >>> print(s.axis_labels())
+        ['foobar_detuning']
+
+        """
+
+        #set default label
+        if new_label is None:
+            new_label = "_".join([l for l in zip_labels])
+
+        #Check that all zips are actually in the system
+        for l in zip_labels:
+            if l not in self._zip_labels:
+                raise RydiquleError(f"No zip labeled {l}")
+
+        # Check the label does not contain protected substrings
+        for protected_label in self.protected_labels:
+            if new_label.find(protected_label) > -1:
+                raise RydiquleError(f"Label {new_label} contains protected substring \"{protected_label}\"")
+
+        #check that all labels are unique
+        if len(zip_labels) != len(set(zip_labels)): #set will be shorter if there are duplicates
+            raise RydiquleError("Zips cannot be zipped to themselves")
+
+        # Check that all zips have the same dimensionality
+        axis_labels = self.axis_labels()
+        stack_shape = self._stack_shape()
+
+        axis_lengths = np.array(
+            [ax_size for ax_size, ax_label in zip(stack_shape, axis_labels)
+             if ax_label in zip_labels]
+        )
+        if not np.all(axis_lengths==axis_lengths[0]):
+            raise RydiquleError(f"Got mismatching dimensions {axis_lengths} for zips")
+
+        for z_label in zip_labels:
+            #generate a list of all couplings that are part of zip z_label
+            couplings = [(s1, s2, param)
+                         for s1, s2, param in self.couplings.edges(data=z_label)
+                         if param is not None]
+
+            for s1, s2, param in couplings:
+                del self.couplings[s1][s2][z_label]
+                self.couplings[s1][s2][new_label] = param
+
+            self._zip_labels.remove(z_label)
+
+        self._zip_labels.append(new_label)
+
+
+    def unzip_parameters(self, zip_label: str, verbose: Optional[bool]=True):
+
+        """
+        Remove a set of zipped parameters from the internal zip_labels list.
+
+        If an element of the internal `_zip_labels` array matches the label provided,
+        removes it from `_zip_labels`. If no such element is present
+        in `_zip_labels`, does nothing, and prints a message (disabled with `verbose=False`)
+
+        Parameters
+        ----------
+        zip_label : str
+            The string label corresponding the key to be deleted in the `_zip_labels`
+            attribute.
+
+        verbose : bool
+            Whether to print a message if the unzip fails due to the specified `zip_label`
+            not being a zip in the sensor. If `True` prints a message to std out if `zip_label`
+            is not an element of the internal `self._zip_labels`. Otherwise, fails silently.
+            Can be used if unzipping as part of an automated script.
+
         Notes
         -----
         .. note::
-            This function should always be used rather than modifying the `_zipped_parameters`
+            This function should always be used rather than modifying the `_zip_labels`
             attribute directly.
-            
+
         Examples
         --------
         >>> s = rq.Sensor(3)
         >>> det = np.linspace(-1,1,11)
         >>> s.add_coupling(states=(0,1), detuning=det, rabi_frequency=1, label="probe")
         >>> s.add_coupling(states=(1,2), detuning=det, rabi_frequency=1)
-        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning", zip_label="demo1")
-        >>> print(s._zipped_parameters) #NOT modifying directly
+        >>> s.zip_parameters({"probe":"detuning", (1,2):"detuning"}, zip_label="demo1")
+        >>> print(s._zip_labels) #NOT modifying directly
+        ['demo1']
+        >>> print(s.couplings.edges(data="demo1"))
+        [(0, 1, 'detuning'), (1, 2, 'detuning')]
         >>> s.unzip_parameters("demo1")
-        >>> print(s._zipped_parameters) #NOT modifying directly
-        {'demo1': ['(1,2)_detuning', 'probe_detuning']}
-        {}
-        
-        If the labels provided are not a match, a message is printed and nothing is altered. 
-        
+        >>> print(s._zip_labels) #NOT modifying directly
+        []
+        >>> print(s.couplings.edges(data="demo1"))
+        [(0, 1, None), (1, 2, None)]
+
+        If the labels provided are not a match, a message is printed and nothing is altered.
+        In the case where simulations are scripted and the printed message is annoying, the
+        print behaviour can be modified with `verbose=False`, potentially useful for scripting
+        cases where the desired behavior is to silently countinue over non-existant zip labels.
+
         >>> s = rq.Sensor(3)
         >>> det = np.linspace(-1,1,11)
         >>> s.add_coupling(states=(0,1), detuning=det, rabi_frequency=1, label="probe")
         >>> s.add_coupling(states=(1,2), detuning=det, rabi_frequency=1)
-        >>> s.zip_parameters("probe_detuning", "(1,2)_detuning")
-        >>> print(s._zipped_parameters) #NOT modifying directly
-        >>> s.unzip_parameters('blip_0')
-        >>> print(s._zipped_parameters) #NOT modifying directly
-        {'zip_0': ['(1,2)_detuning', 'probe_detuning']}
-        No label matching blip_0, no action taken
-        {'zip_0': ['(1,2)_detuning', 'probe_detuning']}
-        
+        >>> s.zip_parameters({"probe":"detuning", (1,2):"detuning"})
+        >>> print(s._zip_labels) #NOT modifying directly
+        ['zip_0']
+        >>> print(s.couplings.edges(data="zip_0"))
+        [(0, 1, 'detuning'), (1, 2, 'detuning')]
+        >>> s.unzip_parameters("zipp0")
+        No label matching zipp0, no action taken
+        >>> print(s._zip_labels) #NOT modifying directly
+        ['zip_0']
+        >>> print(s.couplings.edges(data="zip_0"))
+        [(0, 1, 'detuning'), (1, 2, 'detuning')]
+
         """
         try:
-            del self._zipped_parameters[zip_label]
-        except KeyError:
+            self._zip_labels.remove(zip_label)
+        except ValueError:
             if verbose:
                 print(f"No label matching {zip_label}, no action taken")
+                return
+
+        for edge in self.couplings.edges():
+            try:
+                del self.couplings.edges[edge][zip_label]
+            except KeyError:
+                pass
 
 
-    def add_decoherence(self, states: States, gamma: ScannableParameter,
-                        label: Optional[str] = None):
-        """
-        Add decoherent coupling to the graph between two states.
+    def add_decoherence(self, statespecs: StateSpecs, gamma: ScannableParameter, **kwargs):
+        """Add a coupling between states or groups of states.
 
-        If `gamma` is list-like, the sensor will scan over the values,
-        solving the system for each different gamma, identically to the
-        scannable parameters in coherent couplings.
+        Wraps the :meth:`~.Sensor.add_single_decoherence` and :meth:`~.Sensor.add_decoherence_group`
+        functions, and dispatches to the appropriate one depending on the formatting of the `states`
+        argument. Additional keyword arguments will be passed unmodified to the relevant
+        method. See documentation of those functions for details on keyword argument options.
 
         Parameters
         ----------
-        states : tuple of ints
+        states : tuple of StateSpec
+            The states or state manifolds of the decoherent coupling. If both are integers or
+            string patterns matching a single state in the `Sensor`,
+            :meth:`~.Sensor.add_single_decoherence` is dispatched. If either argument is a
+            specification matching multiple states, :meth:`~.Sensor.add_decoherence_group` is
+            dispatched.
+        gamma : float or Sequence
+            The decoherence rate, in Mrad/s.
+        **kwargs :
+            Additional keyword arguments passed to the appropriate function. See documentation for
+            :meth:`~.Sensor.add_single_decoherence` and :meth:`~.Sensor.add_decoherence_group` for
+            more details on valid keyword arguments.
+
+        Examples
+        --------
+        >>> s = rq.Sensor(3)
+        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
+        >>> s.add_coupling(states=(1,2), detuning=1, rabi_frequency=1)
+        >>> s.add_decoherence((2,0), 0.1, label="misc")
+        >>> print(s.decoherence_matrix())
+        [[0.  0.  0. ]
+         [0.  0.  0. ]
+         [0.1 0.  0. ]]
+
+        To add multiple decoherence effects to the same term, use a different label for each.
+
+        >>> s = rq.Sensor(3)
+        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
+        >>> s.add_coupling(states=(1,2), detuning=1, rabi_frequency=1)
+        >>> s.add_decoherence((2,0), 0.1, label='foo')
+        >>> s.add_decoherence((2,0), 0.15, label='bar')
+        >>> print(s.decoherence_matrix())
+        [[0.   0.   0.  ]
+         [0.   0.   0.  ]
+         [0.25 0.   0.  ]]
+
+        Just like coherent coupling parameters, decoherence values can be passed as list-like objects
+        and scanned. This adjusts the hamiltonian shape for clear broadcasting.
+
+        >>> s = rq.Sensor(3)
+        >>> gamma = np.linspace(0,0.5,11)
+        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
+        >>> s.add_coupling(states=(1,2), detuning=1, rabi_frequency=1)
+        >>> s.add_decoherence((2,0), gamma)
+        >>> print(s.decoherence_matrix().shape)
+        (11, 3, 3)
+        >>> print(s.get_hamiltonian().shape)
+        (11, 3, 3)
+
+        Upper and lower states can also be regex strings matched against states in the Sensor just like for
+        coherent couplings.
+
+        >>> s = rq.Sensor(['g','e1','e2'])
+        >>> s.add_coupling(states=('g','e1'), detuning=1, rabi_frequency=1)
+        >>> s.add_coupling(states=('e1','e2'), detuning=1, rabi_frequency=1)
+        >>> gamma = np.linspace(0, 0.3, 3)
+        >>> cc = {('e1','g'):0.25, ('e2','g'):0.75}
+        >>> s.add_decoherence((['e1','e2'],'g'), gamma, label="test", coupling_coefficients=cc)
+        >>> print(s.decoherence_matrix())
+        [[[0.     0.     0.    ]
+          [0.     0.     0.    ]
+          [0.     0.     0.    ]]
+        <BLANKLINE>
+         [[0.     0.     0.    ]
+          [0.0375 0.     0.    ]
+          [0.1125 0.     0.    ]]
+        <BLANKLINE>
+         [[0.     0.     0.    ]
+          [0.075  0.     0.    ]
+          [0.225  0.     0.    ]]]
+
+        Also just like coherent couplings, decoherent coupling can be defined over manifolds
+        using state specifications. The interface is identical.
+
+        >>> g = (0,[-1,1])
+        >>> e = (1,[-1,1])
+        >>> cc = {
+        ...    ((1,-1),(0,-1)):1,
+        ...    ((1,1),(0,-1)):2,
+        ...    ((1,-1),(0,1)):1,
+        ...    ((1,1),(0,1)):2,
+        ... }
+        >>> s = rq.Sensor([g,e])
+        >>> s.add_coupling((g,e), detuning=1, rabi_frequency=1, label='foo')
+        >>> s.add_decoherence((e,g), 0.1, coupling_coefficients=cc, label='bar')
+        >>> print(s.decoherence_matrix())
+        [[0.  0.  0.  0. ]
+         [0.  0.  0.  0. ]
+         [0.1 0.1 0.  0. ]
+         [0.2 0.2 0.  0. ]]
+
+        """
+        #pass adding edges if gamma is 0
+        if np.all(gamma==np.zeros_like(gamma)):
+            pass
+
+        #get relevant integer states from string label patterns
+        try:
+            states_list1 = self.states_with_spec(statespecs[0])
+            states_list2 = self.states_with_spec(statespecs[1])
+        except ValueError:
+            raise ValueError("states1 and states2 must be valid state specifications")
+
+        if len(states_list1) == len(states_list2) == 1:
+            self.add_single_decoherence((states_list1[0], states_list2[0]), gamma, **kwargs)
+            return
+
+        self.add_decoherence_group(states_list1, states_list2, gamma, **kwargs)
+
+
+    def add_single_decoherence(self, states: States, gamma: ScannableParameter,
+                               decoherent_cc: float=1.0, label: Optional[str] = None):
+        """
+        Add decoherent coupling to the graph between two states.
+
+        If `gamma` is list-like, the array generated by :meth:`~.Sensor.decoherence_matrix` will
+        contain decoherence matrices for every combination of decoherence values provided. This
+        functionality mirrors hamiltonian generation when parameters of
+        :meth:`~.Sensor.add_coupling` are list-like. Note that if `gamma` is 0 or an array
+        of zeros, the associated edge key will be left off the graph.
+
+        Parameters
+        ----------
+        states : tuple of State
             Length-2 tuple of integers corresponding to the two states. The first
-            value is the number of state out of which population decays, and the 
+            value is the number of state out of which population decays, and the
             second is the number of the state into which population decays.
         gamma : float or sequence
             The decay rate, in Mrad/s.
+        decoherent_cc : float
+            The value by which `gamma` is multiplied before it is added to the graph. Typically only used
+            by :meth:`~.Sensor.add_decoherence_group`, but made transparent for scripting purposes.
+            Defaults to 1.0
         label : str or None, optional
             Optional label for the decay. If `None`, decay will be stored on
             the graph edge as `"gamma"`. Otherwise, will cast as a string and decay will be stored
@@ -709,28 +1671,40 @@ class Sensor():
         .. note::
             Adding a decoherece with a particular label (including `None`) will override an existing
             decoherent transition with that label.
-            
+
         Examples
         --------
-        s = rq.Sensor(3)
+        >>> s = rq.Sensor(3)
         >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
         >>> s.add_coupling(states=(1,2), detuning=1, rabi_frequency=1)
-        >>> s.add_decoherence((2,0), 0.1, label="misc")
+        >>> s.add_single_decoherence((2,0), 0.1, label="misc")
         >>> print(s.decoherence_matrix())
         [[0.  0.  0. ]
-        [0.  0.  0. ]
-        [0.1 0.  0. ]]
-        
+         [0.  0.  0. ]
+         [0.1 0.  0. ]]
+
+        To add multiple decoherence effects to the same term, provida a differnt label for each.
+
+        >>> s = rq.Sensor(3)
+        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
+        >>> s.add_coupling(states=(1,2), detuning=1, rabi_frequency=1)
+        >>> s.add_single_decoherence((2,0), 0.1, label='foo')
+        >>> s.add_single_decoherence((2,0), 0.15, label='bar')
+        >>> print(s.decoherence_matrix())
+        [[0.   0.   0.  ]
+         [0.   0.   0.  ]
+         [0.25 0.   0.  ]]
+
         Decoherence values can also be scanned. Here decoherece from states 2->0 is scanned
         between 0 and 0.5 for 11 values. We can also see how the Hamiltonian shape accounts
         for this to allow for clean broadcasting, indicating that the hamiltonian is identical
-        accross all decoherence values.
-        
+        across all decoherence values.
+
         >>> s = rq.Sensor(3)
         >>> gamma = np.linspace(0,0.5,11)
         >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
         >>> s.add_coupling(states=(1,2), detuning=1, rabi_frequency=1)
-        >>> s.add_decoherence((2,0), gamma)
+        >>> s.add_single_decoherence((2,0), gamma)
         >>> print(s.decoherence_matrix().shape)
         (11, 3, 3)
         >>> print(s.get_hamiltonian().shape)
@@ -743,23 +1717,147 @@ class Sensor():
             label_full = "gamma_" + str(label)
 
         states = self._states_valid(states)
-        # invalidate existing decoherence data if already exists
-        self._remove_edge_data(states, kind=label_full)
-        self.couplings.add_edge(*states, **{label_full:gamma})
+        # coerce gamma to numpy array if a sequence
+        if isinstance(gamma, Sized):
+            gamma = np.array(gamma)
+
+        gamma_full = decoherent_cc*gamma
+        if np.all(gamma_full==0.0):
+            return
+
+        self.couplings.add_edge(*states, **{label_full:gamma_full})
+        if debug_state():
+            print(f'  Added decoherence for {states}')
 
         # if edge doesn't have a label (ie decoherence only), add a default label
         if self.couplings.edges[states].get("label") is None:
-            self.couplings.edges[states]["label"] = str(states).replace(" ", "")
+            self.couplings.edges[states]["label"] = state_tuple_to_str(states)
+
+
+    def add_decoherence_group(self, states1: List[State], states2: List[State],
+                              gamma: ScannableParameter, label: str,
+                              coupling_coefficients: Optional[Dict[States,float]] = None):
+        """Adds a group of dechorences to the Sensor.
+
+        Given 2 lists of states, adds a single coupling across each combination of states
+        between the first and second lists. Then, if gamma is a array-like of values, automatically
+        performs :meth:`~.Sensor.zip_parameters` on all decoherences added as part of this
+        funtion so they share an axis when :meth:`~.Sensor.decoherence_matrix` is called.
+
+        Scaling multiplicative factors for `gamma` must be applied per pair of states
+        using `decoherent_cc`, a dictionary of coefficients determining coupling strengths.
+        If a pair is not in `decoherent_cc`, it is assumed to have a coupling coefficient of
+        zero, and will be omitted from the graph. If `decoherent_cc` is `None`, all
+        couplings are assumed to have a relative strength of 1.
+
+        Parameters
+        ----------
+        states1 : List of State
+            The list of states out of which population is decaying. Each element of the list
+            must be a state in this `Sensor`.
+        states2 : List of State
+             The list of states into which population is decaying. Each element of the list
+            must be a state in this `Sensor`.
+        label : str
+            Required string label denoting what the group of dephasings is called. Used to
+            apply a label to the zip.
+        gamma : ScannableParameter
+            Base decoherence rate between the two groups of states, in units of Mrad/s.
+            Mutliplied by the corresponding values in the `decoherent_coupling` dictionary.
+        coupling_coefficients : dict, optional
+            Coefficiants describing the relative coupling strengths for decoherences in the group.
+            Treated as modifications to the "base" dephasing rate specified by the `gamma`
+            argument. The gamma of individual decoherences will be the `gamma` argument
+            multiplied by the corresponding value in this dictionary.
+            If `None`, all couplings in the group are assumed to have a coefficient of 1.0
+            if specified, all unspecified coupling pairs are ignored.
+
+        Raises
+        ------
+        ValueError
+            If the either of the states strings provided cannot be parsed as a regex pattern
+        ValueError
+            If `states1` and `states2` only have one state. Use :meth:`~.Sensor.add_decoherence` instead.
+
+        Examples
+        --------
+        >>> s = rq.Sensor(['g','e1','e2'])
+        >>> s.add_coupling(states=('g','e1'), detuning=1, rabi_frequency=1)
+        >>> s.add_coupling(states=('e1','e2'), detuning=1, rabi_frequency=1)
+        >>> cc = {('e1','g'):0.25, ('e2','g'):0.75}
+        >>> s.add_decoherence_group(['e1','e2'],['g'], 0.1, "test", coupling_coefficients=cc)
+        >>> print(s.decoherence_matrix())
+        [[0.    0.    0.   ]
+         [0.025 0.    0.   ]
+         [0.075 0.    0.   ]]
+
+        Unlike :meth:`Sensor.add_decoherence`, this function does not accept state specifications.
+        Upper and lower states must be passed as lists. As this tends to be a little clunkier,
+        :meth:`Sensor.add_decoherence` is usually preferred.
+
+        >>> g = (0,[-1,1])
+        >>> e = (1, [-1,1])
+        >>> list_g = [(0, -1), (0, 1)]
+        >>> list_e = [(1, -1), (1, 1)]
+        >>> cc = {
+        ...    ((1,1),(0,1)): 0.4,
+        ...    ((1,1),(0,-1)): 0.1,
+        ...    ((1,-1),(0,1)): 0.1,
+        ...    ((1,-1),(0,-1)): 0.4
+        ... }
+        >>> s = rq.Sensor([g,e])
+        >>> print(s.states)
+        [(0, -1), (0, 1), (1, -1), (1, 1)]
+        >>> s.add_decoherence_group(list_e, list_g, 0.1, "foo", coupling_coefficients=cc)
+        >>> print(s.decoherence_matrix())
+        [[0.   0.   0.   0.  ]
+         [0.   0.   0.   0.  ]
+         [0.04 0.01 0.   0.  ]
+         [0.01 0.04 0.   0.  ]]
+
+        """
+        labels = []
+        if coupling_coefficients is None:
+            coupling_coefficients = {(s1,s2):1 for s1, s2 in itertools.product(states1, states2)}
+
+        if len(states1) == 1 and len(states2) == 1:
+            raise ValueError('Both states groups only have one state. Use add_decoherence instead')
+
+        if isinstance(gamma, Sized):
+            # must cast sequences to numpy array to multiply by scalars
+            gamma = np.asarray(gamma)
+
+        for s1, s2 in itertools.product(states1, states2):
+            coupling_label = state_tuple_to_str((s1,s2))
+
+            # apply CG with default of 0 if not specified
+            gamma_cc = coupling_coefficients.get((s1,s2))
+            # skip coupling if coefficient not supplied
+            if gamma_cc is None:
+                continue
+
+            self.add_decoherence((s1,s2), gamma_cc * gamma, label=label)
+            labels.append(coupling_label)
+
+        if hasattr(gamma, "__len__"):
+            #reconstruct the label that will be added to the graph in add_single decoherence
+            if label is None:
+                gamma_label = "gamma"
+            else:
+                gamma_label = "gamma_" + str(label)
+            zip_labels: _ZP = {l:gamma_label for l in labels}
+            self.zip_parameters(zip_labels, zip_label=label)
 
 
     def add_transit_broadening(self, gamma_transit: ScannableParameter,
-                               repop: Union[None, Dict[State, float]]= None,
-                               label: str = "transit") -> None:
+                               repop: Optional[Union[Dict[State, float], List[State]]] = None,
+                               label: str = "transit"):
         """
         Adds transit broadening by adding a decoherence from each node to ground.
-        
-        For each graph node n, adds a decoherent transition from n the specified state
-        (0 by default) using the :meth:`~.Sensor.add_decoherence` method with the `"transit"` label.
+
+        For each state n, adds a decoherent transition from n to each state in the
+        keys of the `repop` dictionary using the :meth:`~.Sensor.add_decoherence`
+        method with provided label (`"transit"`by default)
         See :meth:`~.Sensor.add_decoherence` for more details on labeling.
 
         If an array of transit values are provided, they will be automatically zipped together
@@ -771,27 +1869,34 @@ class Sensor():
             The transit broadening rate in Mrad/s.
         repop: dict, optional
             Dictionary of states for transit to repopulate in to.
-            The keys represent the state labels. The values represent
+            The keys represent tshe state labels. The values represent
             the fractional amount that goes to that state.
-            If the sum of values does not equal 1, population will not be conserved.
+            If the sum of value does not equal 1, population will not be conserved.
             Default is to repopulate everything into the ground state (either state 0
             or the first state in the basis passed to the :meth:`~.Sensor.__init__` method).
+            If `None`, all population decays to the ground state, defined as the first state
+            in the state list passed to the constuctor. Defaults to `None`.
+        label: str, optional
+            Label to be passed to :meth:`~.Sensor.add_decoherence`. Defaults to "transit"
 
         Warns
         -----
-        If the values of the `repop` parameter do not sum to 1, thus meaning
-        population will not be conserved.
-        
+        PopulationNotConservedWarning
+            If the values of the `repop` parameter do not sum to 1, thus meaning
+            population will not be conserved.
+
         Examples
         --------
         >>> s = rq.Sensor(3)
         >>> s.add_transit_broadening(0.1)
         >>> print(s.couplings.edges(data=True))
+        [(0, 0, {'gamma_transit': 0.1, 'label': '(0,0)'}),
+         (1, 0, {'gamma_transit': 0.1, 'label': '(1,0)'}),
+         (2, 0, {'gamma_transit': 0.1, 'label': '(2,0)'})]
         >>> print(s.decoherence_matrix())
-        [(0, 0, {'gamma_transit': 0.1}), (1, 0, {'gamma_transit': 0.1}), (2, 0, {'gamma_transit': 0.1})]
         [[0.1 0.  0. ]
-        [0.1 0.  0. ]
-        [0.1 0.  0. ]]
+         [0.1 0.  0. ]
+         [0.1 0.  0. ]]
 
         >>> s = rq.Sensor(['g', 'e1', 'e2'])
         >>> repop = {'g':0.75, 'e1': 0.25}
@@ -802,32 +1907,43 @@ class Sensor():
          [0.15 0.05 0.  ]]
 
         """
-        
+        #all decay to ground state
         if repop is None:
             ground_state = self.states[0]
             repop = {ground_state: 1.0}
+        #decay evenly across ground manifold
+        elif isinstance(repop, list):
+            ground_list = sum([self.states_with_spec(s) for s in repop], start=[])
+            repop = {s:(1/len(ground_list)) for s in ground_list}
 
-        if isinstance(gamma_transit, list):
+        if not isinstance(repop, dict):
+            raise ValueError("'repop' argument must be 'None', list of ground statespecs, or dict")
+
+        if isinstance(gamma_transit, Sized):
             # needed for multiplying branching ratios
-            gamma_transit = np.array(gamma_transit)
+            gamma_transit = np.asarray(gamma_transit)
 
         if not np.isclose(sum(repop.values()), 1.0):
             warnings.warn(('Repopulation branching ratios do not sum to 1!'
-                           ' Population will not be conserved.'))
+                           ' Population will not be conserved.'),
+                           PopulationNotConservedWarning)
 
         for t, br in repop.items():
             for i in self.states:
-                self.add_decoherence((i, t), gamma=gamma_transit*br, label="transit")
+                self.add_single_decoherence((i, t), gamma=gamma_transit*br, label="transit")
 
-        if isinstance(gamma_transit, (list,np.ndarray)):
+        if hasattr(gamma_transit, "__len__"):
             # need to zip together all the transit rates
-            axes = self.axis_labels()
-            transit_axes = [s for s in axes if s.endswith('gamma_transit')]
-            self.zip_parameters(*transit_axes, zip_label=label)
+            transit_parameters: _ZP = {l:"gamma_transit"
+                                  for s1,s2,l in cast(Iterable[Tuple[State,State,str]],
+                                                      self.couplings.edges(data="label"))
+                                  if self.couplings.edges[s1,s2].get("gamma_transit") is not None}
+            self.zip_parameters(transit_parameters, zip_label=label)
 
 
-    def add_self_broadening(self, node: int, gamma: ScannableParameter,
-                            label: str = "self"):
+    def add_self_broadening(self, state: State, gamma: ScannableParameter,
+                            label: str = "self",
+                            decoherent_cc: Optional[Dict[States, float]] = None):
         """
         Specify self-broadening (such as collisional broadening) of a level.
 
@@ -839,16 +1955,19 @@ class Sensor():
 
         Parameters
         ----------
-        node: int
-            The integer number of the state node to which the broadening
-            will be added. The integer corresponds to the state's position in
-            the graph.
+        state: State
+            State or states to which the broadening will be added.
+            Using a regular expression allows for specifying self broadening of a group of states.
+            In this case, `mult-factor` is used to define relative amplitudes.
         gamma: float or sequence
             The broadening width to be added in Mrad/s.
         label: str, optional
-            Optional label for the state. If `None`, decay will be stored on
-            the graph edge as `"gamma"`. Otherwise, will cast as a string
+            Optional label for the state. By default, decay will be stored on
+            the graph edge as `"gamma_self"`. Otherwise, will cast as a string
             and decay will be stored on the graph edge as `"gamma_"+label`
+        mult-factor: dict
+            Dictionary mapping of the scaling factors to apply to the self broadening
+            of each state in a group specified via regular expression.
 
         Notes
         -----
@@ -857,20 +1976,68 @@ class Sensor():
             value with a label that already exists will overwrite an existing decoherent
             transition with that label. The "self" label is applied to this function
             automatically to help avoid an unwanted overwrite.
-            
+
         Examples
         --------
         >>> s = rq.Sensor(3)
         >>> s.add_self_broadening(1, 0.1)
         >>> print(s.couplings.edges(data=True))
-        >>> print(s.decoherence_matrix())
         [(1, 1, {'gamma_self': 0.1, 'label': '(1,1)'})]
+        >>> print(s.decoherence_matrix())
         [[0.  0.  0. ]
-        [0.  0.1 0. ]
-        [0.  0.  0. ]]
+         [0.  0.1 0. ]
+         [0.  0.  0. ]]
 
         """
-        self.add_decoherence((node, node), gamma, label=label)
+        states_list = self.states_with_spec(state)
+
+        #handle the case of a single state or null spec
+        if len(states_list) == 0:
+            raise RydiquleError(f'No states matching {state}')
+        elif len(states_list) == 1:
+            self.add_single_decoherence((states_list[0], states_list[0]), gamma, label=label)
+            return
+
+        # handle group of states
+        if decoherent_cc is None:
+            decoherent_cc = {(s,s):1 for s in states_list}
+
+        self.add_self_broadening_group(states_list, gamma, label=label, decoherent_cc=decoherent_cc)
+
+
+    def add_self_broadening_group(self, states: List[State], gamma: ScannableParameter,
+                                  label: str='self', decoherent_cc: Optional[dict]=None):
+        """Specify self-broadening (such as collisional broadening) of a group of states.
+
+        Equivalent to calling :meth:`~.Sensor.add_decoherence_group` and specifying both
+        state groups to be the same, with the "self" label. For more complicated systems,
+        it may be useful to use `label` to label the source of self-broadening as, for
+        example, "collisional" for easier bookkeeping and to ensure no values
+        are overwritten.
+
+        Note that this function applies decohernce terms to every combiniation of states
+        in the group, not just from each state to itsself.
+
+        Parameters
+        ----------
+        states: list of State
+            List of states to which the self-broadening is applied.
+        gamma: ScannableParameter
+            The broadening width to be added in Mrad/s.
+        label: str, optional
+            Optional label for the state. By default, decay will be stored on
+            the graph edge as `"gamma_self"`. Otherwise, will cast as a string
+            and decay will be stored on the graph edge as `"gamma_"+label`
+        decoherent_cc: dict, optional
+            Clebsch-Gordon-like coefficients for how gamma scales to different pairs of states
+            within the group. Unspecified pairs are assumed to have coefficients of 0.
+            Default value is None, which applies 0 to all coefficients.
+        """
+
+        if decoherent_cc is None:
+            decoherent_cc = {(s,s):1.0 for s in states}
+
+        self.add_decoherence_group(states, states, gamma, label, decoherent_cc)
 
 
     def decoherence_matrix(self) -> np.ndarray:
@@ -880,7 +2047,7 @@ class Sensor():
         For each edge, sums all parameters with a key that begins with "gamma",
         and places it on the appropriate location in an adjacency matrix for the
         `couplings` graph.
-        
+
         Returns
         -------
         numpy.ndarray
@@ -894,37 +2061,37 @@ class Sensor():
         >>> s.add_decoherence((2,0), 0.05)
         >>> s.add_decoherence((2,1), 0.05)
         >>> print(s.couplings.edges(data=True))
-        >>> print(s.decoherence_matrix())
         [(1, 0, {'gamma_foo': 0.2, 'label': '(1,0)', 'gamma_bar': 0.1}), (2, 0, {'gamma': 0.05, 'label': '(2,0)'}), (2, 1, {'gamma': 0.05, 'label': '(2,1)'})]
+        >>> print(s.decoherence_matrix())
         [[0.   0.   0.  ]
-        [0.3  0.   0.  ]
-        [0.05 0.05 0.  ]]
-        
+         [0.3  0.   0.  ]
+         [0.05 0.05 0.  ]]
+
         Decoherences can be stacked just like any parameters of the Hamiltonian:
-        
+
         >>> s = rq.Sensor(3)
         >>> gamma = np.linspace(0,0.5, 11)
         >>> s.add_decoherence((1,0), gamma)
         >>> print(s.decoherence_matrix().shape)
-        (11,3,3)
+        (11, 3, 3)
 
         Defining decoherences between states labelled with string values works just like coherent couplings:
-       
+
         >>> s = rq.Sensor(['g', 'e1', 'e2'])
         >>> s.add_decoherence(('e1', 'g'), 0.1)
         >>> s.add_decoherence(('e2', 'g'),0.1)
-        >>> s.decoherence_matrix()
-        array([[0. , 0. , 0. ],
-               [0.1, 0. , 0. ],
-               [0.1, 0. , 0. ]])
+        >>> print(s.decoherence_matrix())
+        [[0.  0.  0. ]
+         [0.1 0.  0. ]
+         [0.1 0.  0. ]]
 
         """
-        base_couplings = self.couplings.copy()
+        self._expand_dims()
 
         int_states = {state: i for (i, state) in enumerate(self.states)}
 
         stack_shape = self._stack_shape()
-        for states, param, arr in self.variable_parameters(apply_mesh=True):
+        for states, param, arr, _ in self.variable_parameters(apply_mesh=True):
             self.couplings.edges[states][param] = arr
 
         gamma_shape = (*stack_shape, self.basis_size, self.basis_size)
@@ -943,14 +2110,14 @@ class Sensor():
                 idx = (...,*states_n)
                 gamma_matrix[idx] += f[label]
 
-        self.couplings = base_couplings
+        _squeeze_dims(self.couplings)
         return gamma_matrix
 
 
-    def axis_labels(self, collapse: bool=True, full_labels:bool=False) -> List[str]:
+    def axis_labels(self) -> List[str]:
         """
-        Get a list of axis labels for stacked hamiltonians. 
-        
+        Get a list of axis labels for stacked hamiltonians.
+
         The axes of a hamiltonian
         stack are defined as the axes preceding the usual hamiltonian, which are always
         the last 2. These axes only exist if one of the parametes used to define
@@ -960,11 +2127,16 @@ class Sensor():
         will be combined into a single label, as this is how :meth:`~.Sensor.get_hamiltonian`
         treats these axes.
 
-        The ordering of axis labels is 
+        The ordering of axis labels is as follows:
+
+         - Zipped parameter (shared axes) appear before single parameters.
+         - Zipped parameters are ordered alphabetically by label.
+         - Single axes are sorted first by lower state, then by upper state, then
+           alphabetically by parameter.
 
         Returns
         -------
-        list of str 
+        list of str
             Strings corresponding to the label of each axis on a stack
             of multiple hamiltonians.
 
@@ -976,9 +2148,9 @@ class Sensor():
         >>> blue = {"states":(0,1), "rabi_frequency":1, "detuning":2}
         >>> red = {"states":(1,2), "rabi_frequency":3, "detuning":4}
         >>> s.add_couplings(blue, red)
-        >>> print(s.get_hamiltonian().shape())
+        >>> print(s.get_hamiltonian().shape)
+        (3, 3)
         >>> print(s.axis_labels())
-        (3,3)
         []
 
         Adding list-like parameters expands the hamiltonian
@@ -989,13 +2161,13 @@ class Sensor():
         >>> red = {"states":(1,2), "rabi_frequency":3, "detuning":det}
         >>> s.add_couplings(blue, red)
         >>> print(s.get_hamiltonian().shape)
-        >>> print(s.axis_labels())
         (11, 11, 3, 3)
-        ['blue_detuning', '(1, 2)_detuning']
+        >>> print(s.axis_labels())
+        ['blue_detuning', '(1,2)_detuning']
 
-        The ordering of labels may change if string state names are used. The ordering
-        is determined by the output of the :meth:`~.Sensor.variable_parameters` method.
-        See method documentation for more detail.
+        The ordering of labels doesn't change if string state names are used. For single couplings,
+        the ordering of axes is determined purely by the ordering of the states, regardless
+        of coupling labels or string names of states.
 
         >>> s = rq.Sensor(['g', 'e1', 'e2'])
         >>> det = np.linspace(-10, 10, 11)
@@ -1003,73 +2175,66 @@ class Sensor():
         >>> red = {"states":('e1','e2'), "rabi_frequency":3, "detuning":det}
         >>> s.add_couplings(blue, red)
         >>> print(s.get_hamiltonian().shape)
-        >>> print(s.axis_labels())
         (11, 11, 3, 3)
-        ["('e1','e2')_detuning", 'blue_detuning']
+        >>> print(s.axis_labels())
+        ['blue_detuning', '(e1,e2)_detuning']
 
-        Zipping parameters combines their corresponding labels, since their Hamiltonians now 
-        lie on a single axis of the stack. Here the axis of length 7 (axis 0) corresponds to the
-        rabi frequencies and the axis of shape 11 (axis 1) corresponds to the zipped detunings
-        
+        Zipping parameters combines labels onto a single axis, since their Hamiltonians now
+        lie on a single axis of the stack. The name of that axis will be the label provided to
+        :meth:`~.Sensor.zipped_parameters`. Note that this will default to 'zip_<int>'. Here
+        the axis of length 7 (axis 1) corresponds to the rabi frequencies and the axis of shape
+        11 (axis 0) corresponds to the zipped detunings
+
         >>> s = rq.Sensor(3)
         >>> s.add_coupling(states=(0,1), detuning=np.arange(11), rabi_frequency=np.linspace(-3, 3, 7))
         >>> s.add_coupling(states=(1,2), detuning=0.5*np.arange(11), rabi_frequency=1)
-        >>> s.zip_parameters("(0,1)_detuning", "(1,2)_detuning", zip_label="detunings")
+        >>> s.zip_parameters({(0,1):"detuning", (1,2):"detuning"}, zip_label="detunings")
         >>> print(s.get_hamiltonian().shape)
+        (11, 7, 3, 3)
         >>> print(s.axis_labels())
-        >>> print(s.axsi_labels(full_labels=True))
-        (7, 11, 3, 3)
-        ['(0,1)_rabi_frequency', 'detunings']
-        ['(0,1)_rabi_frequency', '(0,1)_detuning|(1,2)_detuning']
+        ['detunings', '(0,1)_rabi_frequency']
 
         """
-        key_labels = []
-        item_labels = []
+        parameter_groups = self.group_variable_parameters()
+        axis_labels = ['' for _ in parameter_groups]
 
-        # build the base list of axis labels based just on couplings
-        for states, param, _ in self.variable_parameters():
-            if 'label' in self.couplings.edges[states].keys():
-                label = str(self.couplings.edges[states]['label']) + '_' + str(param)
+        for i,group in enumerate(parameter_groups):
+
+            #if 1 entry, combine label+parameter name
+            if len(group)==1:
+                states, parameter, _, _ = group[0]
+                label=self.couplings.edges[states]["label"]
+                axis_labels[i] = label+"_"+parameter
+
+            #if multiple, just extract zip (last entry in any list, here we just pick 1st)
+            elif len(group) > 1:
+                assert group[0][-1] is not None
+                axis_labels[i] = group[0][-1]
+
+            #something has gone horribly wrong
             else:
-                label = str(states) + "_" + str(param)
-            key_labels.append(label)
-            item_labels.append(label)
+                raise ValueError(f"parameter {i} has no data")
 
-        # combine labels for parameters that have been zipped and move to the end of stack
-        if collapse:
-            for key, params in self._zipped_parameters.items():
-                new_label = _combine_parameter_labels(*params)
-
-                for p in params:
-                    key_labels.remove(p)
-                    item_labels.remove(p)
-
-                item_labels.append(new_label)
-                key_labels.append(key)
-
-        if full_labels:
-            return item_labels
-        else:
-            return key_labels
+        return axis_labels
 
 
-    def variable_parameters(self, apply_mesh:bool = False
-                            ) -> List[Tuple[States, str, np.ndarray]]:
+    def variable_parameters(self, apply_mesh:bool = False,
+                            ) -> List[Tuple[States, str, np.ndarray, Optional[str]]]:
         """
         Property to retrieve the values of parameters that were stored on the graph as arrays.
 
         Values are returned as a list of tuples in the standard order of pythons default sorting,
-        applied first to the tuple indicating states and then to the key of the parameter itself. 
-        This means that couplings are sorted first by lower state, then by upper state, then 
+        applied first to the tuple indicating states and then to the key of the parameter itself.
+        This means that couplings are sorted first by lower state, then by upper state, then
         alphabetically by the name of the parameter.To determine order, all state labels treated
-        as their integer position in the basis as determined by ordering in the constructor 
+        as their integer position in the basis as determined by ordering in the constructor
         :meth:`~.Sensor.__init__`.
 
         Returns
         -------
         list of tuples
-            A list of tuples corresponding to the parameters of the systems that are variable 
-            (i.e. stored as an array). They are ordered accordning to states,
+            A list of tuples corresponding to the parameters of the systems that are variable
+            (i.e. stored as an array). They are ordered according to states,
             then according to variable name.
             Tuple entries of the list take the form `(states, param_name, value)`
 
@@ -1079,52 +2244,98 @@ class Sensor():
         >>> vals = np.linspace(-1,2,3)
         >>> s.add_coupling(states=(1,2), rabi_frequency=vals, detuning=1)
         >>> s.add_coupling(states=(0,1), rabi_frequency=vals, detuning=vals)
-        >>> for states, key, value in s.variable_parameters():
-        ...     print(f"{states}: {key}={value}")
-        (0, 1): detuning=[-1.   0.5  2. ]
-        (0, 1): rabi_frequency=[-1.   0.5  2. ]
-        (1, 2): rabi_frequency=[-1.   0.5  2. ]
+        >>> print(s.variable_parameters())
+        [((0, 1), 'detuning', array([-1. ,  0.5,  2. ]), None),
+         ((0, 1), 'rabi_frequency', array([-1. ,  0.5,  2. ]), None),
+         ((1, 2), 'rabi_frequency', array([-1. ,  0.5,  2. ]), None)]
 
         The order is important; in the unzipped case, it will sort as though all state labels
         were cast to strings, meaning integers will always be treated as first.
-        
-        >>> s = rq.Sensor([None, 'e1', 'e2'])
+
+        >>> s = rq.Sensor([0, 'e1', 'e2'])
         >>> det1 = np.linspace(-1, 1, 3)
         >>> det2 = np.linspace(-1, 1, 5)
         >>> blue = {"states":(0,'e1'), "rabi_frequency":1, "detuning":det1}
         >>> red = {"states":('e1','e2'), "rabi_frequency":3, "detuning":det2}
         >>> s.add_couplings(blue, red)
-        >>> for states, key, value in s.variable_parameters():
-        ...    print(f"{states}: {key}={value}")
+        >>> print(s.variable_parameters())
+        [((0, 'e1'), 'detuning', array([-1.,  0.,  1.]), None),
+         (('e1', 'e2'), 'detuning', array([-1. , -0.5,  0. ,  0.5,  1. ]), None)]
         >>> print(f"Axis Labels: {s.axis_labels()}")
-        ('g', 1): detuning=[-1.  0.  1.]
-        (1, 2): detuning=[-1.  -0.5  0.   0.5  1. ]
-        Axis Labels: ["('g',1)_detuning", '(1,2)_detuning']
+        Axis Labels: ['(0,e1)_detuning', '(e1,e2)_detuning']
 
         """
-        l=[]
-        #function to compare mixed tuples
-        def state_order(values):
-            return [self.states.index(x) for x in values]
+        parameter_list: List[Tuple[States, str, np.ndarray, Optional[str]]] = []
 
-        for states in sorted(self.couplings.edges, key=state_order):
-            
-            edge_data = self.couplings.edges.get(states)
-            
+        states: States
+        for states, edge_data in self.couplings.edges.items():
+
+            key: str
             for key, value in sorted(edge_data.items()):
-                if not key.startswith("gamma") and key not in BASE_SCANNABLE_KEYS:
+                if not key.startswith("gamma") and key not in self.scannable_parameters:
                     continue
 
-                if isinstance(value, (list,np.ndarray)):
-                    l.append((states, key, np.asarray(value)))
-        
-        if apply_mesh:
-            vals = [val for _,_,val in l]
-            mesh_vals = np.meshgrid(*vals, indexing='ij', sparse=True)
-            mesh_vals = self._collapse_mesh(mesh_vals)
-            l = [(*l[i][:2], mesh_vals[i].copy()) for i in range(len(l))]
+                if hasattr(value, "__len__"):
 
-        return l
+                    #test all key-value pairs for zip parameters
+                    zip_label=None
+                    for zip_label_test, zip_parameter_test in edge_data.items():
+                        if zip_label_test in self._zip_labels and zip_parameter_test==key:
+                            zip_label=zip_label_test
+                            break
+
+                    parameter_list.append((states, key, np.array(value), zip_label))
+
+        parameter_list.sort(key=self.variable_parameter_sort)
+
+        #no need to do remaining calculations if theres no extra stuff
+        if not apply_mesh:
+            return parameter_list
+
+        #collect the index of each parameter
+        zip_labels=[l if l is not None
+                    else i
+                    for i,(_,_,_,l) in enumerate(parameter_list)]
+        zip_labels_unique = [l for i,l in enumerate(zip_labels) if l not in zip_labels[:i]]
+        axis_indeces = [zip_labels_unique.index(l) for l in zip_labels]
+        try:
+            n_dim = max(axis_indeces)+1
+        except ValueError:
+            n_dim = 0
+
+        #apply meshgrid to parameters
+        #basically a manual implementation of np.meshgrid(..., indexing='ij', sparse=True)
+        #but with some stuff sharing an axis
+        if apply_mesh:
+            for i,(_,_,values,_) in enumerate(parameter_list):
+
+                arr_shape = np.ones(n_dim, dtype=int)
+                arr_shape[axis_indeces[i]] = values.size
+                parameter_list[i][2].shape = tuple(arr_shape)
+
+        return parameter_list
+
+
+    def group_variable_parameters(self, apply_mesh: bool = False,
+                                  ) -> List[List[Tuple[States, str, np.ndarray, Optional[str]]]]:
+
+        variable_parameters = self.variable_parameters(apply_mesh)
+        #collect the index of each parameter
+        zip_labels=[l if l is not None
+                    else i
+                    for i,(_,_,_,l) in enumerate(variable_parameters)]
+        zip_labels_unique = [l for i,l in enumerate(zip_labels) if l not in zip_labels[:i]]
+        axis_indeces = [zip_labels_unique.index(l) for l in zip_labels]
+        try:
+            n_dim = max(axis_indeces)+1
+        except ValueError:
+            n_dim = 0
+
+        grouped_parameters: List[List[Tuple[States, str, np.ndarray, Optional[str]]]] = [[] for _ in range(n_dim)]
+        for p,i in zip(variable_parameters, axis_indeces):
+            grouped_parameters[i].append(p)
+
+        return grouped_parameters
 
 
     def get_parameter_mesh(self) -> List[np.ndarray]:
@@ -1134,13 +2345,13 @@ class Sensor():
         The parameter mesh is the flattened grid of variable parameters
         in all the couplings of a sensor.
         Wraps `numpy.meshgrid` with the `indexing` argument
-        always `"ij"` for matrix indexing. 
+        always `"ij"` for matrix indexing.
 
         Returns
         -------
         list of numpy.ndarray
             list of mesh grids for every variable parameter
-            
+
         Examples
         --------
         >>> s = rq.Sensor(3)
@@ -1152,9 +2363,9 @@ class Sensor():
         ...     print(p.shape)
         (11, 1)
         (1, 21)
-        
+
         """
-        parameter_mesh = [v for _,_,v in self.variable_parameters(apply_mesh=True)]
+        parameter_mesh = [v for _,_,v,_ in self.variable_parameters(apply_mesh=True)]
 
         return parameter_mesh
 
@@ -1182,8 +2393,8 @@ class Sensor():
 
         In the case where the basis of the `Sensor` was explicitly defined with a list
         of states, the ordering of rows and coulumns in the hamiltonian corresponds to the
-        ordering of states passed in the basis. 
-        
+        ordering of states passed in the basis.
+
         See rydiqule's conventions for matrix stacking for more details.
 
         Returns
@@ -1200,10 +2411,10 @@ class Sensor():
         >>> s.add_couplings(red, blue)
         >>> print(s.get_hamiltonian().shape)
         (11, 11, 3, 3)
-        
+
         Time dependent couplings are handled separately. The axis that contains array-like
         parameters with time dependence is length 1 in the steady-state Hamiltonian.
-        
+
         >>> s = rq.Sensor(3)
         >>> rabi = np.linspace(-1,1,11)
         >>> step = lambda t: 0 if t<1 else 1
@@ -1218,13 +2429,13 @@ class Sensor():
         >>> s = rq.Sensor(3)
         >>> s.add_coupling(states=(0,1), detuning=np.arange(11), rabi_frequency=2)
         >>> s.add_coupling(states=(1,2), detuning=0.5*np.arange(11), rabi_frequency=1)
-        >>> s.zip_parameters("(0,1)_detuning", "(1,2)_detuning")
+        >>> s.zip_parameters({(0,1):"detuning", (1,2):"detuning"})
         >>> H = s.get_hamiltonian()
         >>> print(H.shape)
         (11, 3, 3)
 
         If the basis is provided as a list of string labels, the ordering of Hamiltonian rows
-        And columns will correspond to the order of states provided.
+        and columns will correspond to the order of states provided.
 
         >>> s = rq.Sensor(['g', 'e1', 'e2'])
         >>> s.add_coupling(('g', 'e1'), detuning=1, rabi_frequency=1)
@@ -1235,16 +2446,13 @@ class Sensor():
          [ 0. +0.j  0.5-0.j -2.5+0.j]]
 
         """
-        base_couplings = self.couplings.copy()
+        #adjust array parameters to be the appropriate shape
+        self._expand_dims()
 
         #dictionary of state ordering used to determine indeces in ham
         int_states = {state: i for (i, state) in enumerate(self.states)}
 
         stack_shape = self._stack_shape(time_dependence='steady')
-
-        for states, param, arr in self.variable_parameters(apply_mesh=True):
-
-            self.couplings.edges[states][param] = arr
 
         hamiltonian_shape = (*stack_shape, self.basis_size, self.basis_size)
         # returns diagonal elements of Hamiltonian
@@ -1263,145 +2471,33 @@ class Sensor():
             idx = (...,*states_n)
             conj_idx = (...,*states_n[::-1])
 
+            #get the coupling coeffiecient to multiply the rabi frequency by from the graph
+            cc = self.couplings.edges[states].get('coherent_cc', 1.0)
             # factor of 1/2 accounts for implicit rotating wave approximation
-            hamiltonian[idx] = (f['rabi_frequency']*np.cos(f['phase'])
-                                + 1j*f['rabi_frequency']*np.sin(f['phase']))/2
+            hamiltonian[idx] = cc * f['rabi_frequency']*np.exp(1j*f['phase'])/2
             hamiltonian[conj_idx] = np.conj(hamiltonian[idx])
 
         #add the numerical diagonal shifts
         for state1, state2, shift in nx.selfloop_edges(self.couplings, data='e_shift', default=0):
-            
+
             shift_state = int_states[state1]
             idx = (..., shift_state, shift_state)
 
             hamiltonian[idx] += shift
-        
-        self.couplings = base_couplings
+
+        #restore parameters to 1d arrays
+        _squeeze_dims(self.couplings)
+
         return hamiltonian
-    
 
-    def _collapse_mesh(self, mesh):
-        """Collapses the given mesh using rydiqule logic for parameter zipping.
 
-        Expected to be given a mesh which is generated by applying `numpy.meshgrid`
-        function on the output of :meth:`~.Sensor.variable_parameters` for the system.
-        Given such a mesh, ensures that output mesh matches the shape expected by
-        rydiqule's stacking convention, meaning that parameters that are zipped together
-        will share an axis in the hamiltonian stack.
-
-        Parameters
-        ----------
-        mesh : tuple(numpy.ndarray)
-            The uncollapsed meshgid of parameters for the system. Typically the output of
-            `numpy.meshgrid` called on :meth:`~.Sensor.variable_parameters`.
-
-        Returns
-        -------
-        tuple(np.ndarray)
-            The collapsed meshgid with zipped parameters sharing and axis.
+    def get_time_hamiltonian_components(self) -> Tuple[List[np.ndarray], List[np.ndarray]]:
         """
+        Get time-dependent components of the hamiltonian.
 
-        mesh_copy = mesh.copy() #to not mess up original mesh
-        
-        labels_full = self.axis_labels(collapse=False) #uncollapsed labels
-        labels_col = self.axis_labels(collapse=True, full_labels=True) #collapsed labels
-
-        labels_split = [l.split("|") for l in labels_col]
-        axes = np.zeros(len(labels_full), dtype=int)
-
-        #generate a list of where each axis is 
-        for i, l_base in enumerate(labels_full):
-            for j in range(len(labels_col)):
-
-                if l_base in labels_split[j]:
-                    axes[i] = j
-
-        #shift the "scanning" dimension of each parameter array to the appropriate axis
-        for i, m in enumerate(mesh_copy):
-            shape = np.ones(len(labels_col), dtype=int)
-            shape[axes[i]] = m.size
-            mesh_copy[i] = mesh_copy[i].reshape(shape)
-
-        return mesh_copy
-
-
-    def get_time_hamiltonians(self) -> Tuple[np.ndarray, List[np.ndarray], List[np.ndarray]]:
-        """
-        Get the hamiltonians for the time solver.
-
-        Get both the steady state hamiltonian (as returned by :meth:`~.Sensor.get_hamiltonian`)
-        and the time_dependent hamiltonians (as returned by :meth:`~.Sensor.get_time_couplings`).
-        The time dependent hamiltonians give 2 terms, the hamiltonian corresponding
-        to the real part of the coupling and the hamiltonian corresponding to the imaginary part.
-
-        In the case where the basis of the `Sensor` was explicitly defined with a list
-        of states, the ordering of rows and coulumns in the hamiltonian corresponds to the
-        ordering of states passed in the basis. 
-
-        Returns
-        -------
-        hamiltonian_base : np.ndarray
-            The `(*l,n,n)` shape base hamiltonian of the system containing
-            all elements that do not depend on time, where `n` is the basis size
-            of the sensor.
-
-        dipole_matrix_real : np.ndarray
-            The `(M,n,n)` shape array of matrices representing the real
-            time-dependent portion of the hamiltonian. For `0 <= i <= M`,
-            the ith value along the first axis is the portion of the matrix which
-            will be multiplied by the output of the ith `time_dependence` function.
-
-        dipole_matrix_imag: nd.ndarray
-            The `(M,n,n)` shape array of matrices representing the imaginary
-            time-dependent portion of the hamiltonian. For `0 <= i <= M`,
-            the ith value along the first axis is the portion of the matrix which
-            will be multiplied by the output of the ith `time_dependence` function.
-
-        Examples
-        --------
-        >>> s = rq.Sensor(2)
-        >>> step = lambda t: 0. if t<1 else 1.
-        >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1, time_dependence=step)
-        >>> H_base, H_time_real, H_time_imaginary = s.get_time_hamiltonians()
-        >>> print(H_base)
-        >>> print(H_time_real)
-        >>> print(H_time_imaginary)
-        [[0.+0.j 0.+0.j]
-        [0.+0.j 1.+0.j]]
-        [array([[0. +0.j, 0.5+0.j],
-            [0.5+0.j, 0. +0.j]])]
-        [array([[0.+0.j , 0.+0.5j],
-            [0.-0.5j, 0.+0.j ]])]
-
-        If the basis is passed as a list, rows and columns are in the order specified:
-
-        >>> s = rq.Sensor(['g', 'e'])
-        >>> step = lambda t: 0. if t<1 else 1.
-        >>> s.add_coupling(states=('g','e'), detuning=1, rabi_frequency=1, time_dependence=step)
-        >>> H_base, H_time_real, H_time_imaginary = s.get_time_hamiltonians()
-        >>> print(H_base)
-        >>> print(H_time_real)
-        >>> print(H_time_imaginary)
-        [[ 0.+0.j  0.+0.j]
-         [ 0.+0.j -1.+0.j]]
-         [array([[0. +0.j, 0.5+0.j],
-                [0.5+0.j, 0. +0.j]])]
-         [array([[0.+0.j , 0.+0.5j],
-                [0.-0.5j, 0.+0.j ]])]
-
-        """
-        hamiltonian_base = self.get_hamiltonian()
-        dipole_matrices = self.get_time_couplings()
-
-        return hamiltonian_base, *dipole_matrices
-
-
-    def get_time_couplings(self) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        """
         Returns the list of matrices of all couplings in the system defined with
         a `time_dependence` key.
-
-        The ouput will be two lists of matricies representing which terms of the hamiltonian
+        The ouput will be two lists of matricies representing terms of the hamiltonian which
         are dependent on each time-dependent coupling.
         The lists will be of length M and shape `(*l_time, n, n)`,
         where M is the number of time-dependent couplings, `l_time` is time-dependent stack shape
@@ -1421,7 +2517,7 @@ class Sensor():
             real-valued time-dependent portion of the hamiltonian. For `0 <= i <= M`,
             the ith value along the first axis is the portion of the matrix which
             will be multiplied by the output of the ith `time_dependence` function.
-            
+
         list of numpy.ndarray
             The list of M `(*l,n,n)` matrices representing the
             imaginary-valued time-dependent portion of the hamiltonian. For `0 <= i <= M`,
@@ -1436,43 +2532,43 @@ class Sensor():
         >>> f1 = {"states": (0,1), "transition_frequency":10, "rabi_frequency": 1, "time_dependence":wave}
         >>> f2 = {"states": (1,2), "transition_frequency":10, "rabi_frequency": 2, "time_dependence":step}
         >>> s.add_couplings(f1, f2)
-        >>> time_hams, time_hams_i = s.get_time_couplings()
+        >>> time_hams, time_hams_i = s.get_time_hamiltonian_components()
         >>> for H in time_hams:
         ...     print(H)
         [[0.+0.j 1.+0.j 0.+0.j]
-        [1.+0.j 0.+0.j 0.+0.j]
-        [0.+0.j 0.+0.j 0.+0.j]]
+         [1.-0.j 0.+0.j 0.+0.j]
+         [0.+0.j 0.+0.j 0.+0.j]]
         [[0.+0.j 0.+0.j 0.+0.j]
-        [0.+0.j 0.+0.j 2.+0.j]
-        [0.+0.j 2.+0.j 0.+0.j]]
-            
-        To handle stacking across the steady-state and time hamiltonians, the dimensions are 
+         [0.+0.j 0.+0.j 2.+0.j]
+         [0.+0.j 2.-0.j 0.+0.j]]
+
+        To handle stacking across the steady-state and time hamiltonians, the dimensions are
         matched in a way that broadcasting works in a numpy-friendly way
-        
+
         >>> s = rq.Sensor(3)
         >>> rabi = np.linspace(-1,1,11)
         >>> step = lambda t: 0 if t<1 else 1
         >>> blue = {"states":(0,1), "rabi_frequency":rabi, "detuning":1}
         >>> red = {"states":(1,2), "rabi_frequency":rabi, "detuning":0, 'time_dependence': step}
         >>> s.add_couplings(red, blue)
-        >>> time_hams, time_hams_i = s.get_time_couplings()
+        >>> time_hams, time_hams_i = s.get_time_hamiltonian_components()
         >>> print(s.get_hamiltonian().shape)
+        (11, 1, 3, 3)
         >>> print(time_hams[0].shape)
+        (1, 11, 3, 3)
         >>> print(time_hams_i[0].shape)
         (1, 11, 3, 3)
-        (11, 1, 3, 3)
-        (11, 1, 3, 3)
 
         """
         #save to re-add later
-        base_couplings = self.couplings.copy()
+        self._expand_dims()
 
         stack_shape = self._stack_shape(time_dependence='time')
 
         #dictionary of state ordering used to determine indeces in ham
         int_states = {state: i for (i, state) in enumerate(self.states)}
 
-        for states, param, arr in self.variable_parameters(apply_mesh=True):
+        for states, param, arr, _ in self.variable_parameters(apply_mesh=True):
             self.couplings.edges[states][param] = arr
 
         hamiltonian_shape = (*stack_shape, self.basis_size, self.basis_size)
@@ -1482,10 +2578,10 @@ class Sensor():
 
         #loop over time-dependent couplings
         for states, f in self.couplings_with("time_dependence").items():
-            
+
             if 'rabi_frequency' not in f:
                 continue
-            
+
             time_hamiltonian = np.zeros(hamiltonian_shape, dtype='complex')
             time_hamiltonian_i = np.zeros(hamiltonian_shape, dtype='complex')
 
@@ -1493,27 +2589,25 @@ class Sensor():
             states_n = tuple([int_states[s] for s in states])
             idx = (...,*states_n)
             conj_idx = (...,*states_n[::-1])
-            
-            #ignores numpy casting to real warning that we already account for
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                if 'transition_frequency' in f:
-                    time_hamiltonian[idx] = f['rabi_frequency']
-                    time_hamiltonian[conj_idx] = np.conj(f["rabi_frequency"])
-                    time_hamiltonian_i[idx] = 1j*f["rabi_frequency"]
-                    time_hamiltonian_i[conj_idx] = np.conj(f["rabi_frequency"]*1j)
-                
-                #factor of 1/2 for rwa
-                else:
-                    time_hamiltonian[idx] = f['rabi_frequency']/2
-                    time_hamiltonian[conj_idx] = np.conj(f["rabi_frequency"])/2
-                    time_hamiltonian_i[idx] = 1j*f["rabi_frequency"]/2
-                    time_hamiltonian_i[conj_idx] = np.conj(f["rabi_frequency"]*1j)/2
+
+            cc = f.get("coherent_cc", 1.0)
+
+            time_hamiltonian[idx] = cc * f['rabi_frequency']
+            time_hamiltonian_i[idx] = 1j * time_hamiltonian[idx]
+
+            if 'transition_frequency' not in f:
+                # add factors of 1/2 and phase for field in rotating frame
+                time_hamiltonian[idx] *= np.exp(1j*f["phase"])/2
+                time_hamiltonian_i[idx] *= np.exp(1j*f["phase"])/2
+
+            # set hermitian conjugate components
+            time_hamiltonian[conj_idx] = np.conj(time_hamiltonian[idx])
+            time_hamiltonian_i[conj_idx] = np.conj(time_hamiltonian_i[idx])
 
             matrix_list.append(time_hamiltonian)
             matrix_list_i.append(time_hamiltonian_i)
-            
-        self.couplings = base_couplings
+
+        _squeeze_dims(self.couplings)
 
         return matrix_list, matrix_list_i
 
@@ -1521,32 +2615,66 @@ class Sensor():
     def get_time_dependence(self) -> List[TimeFunc]:
         """
         Function which returns a list of the `time_dependence` functions.
-        
-        The list is returned with in the order that matches with the time hamiltonians from 
+
+        The list is returned with in the order that matches with the time hamiltonians from
         :meth:`~.Sensor.get_time_couplings` such that the ith element of of the return of this
-        functions corresponds with the ith Hamiltonian terms returned by that function. 
+        functions corresponds with the ith Hamiltonian terms returned by that function.
 
         Returns
         -------
         list
             List of scalar functions, representing all couplings specified with a `time_dependence`.
-            
 
-        Examples:
-            >>> s = rq.Sensor(3)
-            >>> step = lambda t: 0 if t<1 else 1
-            >>> wave = lambda t: np.sin(2000*np.pi*t)
-            >>> f1 = {"states": (0,1), "transition_frequency":10, "rabi_frequency": 1, "time_dependence":wave}
-            >>> f2 = {"states": (1,2), "transition_frequency":10, "rabi_frequency": 2, "time_dependence":step}
-            >>> s.add_couplings(f1, f2)
-            >>> print(s.get_time_dependence())
-            [<function <lambda> at 0x7fb310edd9d0>, <function <lambda> at 0x7fb37c0c81f0>]
+
+        Examples
+        --------
+        >>> s = rq.Sensor(3)
+        >>> step = lambda t: 0 if t<1 else 1
+        >>> wave = lambda t: np.sin(2000*np.pi*t)
+        >>> f1 = {"states": (0,1), "transition_frequency":10, "rabi_frequency": 1, "time_dependence":wave}
+        >>> f2 = {"states": (1,2), "transition_frequency":10, "rabi_frequency": 2, "time_dependence":step}
+        >>> s.add_couplings(f1, f2)
+        >>> print(s.get_time_dependence())
+        [<function <lambda> at ...>, <function <lambda> at ...>]
 
         """
         time_dependence = []
         for (i,j),f in self.couplings_with("time_dependence").items():
             time_dependence.append(f['time_dependence'])
         return time_dependence
+
+
+    def get_time_hamiltonian(self, t: float) -> np.ndarray:
+        """
+        Get the system hamiltonian at a specific time, t.
+
+        This sums the steady-state hamiltonians with the time-dependent parts,
+        evaluated at a specific time, t.
+        If there is no time dependence in the system, function is equivalent to
+        :meth:`get_hamiltonian`.
+
+        Parameters
+        ----------
+        t: float
+            Time to evaluate the time-dependence function at when building the hamiltonians
+
+        Returns
+        -------
+        numpy.ndarray
+            System hamiltonian, evaluated at time t.
+        """
+
+        hams_steady = self.get_hamiltonian()
+        hamiltonians_time_r, hamiltonians_time_i = self.get_time_hamiltonian_components()
+        time_functions = self.get_time_dependence()
+        # pre-allocate results
+        hamiltonians_time = np.zeros_like(hamiltonians_time_i)
+        for i, (func, htr, hti) in enumerate(zip(time_functions, hamiltonians_time_r, hamiltonians_time_i)):
+            f0 = func(t)
+            hamiltonians_time[i] += f0.real*htr + f0.imag*hti
+        # collapse all time function dependence
+        hamiltonians_total = hams_steady + np.sum(hamiltonians_time, axis=0)
+        return hamiltonians_total
 
 
     def get_hamiltonian_diagonal(self, values: dict, no_stack: bool=False) -> np.ndarray:
@@ -1557,9 +2685,9 @@ class Sensor():
         For each edge along this path,
         values will be added where the path direction and coupling direction match,
         and subtracting values where they do not.
-        The sum of all such values along the path is the `n` th term in the output array. 
+        The sum of all such values along the path is the `n` th term in the output array.
 
-        Primarily for internal functions which help generate hamiltonians. Most commonly used
+        Designed for internal functions which help generate hamiltonians. Most commonly used
         to calculate total detunings for ranges of couplings under the RWA
 
         Parameters
@@ -1616,7 +2744,7 @@ class Sensor():
                 diag[..., i] = term
 
         return diag
-    
+
 
     def get_rotating_frames(self) -> dict:
         """
@@ -1677,14 +2805,14 @@ class Sensor():
         Gets an array of the diagonal elements of the Hamiltonian from the field detunings.
 
         Wraps the :meth:`~.Sensor.get_hamiltonian_diagonal` function using both
-        transition frequencies and detunings. Primarily for internal use. 
+        transition frequencies and detunings. Primarily for internal use.
 
         Returns
         -------
         numpy.ndarray
             N-D array of the hamiltonian diagonal. For an n-level system with stack shape `*l`,
             will be shape `(*l, n)`
-            
+
         """
         detuning_dict = self.get_value_dictionary("detuning")
         # enforces detuning convention that positive detuning == blue detuning
@@ -1725,10 +2853,11 @@ class Sensor():
         >>> s = rq.Sensor(4)
         >>> f1 = {"states": (0,1), "detuning": 2, "rabi_frequency": 1}
         >>> f2 = {"states": (1,2), "detuning": 3, "rabi_frequency": 2}
-        >>> f3 = {"states": (2,3), "rabi_frequency": 3, "transition_frequency": 3}
+        >>> step = lambda t: 1 if t>1 else 0
+        >>> f3 = {"states": (2,3), "rabi_frequency": 3, "transition_frequency": 3, "time_dependence":step}
         >>> s.add_couplings(f1, f2, f3)
         >>> print(s.get_value_dictionary("detuning"))
-        {(0,1): 2, (1,2): 3}
+        {(0, 1): 2, (1, 2): 3}
 
         """
         couplings_with_key = self.couplings_with(key)
@@ -1737,13 +2866,13 @@ class Sensor():
 
     def set_gamma_matrix(self, gamma_matrix: np.ndarray):
         """
-        Set the decoherence matrix for the system. 
-        
+        Set the decoherence matrix for the system.
+
         Works by first removing all existing decoherent data from graph edges, then individually
         adding all nonzero terms of a provided gamma matrix to the corresponding graph edges.
         Can be used to set all decoherence attributes to edges simultaneously,
         but :meth:`~.add_decoherence` is preferred.
-        
+
         Unlike :meth:`~.add_decoherence`, does not support scanning multiple decoherence values,
         rather should be used to set the decoherences of the system to individual static values.
 
@@ -1756,7 +2885,7 @@ class Sensor():
 
         Raises
         ------
-        TypeError
+        RydiquleError
             If `gamma_matrix` is not a numpy array.
         ValueError
             If `gamma_matrix` is not a square matrix of the appropriate size
@@ -1766,44 +2895,44 @@ class Sensor():
         Examples
         --------
         >>> s = rq.Sensor(2)
-        >>> f1 = {"states": (0,1), "transition_frequency":10, "rabi_frequency": 1}
+        >>> f1 = {"states": (0,1), "detuning":1, "rabi_frequency": 1}
         >>> s.add_couplings(f1)
         >>> gamma = np.array([[.1,0],[.1,0]])
         >>> s.set_gamma_matrix(gamma)
         >>> print(s.decoherence_matrix())
         [[0.1 0. ]
-        [0.1 0. ]]
+         [0.1 0. ]]
 
         """
         if not isinstance(gamma_matrix, np.ndarray):
-            raise TypeError(f'gamma_matrix must be a numpy array, not type {type(gamma_matrix)}')
+            raise RydiquleError(f'gamma_matrix must be a numpy array, not type {type(gamma_matrix)}')
 
         if gamma_matrix.shape != (self.basis_size,self.basis_size):
-            raise ValueError((f'gamma_matrix has shape {gamma_matrix.shape}, '
-                              f'must be {(self.basis_size,self.basis_size)}'))
+            raise RydiquleError((f'gamma_matrix has shape {gamma_matrix.shape}, '
+                                 f'must be {(self.basis_size,self.basis_size)}'))
 
         for states, gamma in np.ndenumerate(gamma_matrix):
             states = cast(Tuple[int, int], states)  # cast for mypy
             #remove existing decoherence data
             if self.couplings.has_edge(*states):
-                
+
                 remove_keys = []
                 for key in self.couplings.edges[states].keys():
                     if key.startswith("gamma_"):
                         remove_keys.append(key)
-                        
+
                 for key in remove_keys:
                     del self.couplings.edges[states][key]
-            
+
             #add new decoherence
-            if gamma != 0: 
+            if gamma != 0:
                 #exclude gamma==0; its implicitly put there in decoherence_matrix()
                 self.add_decoherence(states, gamma)
 
 
     def get_doppler_shifts(self) -> np.ndarray:
         """
-        Returns the Hamiltonian with only detunings set to the kvector values for
+        Returns the Hamiltonian with only detunings set to the most probable doppler shift values for
         each spatial dimension.
 
         Determining if a float should be treated as zero is done using :obj:`numpy.isclose`,
@@ -1821,11 +2950,11 @@ class Sensor():
 
         kvecs = self.get_value_dictionary('kvec')
         # collect shifts for each spatial dimension that is non-zero
-        s_kvecs = [{k:v[i] for k,v in kvecs.items() if ~np.isclose(v[i],0)}
+        s_kvecs = [{k:v[i]*self.vP for k,v in kvecs.items() if ~np.isclose(v[i],0)}
                    for i in range(spatial_dim)]
         if not any(s_kvecs):
-            raise ValueError(('You must specify at least one non-zero '
-                              'kvector to do doppler averaging.'))
+            raise RydiquleError(('You must specify at least one non-zero '
+                                 'kvector to do doppler averaging.'))
         # get hamiltonian diagonal for each non-zero spatial dimension
         frequencies = np.array([self.get_hamiltonian_diagonal(s_kvec, no_stack=True)
                                 for s_kvec in s_kvecs if s_kvec])
@@ -1843,7 +2972,7 @@ class Sensor():
                        ) -> Dict[States, CouplingDict]:
         """
         Returns a version of self.couplings with only the keys specified.
-        
+
         Can be specified with a several criteria, including all, none, or any of the keys
         specified.
 
@@ -1852,7 +2981,7 @@ class Sensor():
         keys(tuple of str): tuple of strings which should be one the valid
             parameter names for a state. See :meth:`~.add_coupling` for which
             names are valid for a Sensor object.
-        method : {'all','any', 'not any'} 
+        method : {'all','any', 'not any'}
             Method to see if a given field matches the keys
             given. Choosing "all" will return couplings
             which have keys matching all of the values provided in the keys
@@ -1877,7 +3006,7 @@ class Sensor():
         Examples
         --------
         Can be used, for example, to return couplings in the roating wave approximation.
-        
+
         >>> s = rq.Sensor(3)
         >>> sinusoid = lambda t: 0 if t<1 else sin(100*t)
         >>> f2 = {"states": (0,1), "detuning": 1, "rabi_frequency":2}
@@ -1888,7 +3017,7 @@ class Sensor():
         ...                  [0.05,0,0]])
         >>> s.set_gamma_matrix(gamma)
         >>> print(s.couplings_with("detuning"))
-        {(0, 1): {'rabi_frequency': 2, 'detuning': 1, 'phase': 0, 'kvec': (0, 0, 0), 'no_rwa_warning': False, 'label': '(0,1)'}}
+        {(0, 1): {'rabi_frequency': 2, 'detuning': 1, 'phase': 0, 'kvec': (0, 0, 0), 'coherent_cc': 1.0, 'label': '(0,1)'}}
         """
         def notAll(x):
             return not all(x)
@@ -1902,54 +3031,48 @@ class Sensor():
                 for s,p in self.couplings.edges.items()
                 if methods[method]([k in p for k in keys])
                 }
-    
 
-    def states_with_label(self, label: str) -> List[State]:
-        """Return a dict of all states with a label matching a given regular expression (regex) 
-        pattern. The dictionary will be consist of keys which are string labels applied to states
-        with the :meth:`~.Sensor.label_states` function, and values which are the corresponding
-        integer values of the node on the graph. For more information on using regex patterns see 
-        `this guide <https://docs.python.org/3/howto/regex.html#regex-howto>`.
+
+    def states_with_spec(self, statespec: StateSpec) -> List[State]:
+        """
+        Return a list of all states in the sensor matching the `state_spec` pattern.
+
+        A state is considered a "match" if, for each element of the state, the corresponding
+        element of `statespec` is either exactly the floating point or string value, or a list
+        containing that element of state. In this way, groups of states can be specified more
+        tersely than a complete list of all states.
 
         Parameters
         ----------
-        label : string
-            Regular expression pattern to match labels to. All labels matching the string will
-            be returned in the keys of the dictionary. 
+        statespec:
+            The StateSpec against which state labels in sensor are to be matched
 
         Returns
         -------
-        list
-            List of all labels of states in the sensor which match the provided regex pattern.
-
-        Raises
-        ------
-        ValueError
-            If label is not a regular expression string.
+        list of State
+            All the states in the sensor matching the given specification.
 
         Examples
         --------
-        >>> s = rq.Sensor(3)
-        >>> s.add_coupling((0,1), detuning=1, rabi_freqency=1, label="hi mom")
-        >>> s.add_coupling((1,2), detuning=2, rabi_requency=2)
-        >>> s.label_states({0:"g", 1:"e1", 2:"e2"})
-        >>> print(s.states_with_label("e[12]"))
-        ['e1', 'e2']
+        >>> states = [
+        ...    (0,0),
+        ...    (1,-1),
+        ...    (1,0),
+        ...    (1,1)
+        ... ]
+        >>> s = rq.Sensor(states)
+        >>> s.states_with_spec((1,[-1,0,1]))
+        [(1, -1), (1, 0), (1, 1)]
 
         """
-        try:
-            re_match = re.compile(label)
-        except TypeError:
-            raise ValueError("label must be a regex string.")
-        
-        return [l for l in self.states if isinstance(l, str) and re_match.match(l) is not None]
+        return match_states(statespec, self.states)
 
 
     def get_couplings(self) -> Dict[States, CouplingDict]:
         """
         Returns the couplings of the system as a dictionary
-        
-        Deprecating in favor of calling the couplings.edges attribute directly. 
+
+        Deprecating in favor of calling the couplings.edges attribute directly.
 
         Returns
         -------
@@ -1973,35 +3096,35 @@ class Sensor():
         int
             Number of dimensions, between 0 and 3,
             where 0 means no doppler averaging kvectors have been specified
-            or are too small to be calculates. 
-            
+            or are too small to be calculates.
+
         Examples
         --------
         No spatial dimesions specified
-        
+
         >>> s = rq.Sensor(2)
         >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1)
         >>> print(s.spatial_dim())
         0
-        
+
         One spatial dimension specified
-        
+
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(0,0,1))
+        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(0,0,4))
         >>> print(s.spatial_dim())
         1
-        
-        Multiple spatial dimensions can exist in a single coupling or 
+
+        Multiple spatial dimensions can exist in a single coupling or
         across multiple couplings
-        
+
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(1,0,1))
+        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(3,0,3))
         >>> print(s.spatial_dim())
         2
-        
+
         >>> s = rq.Sensor(3)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(1,0,1))
-        >>> s.add_coupling((1,2), detuning = 2, rabi_freqency=2, kvec=(0,1,0))
+        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(3,0,3))
+        >>> s.add_coupling((1,2), detuning = 2, rabi_freqency=2, kvec=(0,4,0))
         >>> print(s.spatial_dim())
         3
         """
@@ -2017,11 +3140,11 @@ class Sensor():
     def _states_valid(self, states: Sequence) -> States:
         """
         Confirms that the provided states are in a valid format.
-        
-        Typically used internally to validate states added. If provided as 
+
+        Typically used internally to validate states added. If provided as
         a form other than a tuple, first casts to a tuple for consistent
         indexing.
-        
+
         Checks that `states` contains 2 elements, can be interpreted as a tuple,
         and that both states lie inside the basis.
 
@@ -2038,24 +3161,24 @@ class Sensor():
 
         Raises
         ------
-        ValueError
+        RydiquleError
             If `states` has more than two elements.
         TypeError
             If `states` cannot be converted to a tuple.
-        ValueError
+        RydiquleError
             If either state in `states` is outside the basis.
         """
         try:
             tpl = tuple(states)
-        except TypeError:
-            raise ValueError(
-                f'states argument of type {type(states)} cannot be interpreted as a tuple')
+        except TypeError as err:
+            raise RydiquleError(
+                f'states argument of type {type(states)} cannot be interpreted as a tuple') from err
         if len(tpl) != 2:
-            raise ValueError(
+            raise RydiquleError(
                 f'A field must couple exactly 2 states, but {len(tpl)} are specified in {states}')
         for i in tpl:
             if i not in self.states:
-                raise ValueError((f'State specification {i} is not a state in the basis'))
+                raise RydiquleError((f'State specification {i} is not a state in the basis'))
 
         return cast(States, tpl)  # cast for mypy
 
@@ -2067,47 +3190,35 @@ class Sensor():
         axes in :meth:`~.get_hamiltonian()`
 
         """
-        if len(self.variable_parameters()) == 0:
-            return ()
-
-        #make sure time_dependence is valid
-        if time_dependence not in ["steady", "time", "all"]:
-            raise ValueError("time_dependence must be one of 'steady', 'time', or 'all'")
-        
-        shape_array = np.array([m.shape for m in self.get_parameter_mesh()])
-        stack_shape_full = np.max(shape_array, axis=0)
-
-        axis_labels = self.axis_labels(full_labels=True)
-        axis_labels_split = [l.split("|") for l in axis_labels]
-        
-        steady_idx = [] #axes which have steady-state variable parameters
-        time_idx = [] #axes which have time-dependent variable parameters
-        
+        variable_parameters = self.variable_parameters(apply_mesh=True)
+        stack_shape_full = np.array(np.broadcast_shapes(*[p.shape for _,_,p,_ in variable_parameters]))
         time_couplings = self.couplings_with("time_dependence").keys()
-        time_rabi_labels = [str(s).replace(" ","")+"_rabi_frequency" for s in time_couplings]
 
-        #find which axes have time vs steady-state parameters
-        for i, l_list in enumerate(axis_labels_split):
-            for l in l_list:
-                if l in time_rabi_labels:
-                    time_idx.append(i)
-                else:
-                    steady_idx.append(i)
-        
-        #apply steady and time indeces
+        steady_idx = []
+        time_idx = []
+
+        for states, param, val, zip_label in variable_parameters:
+            #find the axis of nontrivial dimension
+            axis = [i > 1 for i in val.shape].index(True)
+
+            if states in time_couplings and param=="rabi_frequency":
+                time_idx.append(axis)
+            else:
+                steady_idx.append(axis)
+
         final_shape = np.ones_like(stack_shape_full)
         if time_dependence in ["steady", "all"]:
             final_shape[steady_idx] = stack_shape_full[steady_idx]
         if time_dependence in ["time", "all"]:
             final_shape[time_idx] = stack_shape_full[time_idx]
-        
-        return final_shape    
+
+        return tuple(final_shape)
 
 
     def dm_basis(self) -> np.ndarray:
         """
-        Generate basis labels of density matrix components. 
-        
+        Generate basis labels of density matrix components.
+
         The basis corresponds to the elements in the solution.
         This is not the complex basis of the sensor class, but rather the real basis
         of a solution after calling one of `rydiqule`'s solvers. This means that the
@@ -2122,9 +3233,9 @@ class Sensor():
         Examples
         --------
         >>> s = rq.Sensor(3)
-        >>> print(s.basis())
+        >>> print(s.dm_basis())
         ['01_real' '02_real' '01_imag' '11_real' '12_real' '02_imag' '12_imag'
-        '22_real']
+         '22_real']
 
         """
         dm_basis = [f'{j:d}{i:d}_imag' if i > j else f'{i:d}{j:d}_real'
@@ -2150,7 +3261,7 @@ class Sensor():
 
         Raises
         ------
-        ValueError
+        RydiquleError
             If `kind` is not `'coherent'` and doesn't begin with `'gamma'`
         """
 
@@ -2160,88 +3271,192 @@ class Sensor():
         if kind != 'coherent' and not kind.startswith('gamma'):
             msg = ("If clearing incoherent data,"
                    " must provide key to clear that starts with `gamma`, not {}")
-            raise ValueError(msg.format(kind))
+            raise RydiquleError(msg.format(kind))
 
-        #get rid of zipped couplings containing
-        label = self.couplings.edges[states]["label"]
-        zipped_idxs = []
-        for idx, zip_strs in enumerate(self._zipped_parameters):
-            zip_labels = [l.split("_",1)[0] for l in zip_strs]
-            if label in zip_labels:
-                zipped_idxs.append(idx)
+        #get rid of zips containing this coupling
+        zip_labels_to_delete = []
+        for param, value in self.couplings.edges[states].items():
+            if param in self._zip_labels:
+                self._zip_labels.remove(param)
+                zip_labels_to_delete.append(param)
 
-        for idx in zipped_idxs[::-1]:
-            del self._zipped_parameters[idx]
-        
+        for label in zip_labels_to_delete:
+            for s1, s2, parameter in cast(Iterable[Tuple[State,State,Optional[str]]],
+                                          self.couplings.edges(data=label)):
+                if parameter is not None:
+                    del self.couplings.edges[s1, s2][label]
+
         # delete undesired keys from the edge
-        for key in list(self.couplings.edges[states]):  # prevent generator
+        for key in list(self.couplings.edges[states]):  # list() prevents generator persistence
             if key == 'label':
                 pass
             elif kind == 'coherent' and not key.startswith('gamma'):
                 del self.couplings.edges[states][key]
             elif kind == key:
                 del self.couplings.edges[states][key]
-                
+
         # delete edge outright if it only has a label
         if not sum(k != 'label' for k in self.couplings.edges[states].keys()):
             self.couplings.remove_edge(*states)
 
 
-    def _coupling_with_label(self, label: str) -> States:
+    def _coupling_with_label(self, label: Union[str, States]) -> States:
         """
         Helper function to return the pair of states corresponding to a particular label string.
         For internal use.
         """
+        #if already a coupling just return as-is
+        if isinstance(label, tuple):
+            if label in self.couplings.edges():
+                return label
+            else:
+                raise RydiquleError(f"{label} is not a coupling in the sensor")
+
         label_map = {key:(state1, state2)
-                     for state1, state2, key in self.couplings.edges(data="label")}
+                     for state1, state2, key in cast(Iterable[Tuple[State,State,str]],
+                         self.couplings.edges(data="label"))}
         if label in label_map.keys():
             return label_map[label]
         else:
-            raise ValueError(f"No coupling with label {label}")
-        
-      
-    def get_coupling_rabi(self, coupling_tuple: States = (0, 1)
-                          ) -> Union[float, np.ndarray]:
-        """
-        Helper function that returns the Rabi frequency of the coupling
-        from a Sensor for use in functions that return experimental values.
+            raise RydiquleError(f"No coupling with label {label}")
+
+
+    def int_states_map(self, invert: bool = False) -> Union[Dict[State, int], Dict[int, State]]:
+        """Get a dictionary mapping between state labels and their corresponding integer ordering.
+        Can be returned with `key:value` pairs defined either by `label:int` or `int:label`,
+        controlled via optional `invert` argument.
 
         Parameters
         ----------
-        coupling_tuple: tuple of int
-            The tuple that defines the coupling to extract to rabi frequencies from
+        invert : bool, optional
+            Whether to switch the role of keys and values. Labels are keys if `False`, and
+            values if `True`, by default False
 
         Returns
         -------
-        float of numpy.ndarray
-            Rabi frequency defined in the Sensor
+        dict
+            Dictionary mapping between state labels and integer ordering
 
-        Warns
-        -----
-        UserWarning
-            If the coupling has time dependence.
-            In this case, the returned Rabi frequency may not be well defined.
-        
         """
-        coupling = self.couplings.edges[coupling_tuple]
 
-        if coupling.get('time_dependence', False):
-            warnings.warn(('Probe is time dependent.  Output of get_coupling_rabi '
-                           'is not guaranteed to be well defined.'))
+        states = {state:n for state, n in zip(self.states, range(self.basis_size))}
+        if invert:
+            states = {v:k for k,v in states.items()}
 
-        rabi = coupling.get('rabi_frequency', None)
-        if isinstance(rabi, (list, np.ndarray)):
+        return states
 
-            # get Rabi from parameter mesh so broadcasting works
-            coupling_label = coupling['label']
+    def variable_parameter_sort(self, par : tuple) -> tuple:
+        """Assistance function which determines the sorting order of elements parameters in sensor.
 
-            # get index in mesh for the scanned Rabi frequency
-            labels = self.axis_labels()
-            mesh_index = labels.index(coupling_label+'_rabi_frequency')
-            parameter_mesh = self.get_parameter_mesh()
+        Called in :meth:`~.Sensor.variable_parameters` to ensure a consistent sort order. Provided as
+        the `key` parameter in python's `sorted()` function before parameters are returned.
 
-            return parameter_mesh[mesh_index]
+        Sorts first by `zip_label`, then by `states`, then by `parameter`. Ensures all parameters
+        zipped with one another are grouped together in a list.  Zipped parameters will always come
+        first. From there, parameters are sorted alphabetically by zip_label (including case), then
+        by state pair (as determined by ordering in the sensor, NOT alphabetically), then
+        alphabetically by parameter.
 
+        Parameters
+        ----------
+        par : tuple
+            4-element list of information on each parameter. Consists of `(states, parameter, value, zip_label)`
+
+        Returns
+        -------
+        tuple
+            3-element tuple that defines a particular parameter's position in the final sorting order.
+
+        """
+        (states, parameter, _, zip_label) = par #unpack parameter
+        states_int = tuple(self.int_states_map()[i] for i in states)
+        zip_label_str = "none" if zip_label is None else ("_"+zip_label) #empty string if no zip label
+        return (zip_label_str, states_int, parameter)
+
+
+    def _expand_dims(self):
+        """Converts the 1-D arrays in the sensor into shapes that allows for rydiqule stacking.
+        """
+        for states, param, arr, _ in self.variable_parameters(apply_mesh=True):
+            self.couplings.edges[states][param] = arr
+
+
+    def __str__(self):
+        """Overload of __str__ allowing a clean way to view all info in a :class:`~.Sensor`.
+
+        Returns
+        -------
+        str
+            Tidy string representation of a sensor, showing all states and couplings.
+
+        """
+
+        n_coh = np.sum([1 for (s1,s2) in self.couplings.edges if "rabi_frequency" in self.couplings.edges[(s1,s2)]])
+        out_str = f"{self.__class__} object with {len(self.couplings)} states and {n_coh} coherent couplings.\n"
+
+        out_str += f"States: {self.states}\n"
+        out_str += "Coherent Couplings: "
+
+        #add coherent couplings
+        coh_couplings = [(s1, s2, e) for (s1, s2, e) in self.couplings.edges.data() if "rabi_frequency" in e]
+        if len(coh_couplings) == 0:
+            coh_couplings_str = "\n    None"
         else:
-            # it's just a number
-            return rabi
+            coh_couplings.sort(key=self.__sort_couplings)
+            coh_couplings_str = "".join(["\n" + "    " + _format_coupling_str(c) for c in coh_couplings])
+        out_str += coh_couplings_str
+
+        #add decoherent couplings
+        decoh_couplings_str = "\nDecoherent Couplings:"
+        decoh_couplings = [(s1, s2, _extract_gamma_keys(e))
+                           for (s1, s2, e) in self.couplings.edges.data()
+                           if "rabi_frequency" not in e and len(_extract_gamma_keys(e)) > 0]
+        if len(decoh_couplings) == 0:
+            decoh_couplings_str += "\n    None"
+        else:
+            decoh_couplings.sort(key=self.__sort_couplings)
+            decoh_couplings_str += "".join(["\n" + "    " + _format_coupling_str(c) for c in decoh_couplings if len(c[2]) > 0])
+        out_str += decoh_couplings_str
+
+        #add energy shift
+        e_shifts_str = "\nEnergy Shifts:"
+        self_loops = [(state, e) for (state, _, e) in nx.selfloop_edges(self.couplings, data="e_shift") if e is not None]
+        if len(self_loops) == 0:
+            e_shifts_str += "\n    None"
+        else:
+            self_loops.sort(key=self.__sort_couplings)
+            e_shifts_str += "".join(["\n" + "    " + str(state) + ": " + str(e) for (state, e) in self_loops])
+        out_str += e_shifts_str
+
+        #add zips if present
+        if len(self._zip_labels) >  0:
+            out_str += "\nZip Labels:\n    " + str(self._zip_labels)
+
+        return out_str  #+ decoh_couplings_str
+
+
+    def __sort_couplings(self, coupling):
+        """Helper function for __str__ to sort couplings by states
+        """
+        if len(coupling) == 2:
+            return self.states.index(coupling[0])
+        return (self.states.index(coupling[0]), self.states.index(coupling[1]))
+
+
+def _format_coupling_str(coupling: tuple):
+    """Helper function to format the data in a coupling into a string for __str__.
+    """
+    states = f"({coupling[0]},{coupling[1]})"
+    params = "".join([f"{k}: {_format_param_str(v)}, " for k,v in coupling[2].items()])
+    return states + ": " + "{" + params[:-2] +"}"
+
+def _extract_gamma_keys(d: Dict):
+    """Helper function to get all entries in a dict whose keys start with "gamma"
+    """
+    return {key:value for key, value in d.items() if key.startswith("gamma")}
+
+def _format_param_str(param):
+    """Helper function to format the data in a parameter into a string for __str__.
+    Mostly just turns arrays into strings indicating number of elements.
+    """
+    return str(param) if not (hasattr(param, "size") and param.size>1) else f"<parameter with {param.size} values>"

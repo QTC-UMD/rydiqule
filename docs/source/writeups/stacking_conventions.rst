@@ -1,5 +1,5 @@
-Introduction
-============
+Stacking Conventions
+====================
 
 For many probelms, Rydiqule is designed to implicitly handle multiple possible values for a
 single parameter. For example, sweeping over a range of detuning values is handled in Rydiqule
@@ -9,7 +9,7 @@ but there are some things worth noting about how Rydiqule specifically handles t
 which are outlined in this document. 
 
 Numpy arrays
-============
+------------
 
 Typically, python lists are quite slow to perform operations on since they are dynamically sized
 and typed. This allows tremendous flexibility in what can be put into a list but some problems
@@ -20,7 +20,7 @@ a numpy ``ndarray`` is a grid of numbers that has dimensionality `m1` by `m2` by
 Numpy routines are written to operate on these arrays very quickls for large numbers of dimensions.
 
 Stacking
-========
+--------
 
 While numpy's own way of handling arrays via matrix broadcasting is `well-documented <https://numpy.org/doc/>`_,
 and most of Rydiqule's own functions use the standard numpy conventions, there are some additional
@@ -45,7 +45,7 @@ are, broadly, agnostic to exaclty what the dimensions ``*l`` represent, and work
 dimensions corresponding to the actual quantities are in the expected position at the end.
 
 Parameter Ordering
-==================
+------------------
 
 Given that any number of parameters may be defined as a list, Rydiqule needs a convention to ensure, in the final
 result, the values represent what is expected and has not been turned around. It is important to Rydiqule's
@@ -69,7 +69,7 @@ results interpretation. Note that the internal functions which calculate these v
 what the axis are, but they do keep them consistent between calculations.
 
 Doppler
-=======
+-------
 
 It is worth a quick note how Rydiqule handles doppler broadening, because it leverages the same conventions
 around stacking as other parameter scans, and it may be encountered and cause confusion if you use Rydiqule

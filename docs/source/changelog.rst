@@ -1,6 +1,125 @@
 Changelog
 =========
 
+v2.0.0
+------
+
+Improvements
+++++++++++++
+
+- Added ability to use arbitrary tuples to define a state.
+- Added concept of `StateSpec`, which is a tuple with a nested list for at least one element.
+  Rydiqule will interpret this as a list of state tuples expanded along the nested element.
+  For example, `(0, [-1, 0, 1])` is interpreted as the group of states `[(0, -1), (0, 0), (0, 1)]`.
+- Added ability to couple groups of states to a single field using a single function. This involves several modifications:
+
+  - The `Sensor.add_coupling_group` has been added which takes two lists of states and couples all combinations of states.
+    Relative scaling of each sub-coupling is controlled via a `coupling_coefficients` dictionary.
+    If an entry is missing from this dictionary, that sub-coupling will not be added.
+  - The previous `Sensor.add_coupling` has has been renamed to `Sensor.add_single_coupling`.
+  - The new `Sensor.add_coupling` function now takes either a pair of states or a pair of `StateSpec` (which define multiple states), and dispatches appropriately.
+  - Identical functionality now exists for the `add_decoherence`, `add_self_broadening`, and `add_energy_shift` functions.
+  - Added a string representation of `Sensor` so that a summary of the data on its graph is shown when calling `print(<sensor>)`.
+
+- Complete overhaul of `Cell`.
+  
+  - States are now specified using the named tuple class `A_QState`, which tracks quantum numbers explicitly.
+  - `Cell` now supports calculations with and without sublevels defined.
+    
+    - If sublevels are not defined (the NLJ basis), results now use an averaged dipole moment.
+      Otherwise, calculations should be identical to `Cell` from v1.
+      See :ref:`nlj update` for further details.
+    - Sublevels can now be defined, in either the fine structure (FS) or hyperfine structure (HFS) bases.
+      Couplings between bases are also supported. This support heavily relies on new coupling group functionality of `Sensor` described above.
+  
+  - A new interface to ARC calculations has been defined, `RQ_AlkaliAtom`,
+    which defines methods for calculating atomic parameters between pairs of `A_QState`.
+  - The `kvec` parameter for couplings is replaced with `kunit`, the unit propagation axis.
+    Necessary prefactors for calculation are automatically applied using ARC functionality.
+    See :ref:`kvec update` for details.
+
+- Definition of `kvec` has been redefined to be the field k-vector,
+  instead of the most probable velocity vector.
+  The most probable speed `vP` must now be provided separately either via init keyword argument
+  (i.e. `Sensor(4, vP=250)`) or by setting the `Sensor.vP` attribute.
+  See :ref:`kvec update` for details.
+- Allow the `about` function to optionally print numpy backend information.
+- Created custom `RydiquleError` and `RydiquleWarning` classes and subclasses to denote
+  errors and warnings specific to Rydiqule.
+  By default, `RydiquleError` will suppress the raise statement in the traceback via patches to exception hooks.
+  This can be disabled by calling `rq.set_debug_state(True)`.
+  `rq.set_debug_state` also controls debugging print statements during Sensor/Cell creation.
+- Added utility functions for converting density matrices between a standard complex basis
+  and rydiqule's real with ground removed computational basis (`convert_dm_to_complex` and `convert_complex_to_dm`).
+  Added utility to add ground state to real computational basis results `convert_to_full_dm`.
+  Also added utility to confirm density matrices are physical (`check_positive_semi_definite`).
+  This functionality is now used in `solve_time` to ensure user-provided `init_cond` are physical.
+- Improved the ergonomics of `Sensor.zip_parameters` so that parameters to be zipped are specified by a dictionary keyed by coupling with entries that specify the parameter.
+- Changed `Sensor.add_energy_shift` to to be more in line with couplings, so that it works as a dispatch function for single shifts or groups.
+  Also added `add_energy_shift_group` which will add and zip a group of energy shifts.
+- Package versioning is now handled by `setuptools_scm` which introspects the version based on git tags (if present).
+  We also use this functionality to dynamically update the version on import when running an from an editable install, to account for local development.
+- Overhaul of the observable functions of `sensor_solution` to use a more physical definition of observable defined by the trace of the density matrix times an operator.
+  Additionally, those functions are transparent to allow more flexible definitions of observables.
+- `sensor_solution` now stores the `Sensor.couplings` graph directly.
+- Added `Sensor.get_time_hamiltonian` method which returns the system hamiltonian at a specific time `t`.
+- Reworked `Sensor`'s time hamiltonian generation function structure to be more clear.
+- `draw_diagram` now scales the linewidth of coupling arrows based on the magnitude of the Rabi frequency.
+- Improved accuracy of language regarding rotating frame choices in rydiqule's physics documentation.
+- Greatly over-hauled and expanded example notebooks and documentation to cover new features and clarify old ones.
+- Added a `Sensor.zip_zips` method to zip axes already containing multiple zipped parameters.
+- Updated CyRK timesolver backend to use `pysolve_ivp`. 
+  Added an improved differential equation generation method `'flat'` which improves performance by ~30%.
+  This new method is currently not compatible with doppler solves.
+- Extended the automated test suite to check docstring examples.
+- Added an analytic 1D doppler-averaged steady-state solver `doppler_1d_exact`.
+  This solver is significantly faster for Doppler-averaged solves.
+  For now, this solver is considered experimental.
+
+Bug Fixes
++++++++++
+
+- Fix bug where re-adding a coupling that had a zipped parameter did not invalidate the zip.
+- `transition_frequency` is now correctly marked as a non-scannable parameter
+- Fixed bugs in `draw_diagram` with un-coupled states and dephasings not toggling correctly.
+- Fixed issue where passing the same numpy array to two zipped parameters would result in incorrect tensor broadcasts.
+
+Deprecations
+++++++++++++
+
+- Overhaul of `Cell` is likely to change results of code that used `Cell` in v1,
+  if not fail outright. Please see documentation for migration guide between v1 and v2.
+- Previously deprecated experiment functions have been deleted from `rydiqule.experiments`.
+  These deprecated functions are: `get_transmission_coef`, `get_susceptibility`, `get_phase_shift`,
+  `get_solution_element`, and `get_OD`.
+  Since v1.1.0, this functionality has been incorporated directly into `Sensor_Solution`.
+- Internally-used utility functions have been removed from the top-level namespace.
+  All these functions can still be accessed by importing from their sub-module locations.
+  Functions removed from the top-level namespace are `generate_eom`, `get_basis_transform`,
+  `solve_eom_stack`, `generate_eom_time`,
+  `get_doppler_equations`, `generate_doppler_shift_eom`, `doppler_classes`, `doppler_mesh`,
+  `apply_doppler_weights`, `compute_grid`, `matrix_slice`, `memory_size`, `get_slice_num`,
+  and `get_slice_num_t`
+- Removed deprecated `Cell.add_states` method.
+- `suppress_rwa_warn` kwarg for `Sensor.add_coupling` is deprecated.
+  Now use `warnings.simplefilter('ignore', rq.RWAWarning)` to suppress the warning.
+- Renamed `Sensor.get_time_couplings` to `Sensor.get_time_hamiltonian_components`.
+- Removed `Sensor.get_time_hamiltonians`. Instead call `Sensor.get_hamiltonian` and
+  `Sensor.get_time_hamiltonian_components` directly.
+- `suppress_dipole_warn` kwarg for `Cell.add_coupling` is deprecated.
+  It is no longer possible to add a non-dipole allowed coupling in Cell.
+- `Solution` object is no longer a bunch/dict object.
+- Dropped support for numba-only timesolver backends.
+
+  - `numbakit-ode` was never much of an improvement, if any for our types of problems
+  - `nbrk_ode` (and it's modern replacement `nbsolve_ivp`) are not actively being maintained by CyRK.
+    They also have not provided significant improvements for our types of problems.
+
+v1.2.3
+------
+
+- Minor hotfix release to pin down incompatible versions of numpy and cyrk dependencies.
+
 v1.2.2
 ------
 
@@ -21,6 +140,7 @@ v1.2.1
 
 Bug Fixes
 +++++++++
+
 - Fixed bug in energy level shifts where shifts overwrote detunings instead of adding.
 
 v1.2.0
@@ -53,14 +173,16 @@ v1.1.0
 Improvements
 ++++++++++++
 
-- Added the ability to specify hyperfine states in a `Cell`. They are distiguished by having 5 quantum numbers `[n, l, j, F, m_F]`.
+- Added the ability to specify hyperfine states in a `Cell`. They are distiguished by having 5 quantum numbers `[n, l, j, f, m_f]`.
 - `kappa` and `eta` are now proprties of `Cell` which are calculated on the fly.
 - Separated rotating frame logic from hamiltonian diagonal generation into a new function `Sensor.get_rotating_frames()`.
   Allows for simple inspection of what rotating frame rydiqule is using in a solve.
 - Reworked the under-the-hood parameter zipping framework. This should have minimal impact on user-facing functionality.
+
   - Hamiltonians with zipped parameters are no longer generated with a `diag` operation.
   - Zipped parameters are now handled with a dictionary rather than a list.
   - Zipped parameters can now be given a shorthand label rather than the default behavior of concatenating individual labels.
+
 - The rearrangement of axes in a stack is now defined completely by the behavior of `axis_labels()`.
 - Added a `diff_nearest` boolean argument to `get_snr`. When true, calculates SNR based on nearest neighbor diff.
   This is in contrast to the default behavior of taking the difference relative to the first element.
