@@ -48,6 +48,7 @@ jobs:
         with:
           name: dist
           path: ./dist
+          if-no-files-found: error
 
       - name: Set Variables for Conda Build
         shell: bash
@@ -69,7 +70,7 @@ jobs:
       - name: Conda package (Unix)
         shell: bash -l {0}
         run: |
-          conda install -c labscript-suite setuptools-conda
+          conda install -c labscript-suite setuptools-conda "conda-build<25"
           setuptools-conda build $CONDA_BUILD_ARGS .
 
       - name: Upload Artifact (conda)
@@ -77,6 +78,7 @@ jobs:
         with:
           name: conda_packages
           path: ./conda_packages
+          if-no-files-found: error
 
   github-release:
     name: Github Release
@@ -179,8 +181,20 @@ jobs:
         shell: bash -l {0}
         run: conda install anaconda-client
 
+      - name: Publish to Test Anaconda channel
+        shell: bash -l {0}
+        if: contains(github.event.ref, 'rc')
+        run: |
+          anaconda \
+            --token ${{ secrets.ANACONDA_API_TOKEN }} \
+            upload \
+            --user $ANACONDA_USER \
+            --label test \
+            conda_packages/*/*
+
       - name: Publish to Anaconda channel
         shell: bash -l {0}
+        if: contains(github.event.ref, 'rc') != true
         run: |
           anaconda \
             --token ${{ secrets.ANACONDA_API_TOKEN }} \
