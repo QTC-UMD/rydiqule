@@ -56,7 +56,7 @@ with a particular emphasis on modeling thermal vapors of Rydberg atoms coupled t
 To accomplish this, a unique graph-based paradigm is used to represent the complex quantum system consisting of multiple energy levels and multiple electromagnetic fields,
 where each energy level is stored as a graph node and each electromagnetic coupling as a graph edge.
 RydIQule then generates a set of differential equations for the quantum state dynamics from the graph,
-using the Lindblad master equation formalism [@manzano_short_2010].
+using the Lindblad master equation formalism [@manzano_short_2020].
 Finally, RydIQule leverages linear equation solvers,
 such as those provided by NumPy [@harris_array_2020], SciPy [@virtanen_scipy_2020] or CyRK [@cyrk]
 to efficiently solve these systems and recover the quantum system response to arbitrary input fields.
