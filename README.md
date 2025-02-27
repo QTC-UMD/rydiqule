@@ -8,7 +8,7 @@ It also functions as a general master equation solver based on the semi-classica
 [![Conda Version](https://img.shields.io/conda/v/rydiqule/rydiqule)](https://anaconda.org/rydiqule/rydiqule)
 [![Python Version](https://img.shields.io/pypi/pyversions/rydiqule.svg)](https://python.org)
 [![License](https://img.shields.io/pypi/l/rydiqule.svg)](https://github.com/QTC-UMD/rydiqule/raw/main/LICENSE)
-[![Docs](https://readthedocs.org/projects/rydiqule/badge/?version=latest)](https://rydiqule.readthedocs.io/en/latest)
+[![Docs](https://readthedocs.org/projects/rydiqule/badge/?version=latest)](https://rydiqule.readthedocs.io/)
 [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.cpc.2023.108952-goldenrod.svg)](https://doi.org/10.1016/j.cpc.2023.108952)
 
 ### Please cite as
@@ -25,7 +25,7 @@ See the [documentation](https://rydiqule.readthedocs.io/en/latest/installation.h
 
 ## Documentation
 
-Documentation is available online at [readthedocs](https://rydiqule.readthedocs.io/en/latest).
+Documentation is available online at [readthedocs](https://rydiqule.readthedocs.io/).
 PDF or EPUB formats of the documentation can be downloaded from the online documentation.
 
 ### Examples
