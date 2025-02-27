@@ -60,7 +60,9 @@
    :template: autosummary-module.rst
    :recursive:
 {% for item in modules %}
+{% if not item.endswith('conftest') %}
    {{ item }}
+{%- endif %}
 {%- endfor %}
 {% endif %}
 {% endblock %}

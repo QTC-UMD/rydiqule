@@ -1,10 +1,11 @@
 """
-Physical Cell objects for use in solvers.
+Subclass of `Sensor` with functionality for representing real atoms.
 """
 
 import scipy
 import numpy as np
 import warnings
+import itertools 
 
 import scipy.constants
 from scipy.constants import Boltzmann, e
@@ -12,34 +13,37 @@ from scipy.constants import Boltzmann, e
 # rydiqule imports
 from .sensor import Sensor
 from .sensor_utils import scale_dipole
-from .sensor_utils import ScannableParameter, QState, States
-from .atom_utils import ATOMS, calc_kappa, calc_eta
+from .sensor_utils import ScannableParameter, TimeFunc
+from .atom_utils import ATOMS, calc_kappa, calc_eta, expand_qnums, validate_qnums, A_QState, ground_state
+from .arc_utils import RQ_AlkaliAtom
+from .exceptions import RydiquleError, AtomError, CouplingNotAllowedError
+from .exceptions import RydiquleWarning, debug_state
 
-from typing import Literal, Optional, Sequence, List, Tuple, Callable, Union
+from typing import Literal, Optional, Sequence, List, Tuple, Callable, Union, Dict
 
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
 
 AtomFlags = Literal['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs']
-
 
 class Cell(Sensor):
     """
     Subclass of :class:`~.Sensor` that creates a Sensor with additional physical properties
     corresponding to a specific Rydberg atom.
 
-    In addition to the core functionality of `~.Sensor`, this class allows for labelling of states
-    with quantum numbers, calculating of state lifetimes and decoherences and tracking of
-    of some physical laser parameters.
+    In addition to the core functionality of `~.Sensor`, this class requires labelling states
+    with `namedtuple`s of quantum numbers, automatically calculating of state lifetimes and
+    decoherences and tracking of of some physical laser parameters.
     A key distictinction between a :class:`~.Cell` and a :class:`~.Sensor` is that
     a cell supports (and requires) and absolute ordering of energy between states,
-    which allows for implicit calculation of decay rates an transition frequencies.
+    which allows for implicit calculation of decay rates and transition frequencies.
 
     """
 
-    def __init__(self, atom_flag: AtomFlags, *atomic_states: QState,
+    def __init__(self, atom_flag: AtomFlags, atomic_states: List[A_QState],
                  cell_length: float = 1e-3, gamma_transit: Optional[float] = None,
-                 beam_area: float = 1e-6, beam_diam: Optional[float] = None,
-                 temp: float = 300.0, probe_tuple: tuple = (0,1)) -> None:
+                 gamma_mismatch:Union[str, dict]="ground", beam_area: float = 1e-6, 
+                 beam_diam: Optional[float] = None, temp: float = 300.0
+                 ) -> None:
         """
         Initialize the Rydberg cell from the given parameters. 
 
@@ -47,14 +51,35 @@ class Cell(Sensor):
         ----------
         atom_flag : str 
             Which atom is used in the cell for calculating physical properties with ARC Rydberg.
-            One of ['H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs'].
-        atomic_states : list[list]
-            List of states to be added to the cell. Each state is 
-            an iterable whose elements are each a list of the form [n, l, j, m], represnting the 
-            Rydberg atomic quantum numbers of the state. At least two states must be added so 
-            that the system is nontrivial. The number of states will determine the basis size
-            of the system. Note that the first state in the list is assumed to be a meta-stable
-            ground.
+            One of {'H', 'Li6', 'Li7', 'Na', 'K39', 'K40', 'K41', 'Rb85', 'Rb87', 'Cs'}.
+        atomic_states : list of A_QState
+            List of :class:`~.atom_utils.A_QState` representing the states of the atom. 
+            More details about the `A_QState` class can be found in its documentation, but it
+            includes the elemends (`n`, `l`, `j`, `m_j`, `f`, `m_f`). These represent the 
+            usual Hydrogen-like atom quantum numbers with the usual restrictions:
+                
+                - `n` must be a positive integer.
+                - `l` must be a non-negative integer less than `n`.
+                - `j` must be a positive half-integer such that :math:`j=l \\pm \\frac{1}{2}`
+                - `m_j` must be a half integer such that :math:`-j \\leq m_j \\leq +j`
+                - `f` must be an integer satisfying :math:`|j-I| \\leq f \\leq (j+I)`
+                - `m_f` must be an integer such that :math:`-f \\leq m_f \\leq +f`
+
+            Additionally, `n`,`l`, and `j` must always be specified, in addition to the following
+            restrictions on other quantum numbers:
+
+                - `m_j` cannot be specified with `f`
+                - If `m_f` is specified, `f` must also be specified.
+
+            All quantum numbers can be specified with lists of valid values, in which case the
+            they will be expanded into a list of states, with one corresponding to each value. If
+            multiple quantum numbers are specified with lists, the resulting list of states will
+            contain all combinations of values. Furthermore, the `j`, `m_j`, `f`, and `m_f` 
+            quantum numbers can each be specifed using `"all"`, which corresponds to a list of
+            all physically allowed values for that quantum number. This convention allows quick
+            specifications of entire manifolds of states to be added to the sensor. See the 
+            `Examples` section to see how to use these powerful specifications.
+
         cell_length: float
             Length of the atomic vapor in meters.
         gamma_transit : float, optional
@@ -62,6 +87,33 @@ class Cell(Sensor):
             beams. Specified in units of Mrad/s. If `None`, will calculate based
             on value of `beam_area`. See :meth:`~.Sensor.add_transit_broadening` for
             details on how transit broadening is treated. Default is None.
+        gamma_mismatch : str or dict
+            How to resolve discrepancies between calculated eacb state lifetime and the sum of 
+            all transtion rates out of each state. In practice, these discrepancies are a result of
+            transition pathways which exist between states when one is accounted for is `states`
+            and one is not. For example, if there is a decoherent transition between states 3->1
+            and states 3->2, but `states` only includes states 0, 1, and 3, the calculated 
+            `gamma_lifetime` of state 3 will be greater than the sum of all computed
+            `gamma_transition` values. In many cases, it is desirable to account for this
+            decoherence in other ways. The options for handling the dicrepancy are:
+
+                - `"ground"` which adds a decoherent coupling coupling between a state `s` with
+                  a discrepancy :math:`\\Delta \\gamma` and divides :math:`\\Delta \\gamma` among 
+                  all the ground states (states matching the `n,l,j` values of the lowest energy
+                  state). 
+                - `"all"` which divides :math:`\\Delta \\gamma` amongst all states in the 
+                  :class:`~.Cell` which already have a `"gamma_transition"` value. The fraction
+                  each transition gets is weighted by the fraction of the total thdat transitions
+                  `"gamma_transition"` value accounts for. 
+                - `"none"` which will not account for this discrepancy at all. In this case this
+                  physics is not guaranteed to be accurate and it is assumed the decoherence will
+                  be accounted for manually in other ways using :meth:`~.add_decoherence`
+
+            In all cases, the accounting is done by adding a `"gamma_mismatch"` value to each
+            relevant edge, which will subsequently be accounted for when 
+            :meth:`~.Sensor.decoherence_matrix` is called. Note that older versions of 
+            `rydiqule` did not have this option and implicitly used the `"ground"` option,
+            and `"ground"` is the current default.
         beam_area : float, optional
             Area of probing field cross-section in m^2.
             Used to calculate `kappa` and `gamma_transit`. Default is 1e-6.
@@ -75,47 +127,88 @@ class Cell(Sensor):
 
         Raises
         ------
-        ValueError
+        RydiquleError
             If at least two atomic states are not provided.
-        ValueError
+        AtomError
             If atom_flag is not one of ARC's supported alkali atoms.
+
+        Warns
+        -----
+        NLJWarning
+            If called using old-style state specification
+
+        Examples
+        --------
+        All the hyperfine states for the D1 line of Rubidium-87 can be defined as follows.
+
+        >>> from rydiqule import A_QState
+        >>> D1_g = A_QState(5, 0, 0.5, f="all", m_f="all")
+        >>> D1_e = A_QState(5, 1, 0.5, f="all",m_f="all")
+        >>> c = rq.Cell("Rb87",[D1_e, D1_g])
+        >>> for state in c.states:
+        ...     print(state)
+        (5, 1, 0.5, f=1.0, m_f=-1.0)
+        (5, 1, 0.5, f=1.0, m_f=0.0)
+        (5, 1, 0.5, f=1.0, m_f=1.0)
+        (5, 1, 0.5, f=2.0, m_f=-2.0)
+        (5, 1, 0.5, f=2.0, m_f=-1.0)
+        (5, 1, 0.5, f=2.0, m_f=0.0)
+        (5, 1, 0.5, f=2.0, m_f=1.0)
+        (5, 1, 0.5, f=2.0, m_f=2.0)
+        (5, 0, 0.5, f=1.0, m_f=-1.0)
+        (5, 0, 0.5, f=1.0, m_f=0.0)
+        (5, 0, 0.5, f=1.0, m_f=1.0)
+        (5, 0, 0.5, f=2.0, m_f=-2.0)
+        (5, 0, 0.5, f=2.0, m_f=-1.0)
+        (5, 0, 0.5, f=2.0, m_f=0.0)
+        (5, 0, 0.5, f=2.0, m_f=1.0)
+        (5, 0, 0.5, f=2.0, m_f=2.0)
 
         """
         if atom_flag not in ATOMS.keys():
-            raise ValueError(f"Atom flag must be one of {ATOMS.keys()}")
-
-        if len(atomic_states) < 2:
-            raise ValueError(("No states added to system. "
-                             "Specify at least two states of the form [n, l, j, m]"))
+            raise AtomError(f"Atom flag must be one of {ATOMS.keys()}")
 
         self.atom_flag = atom_flag
-        self.atom = ATOMS[atom_flag]()
+        self.atom = RQ_AlkaliAtom(ATOMS[atom_flag]())
+        self.I = self.atom.arc_atom.I
 
+        #prepare states by expanding statespec into list and intialize graph
+        qstates_list = expand_qnums(atomic_states, I=self.I)
+        if len(qstates_list) < 2:
+            raise RydiquleError(("At least 2 states must be specified in a Cell"))
+
+        self._validate_input_states(qstates_list)
+        super().__init__(qstates_list)
+        if debug_state():
+            print(f'Cell states added: {qstates_list}')
+
+        #set physical constant attributes
         self.cell_length = cell_length  # Default 0 to do optically thin sample
         self.temp = temp  # K
         self.beam_area = beam_area
-        self.density = self.atom.getNumberDensity(self.temp)
-        self.atom_mass = self.atom.mass
-
+        self.density = self.atom.arc_atom.getNumberDensity(self.temp)
+        self.atom_mass = self.atom.arc_atom.mass
         if beam_diam is None:
-            beam_diam = 2.0*np.sqrt(beam_area/np.pi)
-
-        self.beam_diameter = beam_diam
+            self.beam_diameter = 2.0*np.sqrt(beam_area/np.pi)
+        else:
+            self.beam_diameter = beam_diam
 
         if gamma_transit is None:
             gamma_transit = 1E-6*np.sqrt(8*Boltzmann*self.temp/(self.atom_mass*np.pi)
                                          )/(self.beam_diameter/2*np.sqrt(2*np.log(2)))
+        self.gamma_transit = gamma_transit
 
-        super().__init__(0)
-
-        self._add_states(*atomic_states)
-
-        self.probe_tuple = self._states_valid(probe_tuple)
-
-        self.add_transit_broadening(gamma_transit)
+        # most probable speed for a 3D Maxwell-Boltzmann distribution
+        # used when defining doppler averaging
+        self.vP = np.sqrt(2*Boltzmann*self.temp/self.atom_mass)
+   
+        self._add_state_energies()
+        self._add_state_lifetimes()
+        self._add_decoherence_rates()
+        self._add_gamma_mismatches(gamma_mismatch)
 
     
-    def set_experiment_values(self, probe_tuple: Tuple[int,int],
+    def set_experiment_values(self,
                               probe_freq: float,
                               kappa: float,
                               eta: Optional[float] = None,
@@ -128,159 +221,124 @@ class Cell(Sensor):
 
         Warns
         -----
-        UserWarning: Warns if function is used.
+        RydiquleWarning: Warns if function is used.
         """
 
-        warnings.warn(UserWarning('set_experiment_values not used with Cell'))
+        warnings.warn('set_experiment_values not used with Cell',
+                      RydiquleWarning)
+    
 
-    def add_states(self):
-        """
-        Deprecated.
-        
-        Use \"atomic_state\" keyword argument of the constructor instead.
-        """
-        raise NotImplementedError(("Adding states after a cell has been created is "
-                                   "no longer supported. Please specify states with "
-                                   "the \"atomic_states\" keyword argument in the constructor."))
+    @Sensor.probe_tuple.setter
+    def probe_tuple(self, probe_tuple: Tuple[A_QState, A_QState]):
+        """Setter method for the `probe_tuple` attribute.
 
-
-    def _add_state(self, state: QState) -> None:
-        """Internal method to add a single state to the Cell.
-
-        Should only be used by the :meth:`~.Cell._add_states` function, but can be overloaded
-        in custom implementations of :class:`~.Cell`
+        The `probe_tuple` of a `Cell` is the transition used by
+        default in calculations of observable values after solving. 
+        Both states must be:
+        1. Specified using only NLJ quantum numbers
+        2. Both use either fine or hyperfine structure splitting interchangeably.
 
         Parameters
         ----------
-        state: int or list of ints 
-            The quantum numbers of the state to be added. Should be either length
-            4 of form [n, l, j, m] or length 5 of form [n, l, j, F, mF]
-        """
+        probe_tuple : tuple of A_QState
+            Length-2 tuple of states to set as the `probe_tuple` attribute for the `Cell`
 
-        #add node and get index of current node
-        self.couplings.add_node(self.basis_size)
-        n = self.basis_size - 1 
+        Raises
+        ------
+        ValueError
+            If the states provided are not nodes of the `Cell`
+        RydiquleError
+            If the states are of incompatible types. (e.g. NLJ and sublevel) 
 
-        state = self._validate_qnums(state)
-
-        #add quantum numbers to node
-        self.couplings.nodes[n]["qnums"] = state
-
-        #compute hyperfine splitting if relevant
-        if len(state) == 5:
-            self.couplings.nodes[n]["hfs"] = self.get_cell_hfs_shift(state)
-
-        #add state energy to node
-        if self.basis_size == 1:
-            energy = 0 
-        else:
-            energy = self.get_cell_tansition_frequency(0, state)*1e-6*2.0*np.pi
-        self.couplings.nodes[n]["energy"] = energy
-
-        #add state lifetime to node
-        if self.basis_size == 1:
-            gamma_lifetime = 0
-        else:
-            gamma_lifetime = 1E-6/self.atom.getStateLifetime(*state[0:3])
-        self.couplings.nodes[n]["gamma_lifetime"] = gamma_lifetime
-
-
-    def _add_states(self, *states: QState) -> None:
-        """
-        Internal method to add states to the system and update internal variables
-        for energy and decay rates. 
-        
-        Quantum numbers and other states information are stored on the couplings graph nodes.
-        The first state added to the system is treated as the ground state,
-        and all "absolute energies" are calculated as a difference from ground.
-        Should only be called in :meth:`~.Cell.__init__`.
-
-        Parameters
-        ----------
-        *states : list[list[int or float]]
-            States that are added to the list of atomic states of interest for the cell.
-            Arguments should be lists of the form `[n, l, j, m]`, where n, l, j, and m
-            are the ususal quantum numbers describing the state: principal,
-            orbital, total angular momentum, and magnetic quantum numbers respectively.
+        Notes
+        -----
+        This setter is often uneccesary to call directly, as the `probe_tuple` attibute is also
+        set implicitly by the first coupling added to the system using the 
+        :meth:`~.Sensor.add_coupling` method.
 
         """
-        for state in states:
+                
+        state1_list = self.states_with_spec(probe_tuple[0])
+        state2_list = self.states_with_spec(probe_tuple[1])
 
-            self._add_state(state)
+        if not (len(state1_list) > 0 and len(state2_list) > 0):
+            raise ValueError(f"Probe tuple specification {probe_tuple} contains invalid state specs") 
 
-        self._add_decay_to_graph()
+        n1, l1, j1, _, _, _ = state1_list[0]
+        n2, l2, j2, _, _, _ = state2_list[0]
+
+        nlj_match1 = all([(n,l,j) == (n1, l1, j1) for (n,l,j,_,_,_) in state1_list])
+        nlj_match2 = all([(n,l,j) == (n2, l2, j2) for (n,l,j,_,_,_) in state2_list])
+
+        if not (nlj_match1 and nlj_match2):
+            msg = "Either upper or lower manifolds of probing transition have differing nlj "\
+                  "values. Please ensure all states in each of the upper and lower manifolds "\
+                  "of probe tuple or the first coupling added have matching nlj values."
+            raise RydiquleError(msg)
+
+        self._probe_tuple = probe_tuple
 
 
-    def states_list(self) -> List[QState]:
+    def level_ordering(self) -> List[A_QState]:
         """
-        Returns a list of quantum numbers for all states in the cell.
-
-        States position in the list will be in the order they were added,
-        and correspond to the density matrix values numbered with the same index.
-
-        Returns
-        -------
-        list[list]
-            List of quantum states of the form [n, l, j, m] that are stored
-            on graph nodes in the cell.
-
-        Examples
-        --------
-        >>> state1 = [50, 2, 2.5, 2.5] # states are written with quantum numbers [n, l, j, m] 
-        >>> state2 = [51, 2, 2.5, 2.5]
-        >>> cell = rq.Cell("Rb85", *rq.D2_states(5), state1, state2,
-        >>> cell_length = .0001) #D2 states gets the states for the Rubidium 85 D2 line
-        >>> print(cell.states_list())
-        [[5, 0, 0.5, 0.5], [5, 1, 1.5, 0.5], [50, 2, 2.5, 2.5], [51, 2, 2.5, 2.5]]
-
-        """ 
-        return [state[1] for state in self.couplings.nodes("qnums")]
-
-
-    def level_ordering(self) -> List[int]:
-        """
-        Return a list of the integer numbers of each state (*not* the quantum numbers) 
-        in descending order by energy order.
+        Return a list of the states in the `Cell` in ascending energy order. 
 
         All energies are calculated with respect to the ground state energy, which is defined as 0.
-        Ground state is determined by the first state added to the system (state 0). Thus, state 0 
-        will always be last in the list.
+        Ground state is determined by the rydiqule's calculation of ground energy, which
+        uses `arc` to get the energy of the :math:`nP^{\\frac{1}{2}}` state, where `n` is 1 for
+        Hydrogen, 2 for Lithium, etc.
 
         Returns
         -------
-        list[int]
-            The level numbers of the states in order of decending energy
-            relative to the ground state (state 0).
+        list of A_QState
+            The Cell states in order of decending energy
+            relative to the ground state :math:`nS^{\\frac{1}{2}}`.
 
         Examples
         --------
-        For the following example, states are added to the cell in ascending
-        energy order, so the return reflects that, with the highest-energy state first.
+        For the following example, states are in the list passed to the constructor in
+        ascending energy order, so the ordering the basis is identical to the `level_ordering`.
+        Computed `Cell` attributes the Hamiltonian will, for clarity, always appear in the
+        ording of levels in the list passed to the constructor.
+        
+        >>> from rydiqule import A_QState
+        >>> atom = "Rb85"
+        >>> [g, e] = rq.D2_states(atom)  #uses the D2 line of Rb85
+        >>> state1 = A_QState(50, 2, 2.5)
+        >>> state2 = A_QState(51, 2, 2.5)
+        >>> my_cell = rq.Cell(atom, [g, e, state1, state2])
+        >>> print(my_cell.states)
+        [(n=5, l=0, j=0.5), (n=5, l=1, j=1.5), (n=50, l=2, j=2.5), (n=51, l=2, j=2.5)]
+        >>> # levels in order
+        >>> for i, state in enumerate(my_cell.level_ordering()):
+        ...     print(f"{i}: {state}, E={my_cell.couplings.nodes[state]['energy']*2*np.pi*1e-6} Mrad/s")
+        0: (5, 0, 0.5), E=0.0 Mrad/s
+        1: (5, 1, 1.5), E=15168.8 Mrad/s
+        2: (50, 2, 2.5), E=39819.3 Mrad/s
+        3: (51, 2, 2.5), E=39821.5 Mrad/s
 
-        >>> state1 = [50, 2, 2.5, 2.5]
-        >>> state2 = [51, 2, 2.5, 2.5]
-        >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"), state1, state2,
-        >>> cell_length = .00001) #uses the D2 line of Rb85
-        >>> print(cell.states_list())
-        >>> print(cell.level_ordering())
-        [[5, 0, 0.5, 0.5], [5, 1, 1.5, 0.5], [50, 2, 2.5, 2.5], [51, 2, 2.5, 2.5]]
-        [3, 2, 1, 0]
+        If we scramble the states in the constructor, the output of this function remains
+        the same even though the order of basis states changes to match the list ordering
+        in the constuctor.
 
-        If we add `state1` and `state2` in the opposite order (thus switching
-        their positions in the states list), the level ordering will change since
-        `state2` is still a higher energy.
-
-        >>> state1 = [50, 2, 2.5, 2.5]
-        >>> state2 = [51, 2, 2.5, 2.5]
-        >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"), state2, state1) #uses the D2 line of Rb85
-        >>> print(cell.states_list())
-        >>> print(cell.level_ordering())
-        [[5, 0, 0.5, 0.5], [5, 1, 1.5, 0.5], [51, 2, 2.5, 2.5], [50, 2, 2.5, 2.5]]
-        [2, 3, 1, 0]
+        >>> from rydiqule import A_QState
+        >>> atom = "Rb85"
+        >>> [g, e] = rq.D2_states(atom)  #uses the D2 line of Rb85
+        >>> state1 = A_QState(50, 2, 2.5)
+        >>> state2 = A_QState(51, 2, 2.5)
+        >>> my_cell = rq.Cell(atom, [state2, e, g, state1])
+        >>> print(my_cell.states)
+        [(n=51, l=2, j=2.5), (n=5, l=1, j=1.5), (n=5, l=0, j=0.5), (n=50, l=2, j=2.5)]
+        >>> for i, state in enumerate(my_cell.level_ordering()):
+        ...     print(f"{i}: {state}, E={my_cell.couplings.nodes[state]['energy']*2*np.pi*1e-6} Mrad/s")
+        0: (5, 0, 0.5), E=0.0 Mrad/s
+        1: (5, 1, 1.5), E=15168.8 Mrad/s
+        2: (50, 2, 2.5), E=39819.3 Mrad/s
+        3: (51, 2, 2.5), E=39821.5 Mrad/s
 
         """
         energies = list(self.couplings.nodes("energy")).copy()
-        energies.sort(key=lambda val:val[1],reverse=True)
+        energies.sort(key=lambda val:val[1],reverse=False)
         return [s[0] for s in energies]
 
 
@@ -301,13 +359,6 @@ class Cell(Sensor):
 
         This value is only computed if there is not a `_kappa` attribute in the system.
         If this attribute does exist, this function acts as an accessor for that attribute.
-        
-        Notes
-        -----
-        There is no way to set the `kappa` attribute directly at presence, it is always
-        inferred with the above formula. However, this functionality exists so that
-        custom implementations or specific use cases of :class:`~.Cell` may set it
-        for their own purposes.    
 
         Returns
         -------
@@ -319,8 +370,30 @@ class Cell(Sensor):
         if hasattr(self, "_kappa"):
             return self._kappa
         
-        omega_rad = 1e6*self.couplings.nodes[1]["energy"] #convert from Mrad to rad
-        dipole_moment = self.couplings.edges[0,1]["dipole_moment"]*e*a0 #to C*m
+        if self.probe_tuple is None:
+            raise RydiquleError("Cell.probe_tuple not set. Either set manually or add at least one coupling before calculation.")
+        
+        ground_manifold = self.states_with_spec(self.probe_tuple[0])
+        excited_manifold = self.states_with_spec(self.probe_tuple[1])
+
+        #get the probing transition states for nlj only
+        probe_g_nlj = A_QState(ground_manifold[0].n, ground_manifold[0].l, ground_manifold[0].j)
+        probe_e_nlj = A_QState(excited_manifold[0].n, excited_manifold[0].l, excited_manifold[0].j)
+
+        #ensure nlj all match
+        nlj_match_g = not any([s[:3] != probe_g_nlj[:3] for s in ground_manifold])
+        nlj_match_e = not any([s[:3] != probe_e_nlj[:3] for s in excited_manifold])
+
+        if not (nlj_match_g and nlj_match_e):
+            msg = "automatic kappa calcuations not supported for probing transitons between state manifolds "\
+                "containg differing values of j quantum numbers. kappa can be set manually using <Cell>.kappa "\
+                    " = <value> prior to running calculations"
+            warnings.warn(msg)
+
+        q = self.couplings.edges[ground_manifold[0], excited_manifold[0]]["q"]
+
+        omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2*np.pi
+        dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
 
         kappa = calc_kappa(omega_rad, dipole_moment, self.density)
     
@@ -331,12 +404,15 @@ class Cell(Sensor):
     def kappa(self, value: float):
         """Setter for the kappa attribute.
 
+        Typically not required, as the `kappa` attribute is inferred implicitly
+        by the formula described in its `property` description.
+
         Updates the self._kappa class attribute.
 
         Parameters
         ----------
         value : float
-            The floating-point value to set as the eta parameter for the system.
+            The floating-point value to set as the kappa parameter for the system.
         """
         self._kappa = value
 
@@ -349,13 +425,13 @@ class Cell(Sensor):
 
         Raises
         ------
-        AttributeError:
+        RydiquleError:
             If kappa has not been set.
         """
         try:
             del self._kappa
-        except AttributeError:
-            raise AttributeError("The \"kappa\" attribute has not been set")
+        except AttributeError as err:
+            raise RydiquleError("The \"kappa\" attribute has not been set") from err
     
 
     @property
@@ -375,13 +451,6 @@ class Cell(Sensor):
 
         This value is only computed if there is not a `_eta` attribute in the system.
         If this attribute does exist, this function acts as an accessor for that attribute.
-        
-        Notes
-        -----
-        There is no way to set the `eta` attribute directly at present, it is always
-        inferred with the above formula. However, this functionality exists so that
-        custom implementations or specific use cases of :class:`~.Cell` may set it
-        for their own purposes.   
 
         Returns
         -------
@@ -391,10 +460,30 @@ class Cell(Sensor):
         #does nothing now, possible future-proofing
         if hasattr(self, "_eta"):
             return self._eta
+        if self.probe_tuple is None:
+            raise RydiquleError("Cell.probe_tuple not set. Either set manually or add at least one coupling before calculation.")
         
-        omega_rad = 1e6*self.couplings.nodes[1]["energy"]
-        dipole_moment = self.couplings.edges[0,1]["dipole_moment"]*a0*e
-        
+        ground_manifold = self.states_with_spec(self.probe_tuple[0])
+        excited_manifold = self.states_with_spec(self.probe_tuple[1])
+
+        #get the probing transition states for nlj only
+        probe_g_nlj = A_QState(ground_manifold[0].n, ground_manifold[0].l, ground_manifold[0].j)
+        probe_e_nlj = A_QState(excited_manifold[0].n, excited_manifold[0].l, excited_manifold[0].j)
+
+        #ensure nlj all match
+        nlj_match_g = not any([s[:3] != probe_g_nlj[:3] for s in ground_manifold])
+        nlj_match_e = not any([s[:3] != probe_e_nlj[:3] for s in excited_manifold])
+
+        if not (nlj_match_g and nlj_match_e):
+            msg = "automatic eta calcuations not supported for probing transitons between state manifolds "\
+                "containg differing values of j quantum numbers. eta can be set manually using <Cell>.eta "\
+                    " = <value> prior to running calculations"
+            warnings.warn(msg)
+
+        q = self.couplings.edges[ground_manifold[0], excited_manifold[0]]["q"]
+
+        omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2.0*np.pi
+        dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
         eta = calc_eta(omega_rad, dipole_moment, self.beam_area)
 
         return eta
@@ -422,116 +511,120 @@ class Cell(Sensor):
         
         Raises
         ------
-        AttributeError:
+        RydiquleError:
             If eta has not been set.
         """
         try:
             del self._eta
-        except AttributeError:
-            raise AttributeError("The \"eta\" attribute has not been set")
+        except AttributeError as err:
+            raise RydiquleError("The \"eta\" attribute has not been set") from err
 
 
     @property
     def probe_freq(self):
-        """Get the probe transition frequency, in rad/s
+        """Get the probe transition frequency, in rad/s.
+
+        Note that for :class:`~.Cell`, probing transition frequency is calculated using only
+        the `(n,l,j)` states of the upper and lower manifolds of the `probe_tuple` attribute. For 
+        more precise calculations accounting for atomic splitting etc, `probe_freq` must be set 
+        manually; `rydiqule` does not support doing these calculations automatically.
         
         Returns
         -------
         float
-            Probe transitiion frequency, in rad/s
+            Probe transitiion frequency, in rad/s, between probing nlj states. 
         """
 
         if hasattr(self, '_probe_freq'):
             return self._probe_freq
         
-        energies = self.couplings.nodes("energy")
+        probe_lower_manifold = self.states_with_spec(self.probe_tuple[0])
+        probe_upper_manifold = self.states_with_spec(self.probe_tuple[1])
+
+        (n1, l1, j1) = probe_lower_manifold[0][:3]
+        (n2, l2, j2) = probe_upper_manifold[0][:3]
+
+        energy_lower = self.atom.get_state_energy(A_QState(n1, l1, j1), s=0.5)*2*np.pi
+        energy_upper = self.atom.get_state_energy(A_QState(n2, l2, j2), s=0.5)*2*np.pi
         
-        return np.abs(energies[self.probe_tuple[1]] - energies[self.probe_tuple[0]])*1e6
+        return np.abs(energy_upper - energy_lower)
+    
+    @probe_freq.setter
+    def probe_freq(self, value):
+        """Setter for the probe_freq attribute.
+
+        Updates the self._probe_freq class attribute.
+
+        Parameters
+        ----------
+        value : float
+            The floating-point value to set as the probe frequency parameter for the system.
+        """
+        self._probe_freq = value
+
+
+    @probe_freq.deleter
+    def probe_freq(self):
+        """Deleter for the probe_freq attribute.
+
+        Removes the self._probe_freq class attribute.
         
-
-    def decoherence_matrix(self) -> np.ndarray:
+        Raises
+        ------
+        RydiquleError:
+            If probe_freq has not been set.
         """
-        Get the decoherence matrix for a system.
-
-        This overload differs from :meth:`~Sensor.decoherence_matrix`
-        by including state lifetimes and decay rates calculated from arc rydberg without any
-        explicit definition of decoherence terms. In other words, it ensures that the
-        calculated decoherence terms match what is expected for a particular
-        real-world atom. 
-        
-        Returns
-        -------
-        numpy.ndarray
-            The decoherence matrix stack of the system.
-
-        """
-        # start with base gamma matrix from the transitions on graph
-        gamma = super().decoherence_matrix()
-
-        for state, lifetime in list(self.couplings.nodes(data="gamma_lifetime"))[1:]:
-
-            decay_sum = 0.0
-
-            for edge in self.couplings.out_edges(state):
-                decay_sum += self.couplings.edges[edge].get("gamma_transition", 0)
-
-            gamma[..., state, 0] += lifetime - decay_sum
-
-        return gamma
+        try:
+            del self._probe_freq
+        except AttributeError as err:
+            raise RydiquleError("The \"probe_freq\" attribute has not been set") from err
 
 
-    def _add_decay_to_graph(self) -> None:
-        """
-        Internal helper method to add population decay rates to the nodes to calculate gamma matrix.
-
-        1. add the state lifetime to each node
-        2. add the transition rate to each edge
-        
-        """
-        # First going to get absolute lifetimes of each state
-        states = self.level_ordering()
-
-        for index,state in enumerate(states):
-
-            qnum = self.couplings.nodes[state]["qnums"]
-
-            # Starts at 1, for the ground state, we want to avoid calculating decay
-            # loop over all couplings to get transition rates
-            for lower_state in states[index+1:]:
-                qnum_lower = self.couplings.nodes[lower_state]["qnums"]
-                try:
-                    gamma_transition = 1E-6*self.atom.getTransitionRate(*qnum[0:3],
-                                                                        *qnum_lower[0:3])
-                except ValueError:
-                    gamma_transition = 0
-
-                if gamma_transition != 0:
-                    self.add_decoherence((state, lower_state), gamma_transition, label="transition")
-
-
-    def add_coupling(
-            self, states: States, rabi_frequency: Optional[ScannableParameter] = None,
+    def add_single_coupling(
+            self, states: Tuple[A_QState, A_QState], rabi_frequency: Optional[ScannableParameter] = None,
             detuning: Optional[ScannableParameter] = None,
             transition_frequency: Optional[float] = None,
-            phase: ScannableParameter = 0, kvec: Tuple[float,float,float] = (0,0,0),
-            time_dependence: Optional[Callable[[float],float]] = None, label: Optional[str] = None,
+            phase: Optional[ScannableParameter] = None,
+            kunit: Sequence[float] = (0,0,0),
+            time_dependence: Optional[TimeFunc] = None, label: Optional[str] = None,
             e_field: Optional[ScannableParameter] = None, beam_power: Optional[float] = None,
-            beam_waist: Optional[float] = None,
+            beam_waist: Optional[float] = None, coherent_cc: Optional[float]=None,
             q: Literal[-1, 0, 1] = 0,
             **extra_kwargs) -> None:
         """
-        Overload of :meth:`~.Sensor.add_coupling` which allows for different specification of
-        coupling fields which are more reflective of real experimental setups.
+        Overload of :meth:`~.Sensor.add_single_coupling`, which allows for alternate specifications
+        and automatic calculations of some parameter. 
+
+        This overload fundamentally works identically the `super` method in `Sensor`, with several
+        additions to the functionality that make some assumptions about the underlying system. 
+        Because of this, it still preferred to call :meth:`~.Sensor.add_coupling` on a 
+        :class:`~.Cell` as well. Please refer to that methods documentation for further detail
 
         Rabi frequency is a mandatory argument in :class:`~.Sensor` but in :class:`~.Cell`, 
         there are 3 options for laser power specification:
 
         1. Explicit rabi-frequency definition identical to :class:`~.Sensor`.
         2. Electric field strength, in V/m.
-        3. Specification of both beam power and beam waist.
+        3. Specification of both beam power and beam waist, in W and m respectively.
 
-        Any one of these options can be used in place of the standard`rabi_frequency` argument
-        of :meth:`~.Sensor.add_coupling`.
+        Any one of these options can be used in place of the standard `rabi_frequency` argument
+        of :meth:`~.Sensor.add_coupling`. Note that in all cases, a `rabi_frequency` will be
+        computed and passed to :meth:`~.Sensor.add_single_coupling`, and none of the above
+        arguments will be added to the graph. Note that in any of these cases, if the computed
+        dipole moment for the transition is zero, the coupling will be left off the graph.
+
+        In all cases, the relative coupling strengths between sublevels of states (if present)
+        is calculated and saved as the `coherent_cc` parameter on the graph.
+        These coefficients are defined to be in units of :math:`1/2\\langle J||d||J'\\rangle`,
+        as calculated by 
+        :external+arc:meth:`~arc.alkali_atom_functions.AlkaliAtom.getReducedMatrixElementJ`.
+        The corresponding Rabi frequency that Cell calculates therefore corresponds to
+        :math:`\\Omega_{red} = E \\langle J||d||J'\\rangle / 2\\hbar`.
+        The Rabi frequency for each transition added to the hamiltonian is then given by
+        :math:`\\text{coherent_cc}\\cdot\\Omega_{red}\\cdot e^{i\\text{phase}}`.
+        In the case of NLJ states (ie no sublevels), `coherent_cc=1` and the 
+        non-reduced Rabi frequency is used instead.
+        See the :doc:`physics documentation </writeups/sublevels>` for further details.
 
         As in :class:`~.Sensor`, if `detuning` is specified, the coupling is assumed
         to act under the rotating-wave approximation (RWA), and `transition_frequency`
@@ -559,15 +652,16 @@ class Cell(Sensor):
             Kept such that method signature matches parent.
             Value must be `None` as the transition frequency
             is calculated from atomic properties.
-        phase: float, optional
-            The relative phase of the field in radians.
-            Defaults to zero.
-        kvec: sequence, optional
+        phase : float, optional
+            Static phase offset in the rotating frame.
+            Cannot be used outside the rotating frame, ie when detuning is not defined.
+            Default is undefined, which is interpreted as 0 for couplings in the rotating frame.
+        kunit: sequence, optional
             A three-element iterable that defines the
-            atomic doppler shift on a particular coupling field.
-            It should have magntiude equal to the doppler shift (in the units of Mrad/s)
-            of an atom moving at the Maxwell-Boltzmann distribution most probable
-            speed, `vP=np.sqrt(2*kB*T/m)`. I.E. `np.linalg.norm(kvec)=2*np.pi/lambda*vP`.
+            propagation direction of the field.
+            It should be a normalized vector.
+            This differs from `Sensor`'s `kvec` parameter,
+            since appropriate scale factors are applied automatically in `Cell`.
             If equal to `(0,0,0)`, solvers will ignore doppler shifts
             on this field.  Defaults to `(0,0,0)`.
         time_dependence: scalar function, optional
@@ -598,30 +692,29 @@ class Cell(Sensor):
 
         Raises
         ------
-        ValueError
+        RydiquleError
             If `states` is not a list-like of 2 integers.
-        ValueError
+        RydiquleError
             If an invalid combination of `rabi_frequency`, `e_field`,
             `beam_power`, and `beam_waist` is provided.
-        ValueError
+        RydiquleError
             If `tranistion_frequency` is passed as an argument (it is
             calculated from atomic properties).
-        ValueError
+        RydiquleError
             If `beam_power` and `beam_waist` are both sequences.
-
-        Warns
-        -----
-        UserWarning
-            If any coupling has time-dependence specified,
-            which `get_snr` cannot currently handle as it is steady-state only.
+        CouplingNotAllowedError
+            If the coupling is not dipole-allowed.
+        RydiquleError
+            If `kvec` is supplied instead of `kunit`.
 
         Notes
         -----
         .. note::
             Note that while this function can be used directly just as in :class:`~.sensor.Sensor`,
-            it will often be called implicitly via :meth:`~.Sensor.add_couplings` which `Cell`
+            it will often be called implicitly via :meth:`~.Sensor.add_coupling` which `Cell`
             inherits. While they are equivalent, the second of these options is
-            often the more clear approach.
+            often the more clear approach, and it automatically sets the 
+            `probe_tuple` attribute.
             
         .. note::
             Specifying the beam power by beam parameters or electric field still computes
@@ -633,351 +726,478 @@ class Cell(Sensor):
         Examples
         --------
         In the simplest case, physical properties are calculated automatically in a `Cell`
-        All the familiar quantities are present, as well as many more.
+        All the familiar quantities are present, as well as many more. Note that while not 
+        strictly necessary, it is often convenient to alias states with shorthand variables
+        to avoid very cumbersome state specification. 
 
-        >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"), cell_length = .0001)
-        >>> cell.add_coupling(states=(0,1), detuning=1, rabi_frequency=2)
-        >>> print(dict(cell.couplings.edges))
-        {(0, 0): {'gamma_transit': 0.41172855461658464, 'label': '(0,0)'}, 
-        (0, 1): {'rabi_frequency': 2, 'detuning': 1, 
-        'phase': 0, 'kvec': (0, 0, 0), 'label': '(0,1)'}, 
-        (1, 0): {'gamma_transition': 37.829349995476726, 
-        'label': '(1,0)', 'gamma_transit': 0.41172855461658464}}
+        >>> [g, e] = rq.D2_states("Rb87")
+        >>> cell = rq.Cell("Rb87", [g, e])
+        >>> cell.add_single_coupling((g,e), detuning=1.0, rabi_frequency=2.0, label="probe")
+        >>> print(cell)
+        <class 'rydiqule.cell.Cell'> object with 2 states and 1 coherent couplings.
+        States: [(n=5, l=0, j=0.5), (n=5, l=1, j=1.5)]
+        Coherent Couplings: 
+            ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 2.0, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
+        Decoherent Couplings:
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11316}
+        Energy Shifts:
+            None
         
-        Here we see implicitly calling this overloaded 
-        function through :meth:`~.Sensor.add_couplings`.
+        Since :meth:`~.Sensor.add_couplings`, :meth:`~.Sensor.add_coupling`, 
+        and :meth:`~.Sensor.add_coupling_group` only iterate over calls of this function,
+        they do not need to be overloaded. 
         
-        >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"), cell_length = .0001)
-        >>> c = {"states":(0,1), "detuning":1, "rabi_frequency":2}
-        >>> cell.add_couplings(c)
-        >>> print(dict(cell.couplings.edges))
-        {(0, 0): {'gamma_transit': 0.41172855461658464, 
-        'label': '(0,0)'}, (0, 1): {'rabi_frequency': 2, 'detuning': 1, 
-        'phase': 0, 'kvec': (0, 0, 0), 
-        'label': '(0,1)'}, (1, 0): {'gamma_transition': 37.829349995476726, 
-        'label': '(1,0)', 'gamma_transit': 0.41172855461658464}}
+        >>> [g, e] = rq.D2_states("Rb87")
+        >>> cell = rq.Cell("Rb87", [g, e])
+        >>> probe = dict(states=(g,e), detuning=1.0, rabi_frequency=2.0, label="probe")
+        >>> cell.add_couplings(probe)
+        >>> print(cell)
+        <class 'rydiqule.cell.Cell'> object with 2 states and 1 coherent couplings.
+        States: [(n=5, l=0, j=0.5), (n=5, l=1, j=1.5)]
+        Coherent Couplings: 
+            ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 2.0, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
+        Decoherent Couplings:
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+        Energy Shifts:
+            None
 
-        `e_field` can be specified in stead of `rabi_frequency`,
-        but a `rabi_frequency` will still be added to the system based on the `e_field`,
-        rather than `e_field` directly.
+        `e_field` can be specified instead of `rabi_frequency`,
+        but a `rabi_frequency` will still be added to the system based on the `e_field`
+        and computed dipole moment rather than `e_field` directly.
         
-        >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"), cell_length = .0001)
-        >>> c = {"states":(0,1), "detuning":1, "e_field":6}
-        >>> cell.add_couplings(c)
-        >>> print(cell.couplings.edges(data='e_field'))
-        >>> print(cell.couplings.edges(data='rabi_frequency'))
-        [(0, 0, None), (0, 1, None), (1, 0, None)]
-        [(0, 0, None), (0, 1, -1.172912676105507), (1, 0, None)]
-        
+        >>> [g, e] = rq.D2_states("Rb87")
+        >>> cell = rq.Cell("Rb87", [g, e])
+        >>> cell.add_coupling((g,e), detuning=1.0, e_field=6.0, label="probe")
+        >>> print(cell)
+        <class 'rydiqule.cell.Cell'> object with 2 states and 1 coherent couplings.
+        States: [(n=5, l=0, j=0.5), (n=5, l=1, j=1.5)]
+        Coherent Couplings: 
+            ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 1.177, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
+        Decoherent Couplings:
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+        Energy Shifts:
+            None
+
         As can `beam_power` and `beam_waist`,
         with similar behavior regarding how information is stored.
 
-        >>> cell = rq.Cell("Rb85", *rq.D2_states("Rb85"), cell_length = .0001)
-        >>> c = {"states":(0,1), "detuning":1, "beam_power":1, "beam_waist":1}
-        >>> cell.add_couplings(c)
-        >>> print(cell.couplings.edges(data='beam_power'))
-        >>> print(cell.couplings.edges(data='rabi_frequency'))
-        [(0, 0, None), (0, 1, None), (1, 0, None)]
-        [(0, 0, None), (0, 1, 4.28138982322625), (1, 0, None)]
+        >>> cell = rq.Cell("Rb85", rq.D2_states("Rb85"), cell_length = .0001)
+        >>> cell.add_coupling((g,e), detuning=1.0, beam_power=1.0, beam_waist=1.0, label="probe")
+        >>> print(cell)
+        <class 'rydiqule.cell.Cell'> object with 2 states and 1 coherent couplings.
+        States: [(n=5, l=0, j=0.5), (n=5, l=1, j=1.5)]
+        Coherent Couplings: 
+            ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 4.3, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
+        Decoherent Couplings:
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+        Energy Shifts:
+            None
 
         """ 
-        states = self._states_valid(states)
-        state1 = self.states_list()[states[0]]
-        state2 = self.states_list()[states[1]]
+        state1 = states[0]
+        state2 = states[1]
+        not_nlj = (state1.stype != 'NLJ' and state2.stype != 'NLJ')
 
         # check that tuple energy convention matches atomic properties
-        freq_diff = 2*np.pi*self.get_cell_tansition_frequency(state1, state2)*1e-6
-        det_sign = np.sign(states[1]-states[0])
+        freq_diff = 2*np.pi*self.atom.get_transition_frequency(state1, state2)*1e-6
+        det_sign = np.sign(freq_diff)
         if np.sign(freq_diff) != 1:
             if det_sign > 0:
                 msg = ' higher energy, but it is actually lower. '
             else:
                 msg = ' lower energy, but it is actually higher. '
-            raise ValueError(f'Coupling {states} implies second state is'
-                             + msg + 'Please reverse indeces of states tuple.')
+            raise RydiquleError(f'Coupling {states} implies second state is'
+                                + msg + 'Please reverse indeces of states tuple.')
         
-        suppress_dipole_warn = extra_kwargs.pop("suppress_dipole_warn", False)
+        if 'suppress_dipole_warn' in extra_kwargs:
+            warnings.warn("The 'suppress_dipole_warn' kwarg is deprecated.",
+                           FutureWarning)
         
-        try:
-            dipole_moment = self.get_cell_dipole_moment(state1, state2, q=q)
-            # ARC>=3.4 no longer gives error here, raise manually
-            if dipole_moment == 0 or dipole_moment == np.nan:
-                raise ValueError
-        except ValueError:
-            msg = (f"Transition between states {state1} and {state2} not electric-dipole allowed "
-                   f"for q={q:d} polarization. Solutions may be innacurate. "
-                   "Suppress this by passing \"suppress_dipole_warn=True\" to Cell.add_coupling")
-            dipole_moment = 0
-            if not suppress_dipole_warn:
-                warnings.warn(msg)
-        
-        if isinstance(e_field, list):
-            e_field = np.array(e_field)
-
+        dipole_moment = self.atom.get_dipole_matrix_element(state1, state2, q)
+        if dipole_moment == 0 or dipole_moment == np.nan:
+            raise CouplingNotAllowedError(f'{state1}-->{state2} is not dipole allowed!')
+        if coherent_cc is None:
+            if not_nlj:
+                # calculate spherical dipole matrix element and reduced matrix element
+                # using ARC's conventions
+                sph_moment = self.atom.get_spherical_dipole_matrix_element(state1, state2, q)
+                red_dipole_moment = self.atom.get_reduced_matrix_elementJ(state1, state2)
+                # define coherent_cc as double the spherical moment
+                # this ensures coefficients are closer to 1
+                # Equivalent to defining the spherical moments as being in units of
+                # reduced_matrix_element_J/2
+                passed_cc = 2 * sph_moment
+                dme = red_dipole_moment / 2
+            else:
+                # for NLJ transitions, no sublevel structure so spherical part
+                # is inconsequential (all diffs in reducedJ)
+                passed_cc = 1
+                dme = dipole_moment
+        else:
+            passed_cc = coherent_cc
+            dme = dipole_moment
+                
         if (e_field is not None
             and beam_power is None
             and beam_waist is None
             and rabi_frequency is None
             ):
-            passed_rabi = e_field*scale_dipole(dipole_moment)
+            # E-field definition of Rabi frequency
+            if isinstance(e_field, Sequence):
+                e_field = np.asarray(e_field)
+            passed_rabi = e_field*scale_dipole(dme)
 
         elif (e_field is None
               and beam_power is not None
               and rabi_frequency is None
               and beam_waist is not None
               ):
+            # beam power definition of Rabi frequency
             if isinstance(beam_power, Sequence) and isinstance(beam_waist, Sequence):
-                raise ValueError('beam_power and beam_waist cannot be scanned simultaneously')
+                raise RydiquleError('beam_power and beam_waist cannot be scanned simultaneously')
             else:
-                passed_rabi = np.array([[1e-6*self.atom.getRabiFrequency(*state1, *state2[:-1],
-                                                                         q, bp, bw)
-                                        for bp in np.array(beam_power, ndmin=1)]
-                                        for bw in np.array(beam_waist, ndmin=1)]).squeeze()
+                if not_nlj:
+                    # get the reduced Rabi frequency
+                    passed_rabi = np.array([[1e-6*self.atom.get_reduced_rabi_frequency(state1, state2,
+                                                                                       bp, bw)
+                                            for bp in np.array(beam_power, ndmin=1)]
+                                            for bw in np.array(beam_waist, ndmin=1)]).squeeze()
+                else:
+                    # for NLJ states, use the full Rabi frequency
+                    passed_rabi = np.array([[1e-6*self.atom.get_rabi_frequency(state1, state2,
+                                                                               q, bp, bw)
+                                            for bp in np.array(beam_power, ndmin=1)]
+                                            for bw in np.array(beam_waist, ndmin=1)]).squeeze()
                 if passed_rabi.shape == tuple():
                     passed_rabi = float(passed_rabi)
 
-        elif (e_field is None and beam_power is None and rabi_frequency is not None):
+        elif (e_field is None
+              and beam_power is None
+              and beam_waist is None
+              and rabi_frequency is not None):
+            # Rabi frequency directly provided
+            # this case assumes user has correctly scaled rabi already
             passed_rabi = rabi_frequency
 
         else:
             msg = ("Please only define one of: 1) rabi_frequency or "
                    "2) e_field or 3) beam_power and beam_waist.")
-            raise ValueError(msg)
+            raise RydiquleError(msg)
 
         if detuning is None:
             if transition_frequency is not None:
                 msg = """Cell does not support explicit definition of transition_frequency,
                 it is calculated based on atomic properties."""
-                raise ValueError(msg)
+                raise RydiquleError(msg)
             else:
                 transition_frequency = freq_diff
 
-        super().add_coupling(states=states, rabi_frequency=passed_rabi,
-                             detuning=detuning, transition_frequency=transition_frequency,
-                             phase=phase, kvec=kvec, time_dependence=time_dependence, label=label,
-                             dipole_moment=dipole_moment, **extra_kwargs)
-
-
-    def _validate_qnums(self, qnums: QState):
-        """Validate the quantum numbers provided are appropriately formated and cast to a list.
-        
-        States should either be 4 quantum numbers [n, l, j, m_j] for a pure electron angular
-        momentum state or 5 quantum numbers [n, l, j, F, m_F] for a hyperfine state. 
-
-        Parameters
-        ----------
-        qnums : list(float)
-            Quantum numbers for the state.
-
-        Raises
-        ------
-        ValueError
-            If the list of quantum numbers is not length 4 or 5.
-        """
-        if len(qnums) not in [4,5]:
-            raise ValueError("States must either be of length 4 or 5.")
-        return list(qnums)
-
-
-    def get_cell_hfs_coefficient(self, state: Union[QState, int]):
-        """Get the hyperfine splitting coefficients of the given state using ARC.
-        
-        State can either be given as a list of quantum numbers or an integer value
-        corresponding to a key in the basis of the Cell. Returns 0 if not a hyperfine
-        state and the values A, B returned by ARC Rydberg's `getHFSCoefficients()`
-        function if it is a hyperfine state.
-
-        Parameters
-        ----------
-        state : Union[QState, int]
-            The state to calculate. Can either be an integer corresponding to a graph
-            node or the quantum numbers of a state in the system.
-
-        Returns
-        -------
-        float
-            The hyperfine splitting coeffiecient A.
-        float
-            The hyperfine splitting coeffiecient B.
-        """
-        state = self.get_qnums(state)
-        
-        if len(state) == 4:
-            return 0, 0
-        
-        elif len(state) == 5:
-            return self.atom.getHFSCoefficients(*state[0:3])
-
-
-    def get_cell_hfs_shift(self, state: Union[QState, int]):
-        """Return the hyperfine energy shift for the given hyperfine state.
-        
-        Returns the energy shift if `state` is a hyperfine state (defined with
-        5 quantum numbers) or 0 if the `state` is not a hyperfine state
-        (defined by 4 quantum numbers)
-
-        Parameters
-        ----------
-        state : Union[QState, int]
-            The state for which to calculate the hyperfine shift. Can be a list
-            of quantum numbers or an integer state level of `Cell`
-
-        Returns
-        -------
-        float
-            The hyperfine energy shift in units of Mrad/s.
-        """
-        state = self.get_qnums(state)
-        
-        A, B = self.get_cell_hfs_coefficient(state)
-        return self.atom.getHFSEnergyShift(state[2], state[3], A, B)
-    
-    
-    def get_cell_tansition_frequency(self, state1: Union[QState, int], state2: Union[QState, int]):
-        """Get the transition frequency between 2 states, accounting for hyperfine splitting. 
-        
-        If either state is a hyperfine state, its associated hyperfine shift is added or
-        or subtracted to calculate the total energy difference between 2 states
-
-        Parameters
-        ----------
-        state1 : Union[QState, int]
-            The state the electron is transitioning from. Either a integer of one of the basis
-            states, or a list of quantum numbers.
-        state2 : Union[QState, int]
-            The state the electron is transitioning to. Either an integer of one of the basis
-            states, or a list of quantum numbers.
-
-        Returns
-        -------
-        float
-            The total energy difference between two states accounting for hyperfine splitting.
-        """
-        state1 = self.get_state_num(state1)
-        state2 = self.get_state_num(state2)
-        
-        #get the hyperfine splitting for states
-        E_hfs_1 = self.couplings.nodes[state1].get("hfs", 0)
-        E_hfs_2 = self.couplings.nodes[state2].get("hfs", 0)
-
-        qnums1 = self.couplings.nodes[state1]["qnums"]
-        qnums2 = self.couplings.nodes[state2]["qnums"]
-
-
-        E_base = self.atom.getTransitionFrequency(*qnums1[:3], *qnums2[:3])
-        
-        return E_base - E_hfs_1 + E_hfs_2
-    
-    
-    def get_cell_dipole_moment(self, state1: Union[QState, int], state2: Union[QState, int], q=0):
-        """Get the diploe moment between 2 cell state.
-        
-        Either both states must be hyperfine, or both states must not be hyperfine states.
-        Currently dipole moments cannot be calculated for a mix of state types.
-
-        Parameters
-        ----------
-        state1 : Union[QState, int]
-            The state from which the electron is transitioning.
-        state2 : Union[QState, int]
-            The state to which the electron is transitioning.
-        q : int, optional
-            Polarization of probing optical field in spherical basis. Must be -1, 0, 1.
-            Defaults to 0 for linear polarization.
-
-        Returns
-        -------
-        float
-            The dipole moment of the transition in units of e*a_0.
-
-        Raises
-        ------
-        ValueError
-            If both states are not of the same type.
-        """
-        state1 = self.get_qnums(state1)
-        state2 = self.get_qnums(state2)
-        #both states validated to be length 4 or 5
-        
-        #Handle the cases when both states are of the same type        
-        if len(state1) == len(state2):
-            #hfs case
-            if len(state1) == 5:
-                return self.atom.getDipoleMatrixElementHFS(*state1, *state2, q)
-            #fs case
-            elif len(state1) == 4:
-                return self.atom.getDipoleMatrixElement(*state1, *state2, q)
-
-        #calculate between hfs and fs states
-        if len(state1) > len(state2):
-            return self.atom.getDipoleMatrixElementHFStoFS(*state1, *state2, q)
+        if 'kvec' in extra_kwargs:
+            raise RydiquleError("Cell couplings no longer accept 'kvec' as a parameter. " +
+                                "Use 'kunit' instead, which is the unit propagation axis. " +
+                                "Cell calculates necessary prefactors to define 'kvec' from 'kunit'.")
+        # apply kvec scaling factors for use in underlying Sensor
+        k_norm_sq = np.sum(np.asarray(kunit)**2)
+        if np.isclose(k_norm_sq, 0.0):
+            # doppler not requested for this coupling, pass default along
+            kvec = kunit
+        elif np.isclose(k_norm_sq, 1.0):
+            # apply standard dopper shift
+            lam = abs(self.atom.get_transition_wavelength(state1, state2)) # in m
+            kvec = 2*np.pi/lam*np.asarray(kunit)*1e-6 # scaled to Mrad/m
         else:
-            return -1*self.atom.getDipoleMatrixElementHFStoFS(*state2, *state1, q)
-    
-    
-    def get_state_num(self, state: Union[QState, int]):
-        """Return the integer number in the bases of a node with the given quantum numbers.
+            raise RydiquleError(f'Coupling {states} has un-normalized |kunit|={np.sqrt(k_norm_sq):.2f}!=1')
 
-        Quantum numbers for a state are determined by the "qnums" dictionary key on that node.
-        Can handle either a list of quantum numbers or an integer state. In the case of an
-        integer state, just returns the integer value passed in.
+        super().add_single_coupling(states=states,
+                                    rabi_frequency=passed_rabi,
+                                    coherent_cc=passed_cc,
+                                    detuning=detuning,
+                                    transition_frequency=transition_frequency,
+                                    phase=phase,
+                                    kvec=kvec,
+                                    time_dependence=time_dependence,
+                                    label=label,
+                                    dipole_moment=dipole_moment,
+                                    q=q,
+                                    **extra_kwargs)
+    
+
+    def add_transit_broadening(self, gamma_transit: ScannableParameter,
+                               repop: Optional[Union[Dict[A_QState, float], List[A_QState]]] = None,
+                               label: str = "transit"):
+        """Overload of the :meth:`~.Sensor.add_transit_broadening` method of `Sensor` which
+        automatically populates the `repop` dictionary with a equal decay to all sublevels of
+        the ground `(n, l, j)` state. 
 
         Parameters
         ----------
-        state: Union[QState, int]
-            Either the quantum numbers or integer value of the states.
+        gamma_transit : ScannableParameter
+            Transit brodening of the system. Passed transparently to super function.
+        repop: dict, optional
+            Dictionary of states for transit to repopulate in to.
+            The keys represent tshe state labels. The values represent
+            the fractional amount that goes to that state.
+            If the sum of value does not equal 1, population will not be conserved.
+            If `None`, raises population decay due to transit broadening will be evenly
+            divided amongst all states matching the `(n, l, j)` quantum numbers of the
+            lowest-energy state in the system. Defaults to `None`. 
+        label: str, optional
+            Label to be passed to :meth:`~.Sensor.add_decoherence`. Defaults to "transit"
 
-        Raises
-        ------
-        ValueError:
-            If there is no state matching the given quantum numbers
+        Examples
+        --------
+        >>> atom = "Rb85"
+        >>> g = rq.ground_state(atom, splitting="fs")
+        >>> e = rq.D1_excited(atom, splitting="fs")
+        >>> Rb_Cell = rq.Cell(atom, [g,e])
+        >>> Rb_Cell.add_transit_broadening(0.1)
+        >>> for e in Rb_Cell.couplings.edges.data("gamma_transit"):
+        ...     print(e)
+        ((n=5, l=0, j=0.5, m_j=-0.5), (n=5, l=0, j=0.5, m_j=-0.5), 0.05)
+        ((n=5, l=0, j=0.5, m_j=-0.5), (n=5, l=0, j=0.5, m_j=0.5), 0.05)
+        ((n=5, l=0, j=0.5, m_j=0.5), (n=5, l=0, j=0.5, m_j=-0.5), 0.05)
+        ((n=5, l=0, j=0.5, m_j=0.5), (n=5, l=0, j=0.5, m_j=0.5), 0.05)
+        ((n=5, l=1, j=0.5, m_j=-0.5), (n=5, l=0, j=0.5, m_j=-0.5), 0.05)
+        ((n=5, l=1, j=0.5, m_j=-0.5), (n=5, l=0, j=0.5, m_j=0.5), 0.05)
+        ((n=5, l=1, j=0.5, m_j=0.5), (n=5, l=0, j=0.5, m_j=-0.5), 0.05)
+        ((n=5, l=1, j=0.5, m_j=0.5), (n=5, l=0, j=0.5, m_j=0.5), 0.05)
+
+        """
+        if repop is None:
+            g = self.level_ordering()[0]
+            
+            #construct the ground state manifold
+            m_j = None if g.m_j is None else "all"
+            (f, m_f) = (None, None) if g.f is None else ("all","all")
+            ground_manifold = A_QState(g.n, g.l, g.j, m_j=m_j, f=f, m_f=m_f)
+
+            ground_states_all = self.states_with_spec(ground_manifold)
+            repop = {state: 1/len(ground_states_all) for state in ground_states_all}
+
+        super().add_transit_broadening(gamma_transit=gamma_transit, repop=repop, label=label)
+
+
+    def states_with_spec(self, statespec: A_QState) -> List[A_QState]:
+        """Return a list of all states in the sensor matching the `state_spec` pattern.
+
+        Matching is determined by same rules as :meth:`~.Sensor.states_with_spec`, with no
+        additional logic to account for the different typing of the states. This means that
+        there is expansion of any quantum numbers specified by the "all" keyword, and only
+        states that are already nodes of the `Cell` graph will be included.
+
+        Parameters
+        ----------
+        statespec : A_QState
+            State specification againt which to perform matching,
 
         Returns
         -------
-        int: 
-            The integer value corresponding the number of the state in the basis.
+        List[A_QState]
+            List of all states in :class:`~.Cell` instance which match the provided specification.
+
+        Examples
+        --------
+        >>> atom = "Rb85"
+        >>> g = rq.ground_state(atom, splitting="fs")
+        >>> e = rq.D1_excited(atom, splitting="fs")
+        >>> Rb_Cell = rq.Cell(atom, [g,e])
+        >>> print(Rb_Cell.states_with_spec(A_QState(5, 0, 0.5)))
+        []
+        >>> print(Rb_Cell.states_with_spec(A_QState(5, 0, 0.5, m_j="all")))
+        [(n=5, l=0, j=0.5, m_j=-0.5), (n=5, l=0, j=0.5, m_j=0.5)]
+        >>> print(Rb_Cell.states_with_spec(A_QState(5, 0, 0.5, m_j=[-0.5, 0.5])))
+        [(n=5, l=0, j=0.5, m_j=-0.5), (n=5, l=0, j=0.5, m_j=0.5)]
+        
+        """
+        return super().states_with_spec(statespec)
+    
+
+    def _add_state_energies(self):
+        """
+        Helper function to add all the "energy" key to all the nodes of the graph for the state
+        energies relative to the first state.
+
+        All energies are relative to the ground state, defined as the :math:`nS^{1/2}` state, where
+        n is the principle quantum number of the lowest energy atomic state.
+        """
+        g_state = ground_state(self.atom_flag)
+        ground_energy = self.atom.get_state_energy(g_state)*1e-6*2.0*np.pi
+
+        for state in self.couplings.nodes:
+            state_energy = self.atom.get_state_energy(state)*1e-6*2.0*np.pi #Mrad/s
+            self.couplings.nodes[state]["energy"] = state_energy - ground_energy
+
+
+    def _add_state_lifetimes(self):
+        """
+        Helper function to add all "gamma_lifetime" key-value appropriate to the atom to all nodes 
+        on the graph.
         """
 
-        if isinstance(state, int):
-            return state
+        for i, state in enumerate(self.couplings.nodes):
+            if i==0:
+                self.couplings.nodes[state]["gamma_lifetime"] = 0.0
+            else:
+                self.couplings.nodes[state]["gamma_lifetime"] = 1e-6/self.atom.get_state_lifetime(state)
+
+    def _add_decoherence_rates(self):
+        """
+        Helper function to add natural decay rates to all transitions in the cell. Values
+        for decay rates are calculated with arc, and skipped if selection rules prohibit the
+        transition or if the second state is a higher energy than the first state
+        """
         
-        else:
-            for n, d in self.couplings.nodes.data():
-                if d['qnums'] == list(state):
-                    return n
-        
-        raise ValueError(f"No state in cell with quantum numbers {state}")
+        for s1, s2 in itertools.product(self.couplings.nodes, self.couplings.nodes):
+            #states don't decay to lower energies
+            if self.couplings.nodes[s1]["energy"] <= self.couplings.nodes[s2]["energy"]:
+                continue
+            else:
+                try:
+                    gamma=self.atom.get_transition_rate(s1, s2)/1e6
+                except ValueError:
+                    continue
+                self.add_decoherence((s1,s2), gamma, label="transition")
 
 
-    def get_qnums(self, state: Union[QState, int]):
-        """Gets the quantum numbers for a given states.
-        
-        Works by either retrieving quantum numbers for an integer state,
-        or transparently passing through a state already defined by its
-        quantum numbers.
+    def _add_gamma_mismatches(self, method:Union[str, dict]="ground"):
+        """Adds couplings to the graph accounting for differences between computed 
+        lifetimes and decay rates. 
+
+        In a cell in which all atomic states are accounted for, the computed values of 
+        `gamma_lifetime` for a particular state will be equal to the sum of all 
+        `gamma_transition` values on edges leaving that state. However, it is not always
+        desirable to account for all states in this way for simplicity or computational
+        complexity reasons. This function allows the :class:`~.Cell` to account for any
+        differences in these values that arise as a result of excluding physicalstates from a
+        :class:`~.Cell`. There are multiple ways to resolve these discrepancies, specified by
+        the `method` argument, which is detailed in the `Parameters` section.
+
 
         Parameters
         ----------
-        state : Union[QState, int]
-            The state the get the quantum numbers for.
-
-        Returns
-        -------
-        list(int)
-            The quantum numbers of the state. If `state` is already a 
-            list of quantum numbers, just returns the value of `state`
+        method : str or dict mapping states to str
+            The method by which discrepancies in computed values are resolved. The available
+            methods are as follows:
+                
+                - `"ground"` which adds a decoherent coupling coupling between a state `s` with
+                  a discrepancy :math:`\\Delta \\gamma` and divides :math:`\\Delta \\gamma` among 
+                  all the ground states (states matching the `n,l,j` values of the lowest energy
+                  state). 
+                - `"all"` which divides :math:`\\Delta \\gamma` amongst all states in the 
+                  :class:`~.Cell` which already have a `"gamma_transition"` value. The fraction
+                  each transition gets is weighted by the fraction of the total thdat transitions
+                  `"gamma_transition"` value accounts for. If this method is used, every state in
+                  the `Cell` must have at least one dipole-allowed decay path. 
+                - `"none"` which will not account for this discrepancy at all. In this case this
+                  physics is not guaranteed to be accurate and it is assumed the decoherence will
+                  be accounted for manually in other ways using :meth:`"~.add_decoherence"`
+            
+            Note that in addition to one of these strings `method` can be a dictionary which
+            maps states to one of these strings. In this case, the discrepancy is resolved
+            separately for each state using the method specified for that state. Defaults to "ground"
 
         Raises
         ------
         ValueError
-            If the integer provided is outside the basis of the `Cell`.
+            If the method is not one of the allowed strings or a dictionary mapping states to
+            one of the allowed strings.
+        RydiquleError
+            If the "all" option is selected for `method` and any of the states have no lower
+            state to decay to.
         """
-        if isinstance(state, int):
+      
+        mismatch_fns: Dict[str, Callable] = {
+            "ground": self._add_gamma_mismatch_to_ground,
+            "all": self._add_gamma_mismatch_to_all,
+            "none": lambda *x, **y: None
+        }
+        
+        if method in mismatch_fns.keys():
+            methods_all = {s:method for s in self.couplings.nodes()}
+        elif isinstance(method, dict):
+            methods_all = method
+        else:
+            msg = f"'method' must be one of {mismatch_fns.keys()} or "\
+                "a dictionary mapping states to one of those values"
+            raise ValueError(msg)
+ 
+
+        for state in self.couplings.nodes():
+
+            meth_i = methods_all.get(state, "none")
             try:
-                qnums = self.couplings.nodes[state]["qnums"]
+                fn_i = mismatch_fns[meth_i]
             except KeyError:
-                raise ValueError(f"Cell basis is smaller that state {state}")
-        else:
-            qnums = state
+                msg = f"'method' must be one of {mismatch_fns.keys()} or "\
+                    "a dictionary mapping states to one of those values"
+                raise ValueError(msg)
+
+            fn_i(state)
+
+
+    def _add_gamma_mismatch_to_ground(self, state: A_QState):
+        """Helper function which implements the "ground" option of :meth:`_add_gamma_mismatches`
+        for a single state `state`.
+        
+        """
+        try:
+            lifetime = self.couplings.nodes[state]["gamma_lifetime"]
+        except KeyError:
+            raise KeyError(f"State {state} is not a state of cell.")
+        
+        out_edges = self.couplings.out_edges(state, data="gamma_transition")
+        transition_total = sum([e[2] for e in out_edges if e[2]])
+        
+        #if they dom't match, we add a decoherence to the entire ground state manifold
+        #that matches what remains
+        if not np.isclose(transition_total, lifetime):
+            g = self.level_ordering()[0]
+            
+            #construct the ground state manifold
+            m_j = None if g.m_j is None else "all"
+            (f, m_f) = (None, None) if g.f is None else ("all","all")
+            ground_manifold = A_QState(g.n, g.l, g.j, m_j=m_j, f=f, m_f=m_f)
+
+            self.add_decoherence((state, ground_manifold), gamma=(lifetime-transition_total), label="mismatch")
+
     
-        return self._validate_qnums(qnums)
+    def _add_gamma_mismatch_to_all(self, state:A_QState):
+        """Helper function which implements the "all" option of :meth:`_add_gamma_mismatches`
+        for a single state `state`.
+        
+        """
+        try:
+            lifetime = self.couplings.nodes[state]["gamma_lifetime"]
+        except KeyError:
+            raise KeyError(f"State {state} is not a state of cell.")
+        
+        out_edges = self.couplings.out_edges(state, data="gamma_transition")
+
+        ground_nlj = ground_state(self.atom_flag)[:3]
+
+        if len(out_edges) == 0 and state[:3] != ground_nlj:
+            msg = "'all' option selected for gamma_mismatch handling but no dipole-allowed "\
+                f"states have been been added for tranistion out of {state}"
+            raise RydiquleError(msg)
+
+        transition_total = sum(e[2] for e in out_edges)
+        
+        #if they dom't match, we add a decoherence to the entire ground state manifold
+        #that matches what remains
+        if not np.isclose(transition_total, lifetime):
+            #construct the dictionary of coupling coefficients coefficients
+            cc = {
+                (s1, s2):gamma/transition_total for s1, s2, gamma in out_edges
+                if gamma
+            }
+
+            out_states_list = [s2 for _, s2, _ in out_edges]
+            self.add_decoherence_group([state], out_states_list, gamma = transition_total, coupling_coefficients=cc, label="mismatch")
+
+
+    def _validate_input_states(self, atomic_states: List[A_QState]):
+        """Helper function to check that input states are compatible and defined"""
+        
+        for state in atomic_states:
+            validate_qnums(state, I=self.I)
+            

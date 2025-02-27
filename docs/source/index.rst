@@ -23,7 +23,7 @@ and external computational libraries such as `numpy`, `scipy`, and `ARC`.
 
 For more details, see the :doc:`overview`.
 
-For detailed usage examples, see the :doc:`_intro_nbs/Introduction_To_Rydiqule/Introduction_To_Rydiqule` Jupyter notebook.
+For detailed usage examples, see the :doc:`intro_nbs/Introduction_To_Rydiqule` Jupyter notebook.
 
 If you use rydiqule in your work, please cite as
 
@@ -58,7 +58,8 @@ If you use rydiqule in your work, please cite as
 
    installation
    overview
-   _intro_nbs/**/*
+   intro_nbs/Introduction_To_Rydiqule
+   intro_nbs/Cell_Basics
    changelog   
 
 .. toctree::
@@ -77,6 +78,6 @@ If you use rydiqule in your work, please cite as
    :glob:
    :caption: EXAMPLE NOTEBOOKS
 
-   _examples/**/*
+   examples/*
 
 .. todolist::

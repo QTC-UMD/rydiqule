@@ -6,47 +6,76 @@ See below for detailed instructions.
 
 In all cases, it is highly recommended to install rydiqule in a virtual environment.
 
-Conda installation
-------------------
-
 Installation via conda is recommended for rydiqule.
 It handles dependency installation as well as a virtual environment to ensure packages do not conflict with other usages on the same system.
-Finally, the `numpy` provided by anaconda has been compiled against optimized BLAS/LAPACK implementations, which results in much better performance in rydiqule itself.
+Finally, the `numpy` provided by anaconda has been compiled against optimized BLAS/LAPACK implementations,
+which results in much better performance in rydiqule itself.
 
-Assuming you have not already created a separate environment for RydIQule (recommended), run the following to create a new environment:
+.. note::
 
-.. code-block:: shell
+  RydIQule currently requires python >3.8.
+  For a new installation, it is recommended to use the newest supported python.
+  Currently supported versions are |pythons|
 
-  (base) ~/> conda create -n rydiqule python=3.11
-  (base) ~/> conda activate rydiqule
+Regular Installation
+--------------------
 
-RydIQule currently requires python >3.8.
-For a new installation, it is recommended to use the newest supported python.
+.. tab:: conda
 
-Now install via rydiqule's anaconda channel.
-This channel provides rydiqule as well as its dependencies that are not available in the default anaconda channel.
-If one of these dependencies is outdated, please raise an issue with the 
-`vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
+  Assuming you have not already created a separate environment for RydIQule (recommended), run the following to create a new environment:
 
-.. code-block:: shell
+  .. code-block:: shell
 
-  (rydiqule) ~/> conda install -c rydiqule rydiqule
+    (base) ~/> conda create -n rydiqule python=3.11
+    (base) ~/> conda activate rydiqule
 
+  Now install via rydiqule's anaconda channel.
+  This channel provides rydiqule as well as its dependencies that are not available in the default anaconda channel.
+  If one of these dependencies is outdated, please raise an issue with the 
+  `vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
+
+  .. code-block:: shell
+
+    (rydiqule) ~/> conda install -c rydiqule rydiqule
+
+.. tab:: pip
+
+  To install normally, run:
+
+  .. code-block:: shell
+
+    pip install rydiqule
+
+  This command will use pip to install all necessary dependencies.
+
+Editable Installation
+---------------------
 
 If you would like to install rydiqule in editable mode to locally modify its source,
 this must be done using pip.
-Follow the above to install rydiqule and its dependencies,
-then run the following to uninstall rydiqule as provided by conda
-and install the editable local repository.
 
-.. code-block:: shell
+.. tab:: conda
 
-  (rydiqule) ~/> conda remove rydiqule --force
-  # following must be run from root of local repository
-  (rydiqule) ~/> pip install -e .
+  Follow the above to install rydiqule and its dependencies,
+  then run the following to uninstall rydiqule as provided by conda
+  and install the editable local repository.
 
-Note that editable installations require `git`.
-This can be provided by a system-wide installation or via conda in the virtual environment (`conda install git`).
+  .. code-block:: shell
+
+    (rydiqule) ~/> conda remove rydiqule --force
+    # following must be run from root of local repository
+    (rydiqule) ~/> pip install -e .
+
+.. tab:: pip
+ 
+  Run the following from the root directory of the cloned repository:
+
+  .. code-block:: shell
+
+    pip install -e .
+
+Note that editable installations should have `git` available if you want dynamic versioning (via `setuptools-scm`),
+either by a system-wide installation or via conda in the virtual environment (`conda install git`).
 
 .. note::
 
@@ -55,24 +84,6 @@ This can be provided by a system-wide installation or via conda in the virtual e
     you will need to install ARC via `pip` to build it locally before installing `rydiqule`.
     To see what architectures are supported, please see the 
     `vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
-
-Pure pip installation
----------------------
-
-To install normally, run:
-
-.. code-block:: shell
-
-  pip install rydiqule
-
-This command will use pip to install all necessary dependencies.
-
-To install in an editable way (which allows edits of the source code), 
-run the following from the root directory of the cloned repository:
-
-.. code-block:: shell
-
-  pip install -e .
 
 Editable installtion requires `git` to be installed.
 
@@ -111,20 +122,26 @@ Updating an existing installation
 Upgrading an existing installation is simple.
 Simply run the appropriate upgrade command for the installation method used.
 
-For conda installations, run the following command to upgrade rydiqule
+Regular Installation Upgrade
+++++++++++++++++++++++++++++
 
-.. code-block:: shell
+.. tab:: conda
 
-  conda upgrad rydiqule
+  .. code-block:: shell
 
-For `pip`, you can use the same installation command to upgrade.
-Optionally, include the update flag to greedily update dependencies as well.
+    conda upgrade rydiqule
 
-.. code-block:: shell
+.. tab:: pip
 
-  pip install -U rydiqule
+  .. code-block:: shell
 
-This command will also install any new dependencies that are required.
+    # standard upgrade
+    pip install rydiqule
+    # greedy upgrade: ie update dependencies too
+    pip install -U rydiqule
+
+Editable Installation Upgrade
++++++++++++++++++++++++++++++
 
 If using an editable install, simply replacing the files in the same directory is sufficient.
 Though it is recommended to also run the appropriate pip update command as well to capture updated depedencies.
@@ -150,17 +167,24 @@ These will be automatically installed if not already present.
     When using Windows, it is recommended to install `numpy` from conda,
     which is built against the IntelMKL and has generally shown the best performance for Intel-based PCs.
 
-Optional timesolver backend dependencies include the `numbakit-ode <https://github.com/hgrecco/numbakit-ode>`_
+Optional timesolver backend dependencies include the `numba`
 and `CyRK <https://github.com/jrenaud90/CyRK>`_ packages.
-Both are available via `pip`.
-They can be installed automatically via the optional extras specification for the `pip` command.
+Both are available via `pip`, `conda`, or our anaconda channel.
 
-.. code-block:: shell
+.. tab:: conda
 
-  pip install rydiqule[backends]
+  For conda installations, these dependencies must be installed manually
 
-For conda installations, these dependencies must be installed manually
+  .. code-block:: shell
 
-.. code-block:: shell
+    conda install -c rydiqule CyRK
 
-  conda install -c rydiqule CyRK numbakit-ode
+.. tab:: pip
+
+  Backends can be installed automatically via the optional extras specification for the `pip` command.
+
+  .. code-block:: shell
+
+    pip install rydiqule[backends]
+
+.. |pythons| image:: https://img.shields.io/pypi/pyversions/rydiqule.svg

@@ -11,10 +11,7 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
-import shutil
 import importlib.metadata
-from pathlib import Path
-import nbconvert
 
 # -- Project information (unique to each project) -------------------------------------
 
@@ -24,22 +21,19 @@ latex_author = r"""Quantum Technology Center\and
 DEVCOM Army Research Laboratory\and
 Naval Air Warfare Center - Weapons Division\\
 \\
-\Large Unclassified - Approved for Public Release\\
+\Large Distribution Statement A - Approved for public release:\\
+\Large distribution is unlimited\\
 \\
-\normalsize Dr. Kevin C Cox - kevin.c.cox29.civ@army.mil\\
-\normalsize Dr. Christopher O'brien - christopher.m.obrien22.civ@us.navy.mil\\
-\normalsize Dr. David H Meyer - david.h.meyer3.civ@army.mil\\
-\normalsize Mr. Benjamin Miller - benjamin.n.miller@navy.mil\\
+\normalsize Mr. Benjamin Miller\\
+\normalsize Dr. David H Meyer\\
+\normalsize Dr. Kevin C Cox\\
+\normalsize Dr. Christopher O'brien\\
+\normalsize Mr. Teemu Virtanen\\
 """
 
 release = importlib.metadata.version('rydiqule')
 
 version = release
-
-# HTML icons
-img_path = 'img'
-html_logo = img_path + '/Rydiqule_Icon_64.svg'
-html_favicon = img_path + '/Rydiqule_Icon_Transparent_64_32_16.ico'
 
 # -- General configuration (should be identical across all projects) ------------------
 
@@ -54,8 +48,11 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.todo",
     "sphinx.ext.viewcode",
-    "sphinx_rtd_theme",
     "sphinx.ext.mathjax",
+    "myst_nb",
+    "sphinx_copybutton",
+    "sphinx_inline_tabs",
+    "sphinxext.opengraph",
 ]
 
 autosummary_generate = True
@@ -79,7 +76,10 @@ templates_path = ['_templates']
 exclude_patterns = []
 
 # The suffix(es) of source filenames.
-source_suffix = ['.rst']
+source_suffix = {\
+    '.rst': 'restructuredtext',
+    '.ipynb': 'myst-nb',
+    }
 
 # The master toctree document.
 master_doc = 'index'
@@ -94,6 +94,7 @@ intersphinx_mapping = {
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'numbakitode': ('https://numbakit-ode.readthedocs.io/en/latest/', None),
     'leveldiagram': ('https://leveldiagram.readthedocs.io/en/latest/', None),
+    'arc': ('https://arc-alkali-rydberg-calculator.readthedocs.io/en/latest/', None),
 }
 
 # Make `some code` equivalent to :code:`some code`
@@ -105,12 +106,20 @@ if os.environ.get('READTHEDOCS') and os.environ.get('READTHEDOCS_VERSION') != 'l
 else:
     todo_include_todos = True
 
+# -- Options for myst-nb -----------------------------------------------------
+
+nb_execution_mode = 'off'
+myst_enable_extensions = [
+    "amsmath",
+    "dollarmath",
+]
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "furo"
 html_title = "rydiqule"
 html_short_title = "rydiqule"
 html_show_copyright = False
@@ -118,10 +127,18 @@ html_show_copyright = False
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = []
+html_static_path = ["_static"]
+
+# HTML icons
+img_path = 'img'
+html_favicon = img_path + '/Rydiqule_Icon_Transparent_64_32_16.ico'
 
 # Customize the html_theme
-html_theme_options = {'navigation_depth': 3}
+#html_theme_options = {'navigation_depth': 3}
+html_theme_options = {
+    "light_logo": "Rydiqule_Icon_64_Transparent.svg",
+    "dark_logo": "Rydiqule_Icon_64_Transparent.svg",
+}
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -135,7 +152,7 @@ latex_elements = {
 #'pointsize': '10pt',
 
 # Additional stuff for the LaTeX preamble.
-'preamble': r'''\usepackage{braket}''',
+'preamble': r'\usepackage{braket}',
 
 # Latex figure (float) alignment
 'figure_align': 'htbp',
@@ -169,44 +186,3 @@ latex_use_parts = True
 
 # If false, no module index is generated.
 #latex_domain_indices = True
-
-def setup(app):
-
-    app.connect('builder-inited', run_nbconvert)
-
-def run_nbconvert(_):
-    """
-    Runs nbconvert on all example notebooks, for inclusion in docs.
-    """
-
-    if os.environ.get('READTHEDOCS'):
-        rel_path = '../..'
-        imgs_path = os.path.abspath('./img')
-    else:
-        rel_path = '..'
-        imgs_path = os.path.abspath('./source/img')
-
-    examples_path = os.path.join(os.path.abspath(rel_path),'examples')
-
-    out_base_path = os.path.join(os.path.dirname(Path(__file__)),'_examples')
-    intro_out_base_path = os.path.join(os.path.dirname(Path(__file__)), '_intro_nbs')
-
-    examples = Path(examples_path).glob('*.ipynb')
-    intro_nbs = ['Introduction_To_Rydiqule']
-    img_assets = ['Rydiqule_Logo_Transparent_300.png']
-
-    rst_exporter = nbconvert.exporters.RSTExporter()
-    writer = nbconvert.writers.FilesWriter()
-
-    for ex in examples:
-        name = ex.stem
-        if name in intro_nbs:  
-            out_path = os.path.join(intro_out_base_path,name)
-        else:
-            out_path = os.path.join(out_base_path,name)
-        writer.build_directory = out_path
-        (body, resources) = rst_exporter.from_filename(ex)
-        writer.write(body,resources,name)
-        # copy image assets to every directory
-        for img in img_assets:
-            shutil.copy(os.path.join(imgs_path,img), out_path)

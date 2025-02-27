@@ -1,16 +1,18 @@
 """
 Utilities used by the Sensor classes.
 """
-import string
 import math
+from itertools import product
 
 import numpy as np
+import networkx as nx
 from .sensor_solution import Solution
+from .exceptions import RydiquleError
 import scipy.constants
 from scipy.constants import hbar, e
 from leveldiagram import LD
 
-from typing import Dict, Tuple, Union, Sequence, List, Callable, TYPE_CHECKING
+from typing import Dict, Tuple, Union, List, Callable, TYPE_CHECKING
 if TYPE_CHECKING:
     # only import when type checking, avoid circular import
     from .sensor import Sensor
@@ -21,9 +23,13 @@ a0 = scipy.constants.physical_constants["Bohr radius"][0]
 ScannableParameter = Union[float, List[float], np.ndarray]
 
 CouplingDict = Dict
-State = Union[int, str]
+
+State = Union[int, str, Tuple[float, ...]]
 States = Tuple[State, State]
-QState = Sequence  # TODO: consider using named tuples here
+
+Spec = Tuple[Union[float, List[float]], ...]
+StateSpec = Union[State, List[State], Spec]
+StateSpecs = Tuple[StateSpec, StateSpec]
 
 TimeFunc = Callable[[float], complex]
 
@@ -57,7 +63,7 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
     real_eom : bool, optional
         Transform the equations of motion from the complex basis
         to the real basis. Setting to `False` is intended for internal use only
-        and is not officially supported
+        and is not officially supported.
         Seee :func:`~.make_real` for details.
 
     Returns
@@ -77,7 +83,7 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
 
     Raises
     ------
-    ValueError: If the shapes of gamma_matrix and hamiltonian are not matching
+    RydiquleError: If the shapes of gamma_matrix and hamiltonian are not matching
         or not square in the last 2 dimensions
 
     Examples
@@ -85,13 +91,13 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
     >>> ham = np.diag([1,-1])
     >>> gamma = np.array([[.1, 0],[.1,0]])
     >>> print(ham.shape)
-    >>> eom, const = rq.generate_eom(ham, gamma)
-    >>> print(eom)
-    >>> print(const.shape)
     (2, 2)
+    >>> eom, const = rq.sensor_utils.generate_eom(ham, gamma)
+    >>> print(eom)
     [[-0.1  2.   0. ]
      [-2.  -0.1  0. ]
      [ 0.   0.  -0.1]]
+    >>> print(const.shape)
     (3,)
 
     This also works with a "stack" of multiple hamiltonians:
@@ -100,18 +106,18 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
     >>> ham_full = np.array([ham_base for _ in range(10)])
     >>> gamma = np.array([[.1, 0],[.1,0]])
     >>> print(ham_full.shape)
-    >>> eom, const = rq.generate_eom(ham_full, gamma)
-    >>> print(eom.shape)
-    >>> print(const.shape)
     (10, 2, 2)
+    >>> eom, const = rq.sensor_utils.generate_eom(ham_full, gamma)
+    >>> print(eom.shape)
     (10, 3, 3)
+    >>> print(const.shape)
     (10, 3)
 
     """
     if not hamiltonian.shape[-2:] == gamma_matrix.shape[-2:]:
-        raise ValueError("hamiltonian and gamma matrix must have matching shape")
+        raise RydiquleError("hamiltonian and gamma matrix must have matching shape")
     if not hamiltonian.shape[-1] == hamiltonian.shape[-2]:
-        raise ValueError("hamiltonian and gamma matrix must be square")
+        raise RydiquleError("hamiltonian and gamma matrix must be square")
 
     basis_size = hamiltonian.shape[-1]
     basis = np.array([[[m,n] for m in range(basis_size)] for n in range(basis_size)])
@@ -128,7 +134,7 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
 
     # transform to real basis
     if real_eom:
-        obes, const = make_real(obes, const)
+        obes, const = make_real(obes, const, ground_removed=remove_ground_state)
 
     return obes, const
 
@@ -215,7 +221,7 @@ def remove_ground(equations: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     if equations.shape[-1] != math.isqrt(equations.shape[-1])**2:
         # full equations shape should be perfect square
-        raise ValueError("Ground state already removed")
+        raise RydiquleError("Ground state already removed")
 
     basis_size = int(np.sqrt(equations.shape[-1]))
     eqn_size = equations.shape[-1]
@@ -276,7 +282,7 @@ def make_real(equations: np.ndarray, constant: np.ndarray,
         basis_size = int(np.sqrt(equations.shape[-1]+1))
 
     else:
-        raise ValueError("unsupported equation shape")
+        raise RydiquleError("unsupported equation shape")
 
     u, u_inv = get_basis_transform(basis_size)  # unitary transformation matrix
 
@@ -309,7 +315,7 @@ def get_basis_transform(basis_size: int) -> Tuple[np.ndarray, np.ndarray]:
     ----------
     basis_size : int
         Size of the basis to generate transformations for.
-
+    
     Returns
     -------
     u : numpy.ndarray
@@ -319,7 +325,7 @@ def get_basis_transform(basis_size: int) -> Tuple[np.ndarray, np.ndarray]:
 
     Raises
     ------
-    ValueError
+    RydiquleError
         If `basis_size` does not match current basis.
 
     """
@@ -328,10 +334,10 @@ def get_basis_transform(basis_size: int) -> Tuple[np.ndarray, np.ndarray]:
         u_inv = U[1]
         basis = B[0]
         if basis != basis_size:
-            raise ValueError("new basis size")
+            raise RydiquleError("new basis size")
         return u, u_inv
 
-    except (KeyError, ValueError):
+    except (KeyError, RydiquleError):
         eqn_size = basis_size**2
         u = np.zeros((eqn_size, eqn_size), dtype=complex)
         u_inv = np.zeros((eqn_size, eqn_size), dtype=complex)
@@ -364,6 +370,204 @@ def get_basis_transform(basis_size: int) -> Tuple[np.ndarray, np.ndarray]:
         U[1] = u_inv
         B[0] = basis_size
         return u, u_inv
+
+
+def convert_to_full_dm(dm: np.ndarray) -> np.ndarray:
+    """
+    Converts density matrices from rydiqule's computational basis (real, with state 0 removed)
+    to the full, real basis (ie with state 0 population inserted).
+
+    Solutions computed using one of rydiqule's built in solvers will always output solutions in the 
+    real computational basis which is intended as the input for this function.
+
+    Parameters
+    ----------
+    dm: numpy.ndarray
+        Density matrices in rydiqule's computational basis (real, with state 0 removed).
+        Has shape `(..., b**2-1)` where `b` is the number of states in the basis.
+
+    Returns
+    -------
+    numpy.ndarray
+        Density matrices in the real basis with state 0 present.
+        Will have shape `(..., b**2)`.
+
+    Raises
+    ------
+    RydiquleError
+        If final dimension is of invalid size
+        (i.e. does not correspond to b**2-1, where b is an integer)
+
+    Examples
+    --------
+    >>> [g, e] = rq.D2_states('Rb85')
+    >>> c = rq.Cell('Rb85', [g, e], cell_length =  0.00001)
+    >>> c.add_coupling(states=(g, e), rabi_frequency=1, detuning=1)
+    >>> sols = rq.solve_steady_state(c)
+    >>> print(sols.rho)
+    [0.001371 0.02613  0.000686]
+    >>> print(rq.sensor_utils.convert_to_full_dm(sols.rho))
+    [9.993144e-01 1.371165e-03 2.612972e-02 6.855828e-04]
+
+    """
+    b, r = divmod(math.sqrt(dm.shape[-1]+1), 1.0)
+    if r != 0.0:
+        raise RydiquleError('Computational basis size incorrect. '
+                            'Final dimension must correspond to b**2 - 1, '
+                            'where b is an integer.')
+    b = int(b)
+
+    nonzero_state_pops = dm[..., b::b+1]
+    zero_state_pops = 1.0 - nonzero_state_pops.sum(axis=-1)
+    
+    full_dm = np.concatenate((zero_state_pops[...,np.newaxis], dm), axis=-1)
+
+    return full_dm
+
+
+def convert_dm_to_complex(dm: np.ndarray) -> np.ndarray:
+    """
+    Converts density matrices from rydiqule's computational basis (real, with state 0 removed)
+    to a standard complex basis with all states present.
+
+    Solutions computed using one of rydiqule's built in solvers will always output solutions in the 
+    real, 1-dimensional computational basis which is intended as the input for this function.
+    Note that while a full complex density matrix can be useful to view solutions, performing
+    calculations with the full complex density matrix can often add considerable unwanted rounding
+    errors.
+
+    Parameters
+    ----------
+    dm: numpy.ndarray
+        Density matrices in rydiqule's computational basis (real, with state 0 removed).
+        Has shape `(..., b**2-1)` where `b` is the number of states in the basis.
+
+    Returns
+    -------
+    numpy.ndarray
+        Density matrices in the complex basis with state 0 present.
+        Will have shape `(..., b, b)`.
+
+    Raises
+    ------
+    RydiquleError
+        If final dimension is of invalid size
+        (i.e. does not correspond to b**2-1, where b is an integer)
+
+    Examples
+    --------
+    >>> [g, e] = rq.D2_states('Rb85')
+    >>> c = rq.Cell('Rb85', [g, e], cell_length =  0.00001)
+    >>> c.add_coupling(states=(g, e), rabi_frequency=1, detuning=1)
+    >>> sols = rq.solve_steady_state(c)
+    >>> print(sols.rho)
+    [0.001371 0.02613  0.000686]
+    >>> print(rq.sensor_utils.convert_dm_to_complex(sols.rho))
+    [[9.993144e-01+0.j      1.371166e-03+0.02613j]
+     [1.371166e-03-0.02613j 6.855828e-04+0.j     ]]
+
+    """
+    b, r = divmod(math.sqrt(dm.shape[-1]+1), 1.0)
+    if r != 0.0:
+        raise RydiquleError('Computational basis size incorrect. '
+                            'Final dimension must correspond to b**2 - 1, '
+                            'where b is an integer.')
+    b = int(b)
+    
+    _, u_inv = get_basis_transform(b)
+    
+    full_dm = convert_to_full_dm(dm)
+    
+    stack_shape = full_dm.shape[:-1]
+
+    complex_dm = np.einsum('ij,...j', u_inv, full_dm).reshape((*stack_shape, b, b))
+
+    return complex_dm
+
+
+def convert_complex_to_dm(complex_dm: np.ndarray) -> np.ndarray:
+    """
+    Converts a standard density matrices in the complex basis with ground state
+    into rydiqule's computational real basis with ground state removed.
+
+    `rydiqule`'s built-in functions do not return complex density matrices, so this function is used
+     internally and to undo the conversion of :func:`~.sensor_utils.convert_dm_to_complex`. 
+
+    Parameters
+    ----------
+    complex_dm: numpy.ndarray
+        Stack of density matrices in the complex basis with ground state present.
+        Has shape of `(..., b, b)` where `b` is the number of states in the basis.
+
+    Returns
+    -------
+    numpy.ndarray
+        Density matrices in rydiqule's computational basis (real with state 0 removed).
+        Has shape `(..., b**2-1)`.
+
+    Raises
+    ------
+    RydiquleError
+        If the provided density matrices are not square.
+    RydiquleError
+        If the converted matrix is not real (implies non-hermitian)
+    """
+    
+    shape = complex_dm.shape[-2:]
+    stack_shape = complex_dm.shape[:-2]
+    if not shape[0] == shape[1]:
+        raise RydiquleError('Input density matrices must be square')
+    b = shape[0]
+    
+    u, _ = get_basis_transform(b)
+    
+    flat_ground_removed = complex_dm.reshape(stack_shape + (b**2,))[...,1:]
+    
+    dm = np.einsum('ij,...j', u[1:,1:], flat_ground_removed)
+    
+    real_dm = np.real_if_close(dm)
+
+    if np.iscomplexobj(real_dm):
+        raise RydiquleError('Converted matrix is not real, likely unphysical')
+    
+    return dm
+
+
+def check_positive_semi_definite(dm: np.ndarray):
+    """
+    Checks if the provided matrices is a physical density matrix.
+
+    This is done by confirming each matrix of the stack is positive semi-definite.
+
+    Parameters
+    ----------
+    dm: numpy.ndarray
+        Stack of density matrices in rydiqule's computational basis
+        (i.e. real with ground state removed).
+        Expected shape is `(..., N)` where `N = basis_size**2-1`.
+
+    Raises
+    ------
+    RydiquleError
+        If at least one density matrix of the stack is not positive semi-definite.
+    """
+    
+    complex_dm = convert_dm_to_complex(dm)
+    
+    # calculate eigenvalues, attempt to convert to real if no complex parts
+    eigs = np.real_if_close(np.linalg.eigvals(complex_dm))
+    # use same tolerance as np.real_if_close to determine if zero
+    tol = np.finfo(eigs.dtype).eps * 100 
+    try:
+        if np.iscomplexobj(eigs):
+            raise RydiquleError('Eigenvalues are not real')
+        if not np.all(np.isclose(eigs.sum(axis=-1), 1.0)):
+            raise RydiquleError('Eigenvalues do not sum to 1.0')
+        if not np.all(eigs >= -tol):
+            raise RydiquleError('Eigenvalues are not all >= 0.0')
+    except RydiquleError as err:
+        raise RydiquleError('At least one density matrix is not positive semi-definite. '
+                            'This is unphysical.') from err
 
 
 def _get_rho(n: int) -> np.ndarray:
@@ -426,11 +630,11 @@ def get_rho_ij(sols: Union[np.ndarray, Solution],
     --------
     >>> sols = np.arange(180).reshape((4,5,3,3))
     >>> print(sols.shape)
+    (4, 5, 3, 3)
     >>> rho_01 = rq.get_rho_ij(sols, 0,1)
     >>> print(rho_01.shape)
-    >>> print(rho_01[0,0])
-    (4, 5, 3, 3)
     (4, 5, 3)
+    >>> print(rho_01[0,0])
     [0.-1.j 3.-4.j 6.-7.j]
 
     """
@@ -541,58 +745,90 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
         Diagram handle
 
     """
-    from .cell import Cell
     rq_g = sensor.couplings.copy()
+    sensor_states = sensor.states
 
-    # level settings
+    ### level settings
     # use rotating frames to send levels up or down relative to others
     frames = sensor.get_rotating_frames()
     # get flattend dictionary of all state paths
     # also calculates energy based on sum of frame signs in path
-    energies = {k: np.sum(np.sign(v)[1:]) # ignore first state so all subgraphs start at 0
-                for d in list(frames.values()) # get list of subgraph path dicts
-                for k, v in d.items()}
+    energies = {}
+    for d in list(frames.values()):
+        for k, v in d.items():
+            energies[k] = energies[k] = sum([i for (_,i) in v[1:]])
+    
     for lev, vals in rq_g.nodes.items():
         ld_kw = vals.get('ld_kw', {})
-        ld_kw['energy'] = energies[lev]
-        
-        if isinstance(sensor, Cell):
-            ld_kw['left_text'] = vals['qnums']
+        ld_kw['energy'] = energies.get(lev, 0.0)
         
         rq_g.nodes[lev]['ld_kw'] = ld_kw
 
-    # coupling settings
-    for edge, vals in rq_g.edges.items():
-        ld_kw = vals.get('ld_kw', {})
-        if 'dipole_moment' in vals:
-            ld_kw['linestyle'] = 'dashed'
-        elif 'rabi_frequency' in vals:
-            if not np.all(vals.get('rabi_frequency')):
-                ld_kw['hidden'] = True
-
-        rq_g.edges[edge]['ld_kw'] = ld_kw
-
-    # decoherence settings
-
-    # get decoherence normalizations
+    ### get decoherence normalizations
     gamma_matrix = sensor.decoherence_matrix()
     # we get the biggest possible decoherence value for each term
     # by doing a max reduction along stack axes
     stack_axes = tuple(np.arange(0, gamma_matrix.ndim-2))
     gamma_matrix = gamma_matrix.max(axis=stack_axes)
-
-    if include_dephasing and gamma_matrix.any():
+    # get overall max/min
+    if not np.any(gamma_matrix):
+        # no dephasings defined, ignore
+        max_dephase = 1.0
+        min_dephase = 0.1
+    else:
         max_dephase = gamma_matrix.max()
         min_dephase = gamma_matrix[gamma_matrix != 0.0].min()
         if np.isclose(min_dephase, max_dephase):
             # all non-zero dephasings are the same, prevent /0 error in normalization
             min_dephase = max_dephase*1e-1
 
+    ### get rabi normalizations
+    hamiltonian = sensor.get_hamiltonian() + sensor.get_time_hamiltonian(0)
+    # get biggest element along each stack
+    hamiltonian = np.abs(hamiltonian).max(axis=stack_axes)
+    # set diagonals to zero
+    np.einsum('...ii->...i', hamiltonian)[:] = 0
+    # get overall max/min
+    max_rabi = 2*hamiltonian.max()
+    min_rabi = np.min(2*hamiltonian[hamiltonian != 0.0])
+    if np.isclose(max_rabi, 0.0):
+        raise RydiquleError('No non-zero couplings! Cannot draw diagram')
+    if np.isclose(max_rabi, min_rabi):
+        min_rabi = max_rabi*1e-1
+
+    ### coupling settings
+    max_lw = 3.0
+    norm_lw = 1.0
+    min_lw = 0.3
+    for edge, vals in rq_g.edges.items():
+        ld_kw = vals.get('ld_kw', {})
+        if 'phase' in vals:
+            # only add ld_kw here if coherent coupling
+            if 'time_dependence' in vals:
+                t_factor = vals.get('time_dependence')(0.0)
+                ld_kw['linestyle'] = 'dashed'
+            else:
+                t_factor = 1.0
+            c_rabi_max = np.max(np.abs(vals.get('rabi_frequency'))) * t_factor
+            if np.isclose(c_rabi_max, 0.0):
+                ld_kw['hidden'] = True
+            else:
+                # set lw based on rabi/max_dephasing
+                ld_kw['lw'] = (max_lw - min_lw)/(max_rabi - min_rabi)*(
+                    c_rabi_max/max_dephase - 1
+                ) + norm_lw
+
+            rq_g.edges[edge]['ld_kw'] = ld_kw
+
+    ### decoherence settings
+    if include_dephasing and gamma_matrix.any():
         # reversing order of traverse to prevent transit overlaps
         idxs = np.argwhere(gamma_matrix != 0.0)[::-1,:]
         for idx in idxs:
-
-            ld_kw = rq_g.edges[tuple(idx)].get('ld_kw', {})
+            
+            states = (sensor_states[idx[0]], sensor_states[idx[1]])
+            
+            ld_kw = rq_g.edges[states].get('ld_kw', {})
 
             ld_kw['wavy'] = True
             ld_kw['deflect'] = True
@@ -608,44 +844,196 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
                                 )/np.log10(min_dephase/max_dephase))
             ld_kw['alpha'] = alph
 
-            rq_g.edges[tuple(idx)]['ld_kw'] = ld_kw
+            rq_g.edges[states]['ld_kw'] = ld_kw
 
-    # create diagram handle
+    else:
+        # remove edges that have only dephasings on them
+        edges_to_remove = [(i,j)for i,j,k in rq_g.edges(data=True)
+                            if 'phase' not in k ]
+        rq_g.remove_edges_from(edges_to_remove)
+
+    ### create diagram handle and draw
     ld = LD(rq_g, use_ld_kw=True)
     ld.draw()
 
     return ld
 
 
-def _get_collapse_str(len: int, *matched_dims) -> str:
+def match_states(statespec: StateSpec, compare_list: List[State]) -> List[State]:
+    """Return all states in a list matching the pattern described by a given specification.
+
+    A `StateSpec` is described by a tuple containing floats or strings, or lists of floats or
+    strings. A state `s` in `compare_list` is considered a match to `statespec` if `s` and 
+    `statespec` are the same length and for each element in `statespec`, :
+
+        1. The corresponding element in `s` is equal to the element in `statespec` (in the case of a
+            single value)
+        2. The element is `s` is an element of the list which is an element of `statespec` (in the
+            case of a list element of `statespec`).
+        3. The element of `statespec` is the string `"all"`
+
+    Parameters
+    ----------
+    statespec : StateSpec
+        The state specification against which to compare elements of the list.
+    compare_list : List[State]
+        The list of individual states to compare.
+
+    Returns
+    -------
+    list of State
+        Sublist of `compare_list` containing all elements of `compare_list` matching `statespec`. 
+
+    Examples
+    --------
+    While primarily intended for internal use, `match_states` can be accessed directly through
+    `sensor_utils`.
+
+    >>> compare_states = [(0,0),
+    ...       (1,0),(1,1),
+    ...       (2,0),(2,1),(2,2)
+    ...      ]
+    >>> spec = (2,[0,1,2])
+    >>> print(rq.sensor_utils.match_states(spec, compare_states))
+    [(2, 0), (2, 1), (2, 2)]
+    >>> wildcard_spec = (2,"all")
+    >>> print(rq.sensor_utils.match_states(wildcard_spec, compare_states))
+    [(2, 0), (2, 1), (2, 2)]
+    
     """
-    Internal helper function to build the string argument of `numpy.einsum`
-    when dimensions are collapsed.
+    #handle the case where the state_spec is not a tuple but a list of single values
+    #case 1. statesepc is a lis of integers
+    if isinstance(statespec, list):
+        return [state for state in statespec if state in compare_list]
+    
+    #case 2. state is a single int
+    elif not isinstance(statespec, tuple):
+        #should only ever return a 1 or 0 element list
+        return [state 
+                for state in compare_list
+                if state==statespec]
 
-    Creates a string of the appropriate number of ascii characters
-    (the first n for an n-dimensional stack).
-    Then swaps in new characters in the appropriate place to produce a string that can be passed
-    to `numpy`'s `einsum` function.
+    #case 3. the test statespec is in the compare_list directly. guarantee only 1 match
+    elif statespec in compare_list:
+        return [statespec]
+    
+    #case 4. everything else, need to check patterns 
+    else:
+        #shave down list to only tuples with length matching statespec-
+        #anything else cant match and will be a problem later
+        compare_list_tuple = [s for s in compare_list if isinstance(s, tuple) and len(s)==len(statespec)]
+        
+        #not strictly necessary, but casting all elements being list makes comparison easy with "in"
+        spec_qnums_as_list = [[qn] if not isinstance(qn, (list,str)) else qn for qn in statespec]
+
+        matching_states = []
+        for state in compare_list_tuple:
+            
+            qnum_match = [qn1=="all" or qn_compare in qn1
+                        for qn1, qn_compare in zip(spec_qnums_as_list, state)]
+            if all(qnum_match):
+                matching_states.append(state) #should be safe since tuples are immutable
+
+        return matching_states
+
+
+def expand_statespec(statespec: StateSpec) -> List[State]:
+    """    Returns a list of all possible `states` corresponding to a given `statespec`.
+
+    A `state` in `rydiqule` is defined by either a floating point or string value, or a tuple
+    of such values. A `StateSpec` can replace any float or string value with a list of such
+    values. The `expand_statespec` function's purpose is to convert a single `statespec` in which
+    some number of elements are defined as lists into a list of all the states which correspond to 
+    the state.
+
+    If the provided spec is only a single state, a 1-element list containing that state is returned.
+
+    Parameters
+    ----------
+    statespec : StateSpec
+        State specification with either zero or one element defined as a list. 
+
+    Returns
+    -------
+    list of State
+        List of all states matching the provided statespec
+
+    Raises
+    ------
+    RydiquleError
+        If the provided `statespec` is not a valid state specification.
+
+    Notes
+    -----
+    ..note:
+        This function will preserve the state type for namedtuple statespecs. So for example,
+        passing an :class:`~.atom_utils.A_QState` for example will return a list of states of the
+        same type.
+
+    Examples
+    --------
+    >>> ground = (0,0)
+    >>> excited = (1, [0,1])
+    >>> print(rq.expand_statespec(ground))
+    [(0, 0)]
+    >>> print(rq.expand_statespec(excited))
+    [(1, 0), (1, 1)]
+
+    This function has utility in allowing otherwise cubersome state definitions to be
+    defined with variables in :class:`sensor.Sensor` functions. 
+
+    >>> g = (0,0)
+    >>> e = (1, [-1,0,1])
+    >>> [em1, e0, ep1] = rq.expand_statespec(e)
+    >>> s = rq.Sensor([g,e])
+    >>> cc = {(g,em1): 0.25,
+    ...       (g,e0): 0.5,
+    ...       (g,ep1): 0.25}
+    >>> s.add_coupling((g,e), detuning=1, rabi_frequency=2, coupling_coefficients=cc, label="probe")
+    >>> print(s.get_hamiltonian())
+    [[ 0.  +0.j  0.25+0.j  0.5 +0.j  0.25+0.j]
+     [ 0.25-0.j -1.  +0.j  0.  +0.j  0.  +0.j]
+     [ 0.5 -0.j  0.  +0.j -1.  +0.j  0.  +0.j]
+     [ 0.25-0.j  0.  +0.j  0.  +0.j -1.  +0.j]]
+        
     """
-    # left-hand side and right-hand side of equation in einstein summation convention
-    idxs_rhs = string.ascii_lowercase[:len]
-    idxs_lhs = string.ascii_lowercase[:len]
+    ## resolve more trivial cases of single states
+    if isinstance(statespec, (int, str)):
+        return [statespec]
+    # transparent to lists
+    elif isinstance(statespec, list):
+        return statespec
+    #make sure its not a dumb type
+    elif not isinstance(statespec, tuple):
+        raise RydiquleError(f"{statespec} is not a valid state specification.")
+    
+    statespec_type = type(statespec)
 
-    for i, dims in enumerate(matched_dims):
-        new_idx = string.ascii_lowercase[-(i+1)]
+    spec_qnums_as_list = [[qn] if not isinstance(qn, (list)) else qn for qn in statespec]
+    states_list = [state for state in product(*spec_qnums_as_list)]
 
-        for d in dims:
-            old_idx = idxs_rhs[d]
-            idxs_rhs = idxs_rhs.replace(old_idx, new_idx)
-            idxs_lhs = idxs_lhs.replace(old_idx, "")
-
-        idxs_lhs += new_idx
-
-    full_expression = idxs_rhs + "...->" + idxs_lhs + "..."
-    return full_expression
+    if hasattr(statespec, "_make"):
+        return [statespec_type._make(state) for state in states_list]
+    else:
+        return states_list   
 
 
-def _validate_sols(sols):
+def state_tuple_to_str(states:States) -> str:
+    """Helper function to create a more terse string representation of a tuple of state tuples.
+
+    The default python behavior for a str representation of tuples is to use `__repr__` for
+    individual elements. We want to use `str`, since the output is pointlessly long otherwise.
+    `A_QState.__repr__()` is longer than `A_QState.__str__()`
+
+    Parameters
+    ----------
+    states : tuple of states
+        States for which to produce a string representation.
+    """
+    return "(" + ",".join([str(s) for s in states]) + ")"
+
+
+def _validate_sols(sols) -> np.ndarray:
     """Helper function to validate that solutions are of an appropriate type.
     There are 3 outcomes:
     
@@ -663,7 +1051,7 @@ def _validate_sols(sols):
         
     Raises
     ------
-    ValueError:
+    RydiquleError:
         If `sols` is not an array or object with a `rho` attribute that is an array.
     """
     if hasattr(sols, "rho"):
@@ -672,48 +1060,33 @@ def _validate_sols(sols):
         rho = sols
         
     if not isinstance(rho, np.ndarray):
-        raise TypeError(
+        raise RydiquleError(
             "sols must be a numpy array or have an attribute \"rho\" which is a numpy array.")
     
     return rho
+
+
+def _squeeze_dims(couplings:nx.Graph):
+    """Squeezes all array parameters on the graph into 1-dimensional arrays.
+
+    Modifies the parameters in-place rather than returning a modified object.
+    If provided as a sensor, will modify the `couplings` graph of the sensor.
+
+    Parameters
+    ----------
+    sensor : nx.DiGraph or Sensor
+        The sensor or graph for which the parameters will be squeeze.
+
+    Raises
+    ------
+    TypeError
+        If `sensor` is not a graph or :class:`~.Sensor`.
+    """
+    for states in couplings.edges:
+        for param in couplings.edges[states]:
+            if isinstance(couplings.edges[states][param], np.ndarray):
+                new_shape = [dim for dim in couplings.edges[states][param].shape if dim != 1]
+                couplings.edges[states][param].shape = new_shape
     
 
-def _combine_parameter_labels(*labels: str) -> str:
-    """
-    Combine 2 or more parameter label strings into a single label.
-
-    Labels are grouped by parameter type (detuning, rabi_freq, etc),
-    separated by a |
-
-    """
-
-    return "|".join(labels)
-
-
-    ## LEAVING IN CASE WE WANT TO USE THIS
-
-    # new_label = []
-
-    # couplings = []
-    # params = []
-
-    # #get lists of all the coupling labels and param types
-    # for label in labels:
-    #     coupling, param = label.split("_", 1)
-    #     couplings.append(coupling)
-    #     params.append(param)
-
-    # #build the full label from the lists
-    # #under this convention, couplings will be grouped in the label
-    # #by parameter type, with parameter types separated by a pipe
-    # for p_base in params: #loop over parameter types, skipping those that have already been done
-    #     if (p_base + "|") in new_label:
-    #         continue
-
-    #     for c, p_test in zip(couplings, params): #for each parameter type, get all labels
-    #         if p_test == p_base:
-    #             new_label.append(c + "_")
-    #     new_label.append(p_base + "|") #add a pipe to separate parameter types
-
-    # #turn the full label array into a string, get rid of pipe on the end
-    # return "".join(new_label)[:-1]
+        

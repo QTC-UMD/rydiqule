@@ -7,7 +7,7 @@ Equations of Motion Generation
 ------------------------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
     
     eom_notes
 
@@ -15,7 +15,7 @@ Stacking Conventions
 ------------------------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
     
     stacking_conventions
 
@@ -23,7 +23,7 @@ Observables
 -----------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     observables
 
@@ -31,7 +31,7 @@ Doppler Averaging
 -----------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     doppler
 
@@ -39,6 +39,15 @@ Time-Dependence
 ---------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     time_dependence
+
+Solving with Atomic Structure
+-----------------------------
+
+.. toctree::
+    :maxdepth: 3
+
+    nlj
+    sublevels

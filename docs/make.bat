@@ -9,8 +9,10 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=source
 set BUILDDIR=build
+set AUTOSUMMARYDIR=source\api\_autosummary
 
 if "%1" == "" goto help
+if "%1" == "clean" goto clean
 
 %SPHINXBUILD% >NUL 2>NUL
 if errorlevel 9009 (
@@ -30,6 +32,12 @@ goto end
 
 :help
 %SPHINXBUILD% -M help %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
+goto end
+
+:clean
+echo Removing autosummary directory
+rmdir /s/q %AUTOSUMMARYDIR%
+%SPHINXBUILD% -M clean %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 
 :end
 popd

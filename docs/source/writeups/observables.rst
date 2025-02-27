@@ -1,5 +1,5 @@
-Introduction
-============
+Observables
+===========
 
 Rydiqule can be used to calculate physical outcomes of experiments.
 These functions get placed into two categories, **Experiments** and **Observables**.
@@ -11,7 +11,7 @@ Experiments are quantities that require more information.
 At the time of writing, the only example is the :func:`~.get_snr` function.
 
 Observable Derivation
-=====================
+---------------------
 
 Most of the Observables are derived from the optical/electrical susceptibility.
 Susceptibility is given by the optical polarizability :math:`P^+`,
@@ -30,7 +30,7 @@ The factor of two arises from the rotating wave approximation,
 such that :math:`P^+` represents the atomic polarizability in the rotating frame.
 
 Observable Validation
-=====================
+---------------------
 
 Rydiqule calculates the susceptibility using equivalent equations,
 but written in terms of atomic constants :math:`\kappa` and :math:`\eta` (see [2] for definitions).

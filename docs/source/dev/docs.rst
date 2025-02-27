@@ -1,8 +1,13 @@
 Building the Documentation
 ==========================
 
-The Rydiqule documentation can be built locally from the source repository using `sphinx`.
-To do so, you will need to install the `sphinx` and `sphinx-rtd-theme` packages.
+This section describes how to build the documentation locally.
+A web-hosted copy of the docs is avialable at `https://rydiqule.readthedocs.io/en/latest/ <https://rydiqule.readthedocs.io/en/latest/>`_
+and should generally be used.
+These instructions are provided for local testing and development purposes.
+
+The Rydiqule documentation is built locally from the source repository using `sphinx`.
+To do so, you will need to install the `docs` optional dependencies.
 
 html
 ----
@@ -34,9 +39,28 @@ or via the MikTeX package `gnu-freefont`.
 This build also requires a great many other latex packages in addition to `latexmk`.
 It is easiest to install these packages on the fly as needed, if your latex distribution supports that.
 
-Given the difficulty of building this type of documentation, 
-we attempt to include an updated pdf with each relase.
-It is locaed in the `docs\build\latex` directory.
+Given the difficulty of building this type of documentation locally, 
+a copy can be downloaded from the `documentation website. <https://rydiqule.readthedocs.io/_/downloads/en/latest/pdf/>`_
+
+latex
+-----
+
+It is also possible to build the pdf docs in stages, allowing for more control of the process.
+This is also how the docs are built on readthedocs, allowing for more accurate reproduction of results there.
+
+First, build the latex for the docs pdf.
+
+.. code-block:: shell
+
+  make latex
+
+Then change directory to the `docs/build/latex` directory and run the following `latexmk` command.
+
+.. code-block:: shell
+
+  latexmk -r latexmkrc -pdf -f -dvi- -ps- -jobname=rydiqule -interaction=nonstopmode
+
+This workflow largely recreates the `latexpdf` workflow, but invokes options that ensure errors do not stop the build.
 
 epub
 ----
@@ -46,3 +70,5 @@ There is also the ability to build the documentation in the EPUB format, if desi
 .. code-block:: shell
 
   make epub
+
+This version of the documentation is also available for download on `ReadTheDocs <https://rydiqule.readthedocs.io/_/downloads/en/latest/epub/>`_.

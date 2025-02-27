@@ -3,7 +3,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from typing import Sequence, Callable, Literal
-from rydiqule.sensor_utils import TimeFunc
+from ..sensor_utils import TimeFunc
+from ..exceptions import RydiquleError
 
 def scipy_solve(eoms_base: np.ndarray, const: np.ndarray,
                 eom_time_r: np.ndarray, const_r: np.ndarray,
@@ -84,8 +85,8 @@ def scipy_solve(eoms_base: np.ndarray, const: np.ndarray,
                                    eom_time_r, const_r,
                                    eom_time_i, const_i,
                                    time_inputs)
-    except KeyError:
-        raise ValueError("\'eqns\' must be one of \'loop\' or \'comp\'.")
+    except KeyError as err:
+        raise RydiquleError("\'eqns\' must be one of \'loop\' or \'comp\'.") from err
     
     init_cond = init_cond.ravel()
 

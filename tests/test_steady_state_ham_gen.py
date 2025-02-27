@@ -4,6 +4,8 @@ from rydiqule import Sensor
 from rydiqule import Cell
 from rydiqule import D2_states
 
+from rydiqule.atom_utils import A_QState
+
 
 @pytest.mark.steady_state
 def test_ladder_5_level():
@@ -85,16 +87,18 @@ def test_v_5_level():
 @pytest.mark.steady_state
 def test_v_5_cell():
 
-    f1 = {'states':(0,1), 'rabi_frequency':0, 'detuning':1}
-    f2 = {'states':(1,2), 'rabi_frequency':0, 'detuning':2}
-    f3 = {'states':(2,3), 'rabi_frequency':0, 'detuning':4}
-    f4 = {'states':(2,4), 'rabi_frequency':0, 'detuning':8}
+    [g, e] = D2_states(5)  
 
-    state1 = [10, 2, 2.5, 0.5]
-    state2 = [11, 3, 3.5, 0.5]
-    state3 = [9, 3, 3.5, 0.5]
+    state1 = A_QState(10, 2, 2.5)
+    state2 = A_QState(11, 3, 3.5)
+    state3 = A_QState(9, 3, 3.5)
 
-    RbSensor_ss = Cell('Rb85', *D2_states(5), state1, state2, state3, cell_length = 0.00001)
+    f1 = {'states':(g,e), 'rabi_frequency':0, 'detuning':1}
+    f2 = {'states':(e,state1), 'rabi_frequency':0, 'detuning':2}
+    f3 = {'states':(state1,state2), 'rabi_frequency':0, 'detuning':4}
+    f4 = {'states':(state1,state3), 'rabi_frequency':0, 'detuning':8}
+
+    RbSensor_ss = Cell('Rb85', [g, e, state1, state2, state3], cell_length = 0.00001)
 
     RbSensor_ss.add_couplings(f1, f2, f3, f4)
 
@@ -106,14 +110,13 @@ def test_v_5_cell():
   
 @pytest.mark.steady_state
 def test_e_shift():
-    f1 = {'states':('g',1), 'rabi_frequency':0, 'detuning':1}
-    f2 = {'states':(1,2), 'rabi_frequency':0, 'detuning':2}
-    
-    s = Sensor(['g', 1, 2])
+    f1 = {'states':('g','e1'), 'rabi_frequency':0, 'detuning':1}
+    f2 = {'states':('e1','e2'), 'rabi_frequency':0, 'detuning':2}
+
+    s = Sensor(['g', "e1", "e2"])
     s.add_couplings(f1, f2)
     s.add_energy_shift('g', .5)
-    s.add_energy_shift(1, 1)
-    s.add_energy_shift(2, 1.5)
+    s.add_energy_shift(['e1', 'e2'], 0.5, prefactors={"e1":2, "e2":3})
 
     expected_ham = np.diag([0, -1, -1-2]) + np.diag([.5, 1, 1.5])
     ham = s.get_hamiltonian()

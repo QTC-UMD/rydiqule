@@ -12,7 +12,8 @@ from pathlib import Path
 from importlib.metadata import version
 
 
-def about(obscure_paths: bool = True):
+def about(obscure_paths: bool = True,
+          show_numpy_config: bool = False):
     """About box describing Rydiqule and its core dependencies.
 
     Prints human readable strings of information about the system.
@@ -22,27 +23,28 @@ def about(obscure_paths: bool = True):
 
     obscure_paths: bool, optional
         Remove user directory from printed paths. Default is True.
+    show_numpy_config: bool, optional
+        Show the numpy config for BLAS/LAPACK backends. Default is False.
 
     Examples
     --------
-    >>> import rydiqule as rq
-    >>> rq.about()
+    >>> rq.about() # doctest: +SKIP
     <BLANKLINE>
             Rydiqule
         ================
     <BLANKLINE>
-    Rydiqule Version:     0.4.0
-    Installation Path:    C:\\~\\rydiqule\\src\\rydiqule
+    Rydiqule Version:     1.2.0
+    Installation Path:    ~\\rydiqule\\src\\rydiqule
     <BLANKLINE>
         Dependencies
         ================
     <BLANKLINE>
-    NumPy Version:        1.21.5
-    SciPy Version:        1.7.3
-    Matplotlib Version:   3.5.2
-    ARC Version:          3.2.1
-    Python Version:       3.9.12
-    Python Install Path:  C:\\~\\miniconda3\\envs\\arc
+    NumPy Version:        1.24.3
+    SciPy Version:        1.11.3
+    Matplotlib Version:   3.8.0
+    ARC Version:          3.4.0
+    Python Version:       3.9.18
+    Python Install Path:  ~\\miniconda3\\envs\\arc
     Platform Info:        Windows (AMD64)
     CPU Count:            16
     Total System Memory:  256 GB
@@ -53,13 +55,19 @@ def about(obscure_paths: bool = True):
     assert install_path is not None
     rydiqule_install_path = Path(install_path).parent
     try:
-        ryd_path = '~' / rydiqule_install_path.relative_to(home)
+        if obscure_paths:
+            ryd_path = '~' / rydiqule_install_path.relative_to(home)
+        else:
+            ryd_path = rydiqule_install_path
     except ValueError:
         ryd_path = rydiqule_install_path
 
     python_install_path = Path(sys.executable).parent
     try:
-        py_path = '~' / python_install_path.relative_to(home)
+        if obscure_paths:
+            py_path = '~' / python_install_path.relative_to(home)
+        else:
+            py_path = python_install_path
     except ValueError:
         py_path = python_install_path
 
@@ -83,8 +91,13 @@ def about(obscure_paths: bool = True):
     print(f'Python Version:       {platform.python_version():s}')
     print(f'Python Install Path:  {py_path}')
     print(f'Platform Info:        {platform.system():s} ({platform.machine():s})')
-    print(f'CPU Count:            {os.cpu_count()}')
+    print(f'CPU Count and Freq:   {os.cpu_count():d} @ {psutil.cpu_freq().current*1e-3:.2f} GHz')
     print(f'Total System Memory:  {psutil.virtual_memory().total/1024**3:.0f} GB')
+
+    if show_numpy_config:
+        print('\nNumPy BLAS/LAPACK configuration:\n')
+        import numpy
+        numpy.show_config()
 
 
 if __name__ == "__main__":

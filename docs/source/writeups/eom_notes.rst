@@ -1,5 +1,5 @@
-Introduction
-============
+Equations of Motion Generation
+==============================
 
 This document details a few notes about the theoretical operations
 taking place under the hood in the Rydiqule Modelling package. In
@@ -7,7 +7,7 @@ particular, we discuss the methods that Rydiqule uses to numerically
 solve differential equations for density matrices.
 
 Hamiltonian and Rotating Wave Approximation
-===========================================
+-------------------------------------------
 
 For a two level atom interacting with an electric field
 :math:`\textbf{E}`, the dipole interaction Hamiltonian is,
@@ -41,7 +41,7 @@ where :math:`\sigma^+ = \ket{g}\!\bra{e}` and
 :math:`\sigma^- = \ket{e}\!\bra{g}`
 
 Equations of Motion
-===================
+-------------------
 
 The Master equation is,
 
@@ -90,7 +90,7 @@ For example,
 For the programmatic code, we need knowledge of this relationship.
 
 Removing the Ground State
-=========================
+-------------------------
 
 The density vector (matrix) is physically constrained, so that the total
 population is one. This constraint is not included in the equations of
@@ -143,7 +143,7 @@ density matrix :math:`\rho_00` is replaced by the sum of all excited
 states.
 
 Making the Equations Real
-=========================
+-------------------------
 
 Numerically, converting to a real set of equations is important, because
 it prohibits the buildup of “imaginary populations” in quantum states.
