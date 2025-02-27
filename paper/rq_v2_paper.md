@@ -16,6 +16,11 @@ authors:
     orcid: 0000-0003-2452-2017
     equal-contrib: true
     affiliation: 1
+  - name: Omar Nagib
+    affiliation: 2
+  - name: Teemu Virtanen
+    orcid:
+    affiliation: 3
   - name: Kevin C. Cox
     orcid: 0000-0001-5049-3999
     affiliation: 1
@@ -23,8 +28,14 @@ affiliations:
   - index: 1
     name: DEVCOM Army Research Laboratory, 2800 Powder Mill Rd, Adelphi, MD, 20783, USA
     ror: 011hc8f90
+  - index: 2
+    name: Department of Physics, University of Wisconsin-Madison, 1150 University Avenue, Madison, WI, 53706, USA
+    ror: 01y2jtd41
+  - index: 3
+    name: Naval Air Warfare Center, 1 Administration Circle, China Lake, CA, 93555, USA
+    ror: 01f0pxq13
 
-date: 17 December 2024
+date: 27 February 2025
 bibliography: paper.bib
 aas-doi: 
 aas-journal:
@@ -54,7 +65,7 @@ allowing for efficient parameterization and computation of large sets of equatio
 All together, RydIQule provides a flexible platform for forward modeling Rydberg sensors while also providing a widely useful set of theoretical tools for fundamental exploration of atomic physics concepts.
 
 The initial public release of RydIQule in late 2023 built the core functionality described above [@miller_rydiqule_2024].
-Here we outline RyIQule's version 2 release which significantly expands on its capability to more accurately model real-world atoms.
+Here we outline RyIQule's version 2 release which expands on its capability to more accurately model real-world atoms.
 
 # Statement of Need
 
@@ -72,11 +83,11 @@ In RydIQule's initial release, users would have no choice but to individually ad
 For this reason, RydiQule was not easily scaled to realistic scenarios involving several atomic states and typically many tens, or possibly even hundreds, of sublevels.
 
 The main advance of RydIQule version 2 is to allow user-friendly inclusion of large atomic manifolds that include the complete set of electronic and magnetic sublevels.
-
-The main advance of RydIQle version 2 is to allow the inclusion of large atomic manifolds with little additional code beyond what was required to solve few-level systems in version 1. 
 In particular, this release introduces a new paradigm for structured labeling of states using arbitrary tuples,
 and expands the automated calculation of relevant atomic properties on alkali atoms commonly used in Rydberg physics
 to include sublevels.
+This release also includes a new steady-state Doppler-averaging method that improves speed and accuracy,
+along with many other optimizations and improvements to the code-base.
 
 ## Handling Sublevel Structure
 
@@ -104,6 +115,15 @@ In particular, there is automatic calculation of coupling strengths between mani
 This feature allows for more efficient modeling of Rydberg atoms since low energy and high energy states can be defined in their natural bases,
 fine and hyperfine respectively, lowering the total number of sublevels that need to be calculated.
 
+## Analytic Doppler Averaging
+
+Experimental support for Doppler-averaged models using an exact analytic solution has been added.
+This functionality is based on the theoretical work presented in [@nagib_exact_2025].
+That work derived a method for solving the Linblad master equation in the eigenbasis of the system,
+which allows for a separation of the Doppler-averaging integration from system diagonalization enabling a general, analytic result.
+Replacing RydIQule's approximate numeric integration with this exact method results in faster and significantly higher accuracy solutions.
+At present, only 1-dimensional Doppler averages are supported, with extensions to higher dimensions planned for the next minor release.
+
 # Related Packages and Work
 
 Modeling quantum systems using the semi-classical Lindblad formalism is a common task that has been implemented by many physicists for their bespoke problems.
@@ -112,10 +132,10 @@ Ultimately, the goal of RydIQule has not been to develop a new modeling techniqu
 but rather to make a common, flexible, and most importantly efficient tool that solves a ubiquitous problem.
 
 RydIQule's version 2 release aims to capture the functionality of the Atomic Density Matrix (ADM) package [@rochester_atomicdensitymatrix_2008] written in Mathematica.
-While very capable, it suffers from a couple of limitations.
-Firstly, it is built on a proprietary platform requiring a paid license which limits its accessibility.
-Second, since Mathematica is an interpreted language,
-it lacks the speed that complied libraries like NumPy enable, especially when exploring a large parameter space.
+While very capable,
+it is built on a proprietary platform requiring a paid license which limits its accessibility.
+And since Mathematica is an interpreted language,
+it can lack the speed that complied libraries like NumPy enable, especially when exploring a large parameter space.
 
 Since RydIQule version 1 has been publically released,
 it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024]
