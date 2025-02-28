@@ -74,8 +74,8 @@ and quantum information [@adams_rydberg_2019].
 However, the breadth of possible configurations and experimental parameters makes general modeling of an experiment difficult.
 One challenge is that many atomic energy levels consist of numerous magnetic sublevels that arise from the different possible orientations of the electron's and nucleus's angular momentum.
 These sublevels have different responses to applied magnetic and electric fields which leads measureable differences for most real-world atomic sensors.
-In some cases, this sublevel structure can be treated in average and ignored.
-More often, they are ignored due to the significant complexity inherent in expanding the model size to account for them.
+In some cases, this sublevel structure can be treated in average and safely ignored.
+More often however, they are ignored due to the significant complexity inherent in expanding the model size to account for them.
 
 For example, in accounting for magnetic splitting,
 a typical Rydberg spectroscopy experiment using the $5\text{S}_{1/2}\rightarrow5\text{P}_{3/2}\rightarrow n\text{D}$ set of transitions would have a total of 46 levels with up to 34 dipole-allowed couplings between them.
@@ -94,9 +94,9 @@ along with many other optimizations and improvements to the code-base.
 RydIQule's primary improvement in version 2 is in handling state manifolds: degenerate sets of sublevel states defined by a magnetic interaction with the electron.
 It handles this sublevel structure by expanding the way nodes are labelled.
 Rather than only using integers, arbitrary tuples can now be used as graph nodes.
-This allows for the ready definition of a manifold by using tuples in a way that directly maps to the atomic structure.
-RydIQule's core functions relating to graph operations have been updated to interchangeably use individual states or entire manifolds.
-Its internals have been overhauled to not only ensure that all relevant states/couplings are added, but tracked as originating from a single manifold.
+This allows for manifolds to be defined by using tuples in a way that directly maps to the atomic structure.
+RydIQule's core functions relating to graph operations have been updated to interchangeably address individual states or entire manifolds.
+It's internals have been overhauled to not only ensure that all relevant states/couplings are added, but tracked as originating from a single manifold.
 
 ## Improved Calculation of Atomic Properties
 
@@ -106,8 +106,8 @@ In version 1, this class could only handle simplified atomic models that treated
 Though this type of model is very fast and can be effective in many situtations,
 it breaks down for systems in the presence of magnetic fields (including those as weak as Earth's background magnetic field)
 or for large electric field amplitudes that result in inhomogeneous couplings due to sublevel structure.
-With the native ability to specify states using tuples, `Cell` can now define states by their quantum numbers directly,
-which allows for natural definition and coupling of manifolds.
+By leveraging the tuple labelling outlined above, `Cell` can now define states by their quantum numbers directly,
+which allows for natural definition and coupling of entire manifolds.
 
 Version 2 also greatly enhances the leveraging of ARC to calculate more system parameters automatically.
 In particular, there is automatic calculation of coupling strengths between manifolds defined in incommensurate fine and hyperfine bases.
