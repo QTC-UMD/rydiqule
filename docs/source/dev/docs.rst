@@ -2,7 +2,7 @@ Building the Documentation
 ==========================
 
 This section describes how to build the documentation locally.
-A web-hosted copy of the docs is avialable at `https://rydiqule.readthedocs.io/en/latest/ <https://rydiqule.readthedocs.io/en/latest/>`_
+A web-hosted copy of the docs is avialable at `https://rydiqule.readthedocs.io/ <https://rydiqule.readthedocs.io/>`_
 and should generally be used.
 These instructions are provided for local testing and development purposes.
 
@@ -40,7 +40,7 @@ This build also requires a great many other latex packages in addition to `latex
 It is easiest to install these packages on the fly as needed, if your latex distribution supports that.
 
 Given the difficulty of building this type of documentation locally, 
-a copy can be downloaded from the `documentation website. <https://rydiqule.readthedocs.io/_/downloads/en/latest/pdf/>`_
+a copy can be downloaded from the `documentation website. <https://rydiqule.readthedocs.io/_/downloads/en/stable/pdf/>`_
 
 latex
 -----
@@ -71,4 +71,4 @@ There is also the ability to build the documentation in the EPUB format, if desi
 
   make epub
 
-This version of the documentation is also available for download on `ReadTheDocs <https://rydiqule.readthedocs.io/_/downloads/en/latest/epub/>`_.
+This version of the documentation is also available for download on `ReadTheDocs <https://rydiqule.readthedocs.io/_/downloads/en/stable/epub/>`_.

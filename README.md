@@ -21,7 +21,7 @@ RydIQule: A Graph-based paradigm for modeling Rydberg and atomic sensors,
 ## Installation
 
 Installation can be done via pip or conda.
-See the [documentation](https://rydiqule.readthedocs.io/en/latest/installation.html) for details.
+See the [documentation](https://rydiqule.readthedocs.io/en/stable/installation.html) for details.
 
 ## Documentation
 
@@ -43,8 +43,16 @@ The views, opinions and/or findings expressed are those of the authors and shoul
 
 ## Contact
 
-The github repository is for code distribution only.
+This github repository is primarily for code distribution.
 While we monitor it, 
-we will not directly respond to issues or pull requests posted to it.
-If you would like a response from the developers, please e-mail
-david.h.meyer3.civ@army.mil or kevin.c.cox29.civ@army.mil
+responses to issues or pull requests posted to it may be limited.
+If you would like a more detailed response from the developers,
+please e-mail david.h.meyer3.civ@army.mil or kevin.c.cox29.civ@army.mil
+
+### Contributing
+
+We actively encourage contributions and collaboration in the development of rydiqule.
+Unforunately, rydiqule's development is done privately, _for reasons_.
+If you would like to submit a PR for all but the most trivial of changes,
+please e-mail us directly so we can discuss the collaboration.
+

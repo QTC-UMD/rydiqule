@@ -5,7 +5,16 @@ Rydiqule employs the `optional type hinting capabilities of python <https://peps
 These type annotations are not checked or enforced at runtime by python itself.
 Rather, they provide hints to fellow programmers and users about the types of function arguments, return types, and class variables.
 
-We use the `mypy <https://mypy.readthedocs.io/en/stable/>`_ static type checking library to read these hints and catch type errors within the code base.
+We use the `pyright <https://microsoft.github.io/pyright/#/>`_ static type checking library to read these hints and catch type errors within the code base.
+The easiest way to use this checker locally is via the VS Code Pylance extensions,
+which defaults to the pyright type checker and will automatically run when configuration options are detected in the root `pyproject.toml`.
+
+Note that python is still a dynamic, duck-typed language,
+and rydiqule employs some features that are perfectly valid python which are not expressable in the type hinting system.
+In these situations, we err on the side of type hints being primarily documentation,
+and do our best to not obfuscate functioning code merely to satisfy the type checker.
+
+We also have configurations for using the `mypy <https://mypy.readthedocs.io/en/stable/>`_ static type checking library.
 To run this check locally, install the `mypy` python package and run the following command from the package root directory.
 
 .. code-block:: shell

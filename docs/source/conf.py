@@ -120,7 +120,7 @@ myst_enable_extensions = [
 # a list of builtin themes.
 #
 html_theme = "furo"
-html_title = "rydiqule"
+html_title = f"rydiqule v{release}"
 html_short_title = "rydiqule"
 html_show_copyright = False
 
