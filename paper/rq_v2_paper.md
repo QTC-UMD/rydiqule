@@ -77,8 +77,8 @@ These sublevels have different responses to applied magnetic and electric fields
 In some cases, this sublevel structure can be treated in average and ignored.
 More often, they are ignored due to the significant complexity inherent in expanding the model size to account for them.
 
-For example, in accounting for nuclear magnetic splitting,
-the commonly-used $5\text{S}_{1/2}$ ground state of rubidium 85 breaks into 12 magnetic sublevels divided between two manifolds of degerate sublevels.
+For example, in accounting for magnetic splitting,
+a typical Rydberg spectroscopy experiment using the $5\text{S}_{1/2}\rightarrow5\text{P}_{3/2}\rightarrow n\text{D}$ set of transitions would have a total of 46 levels with up to 34 dipole-allowed couplings between them.
 In RydIQule's initial release, users would have no choice but to individually add each sublevel and the many associated electromagnetic couplings, making it of little functional use.
 For this reason, RydiQule was not easily scaled to realistic scenarios involving several atomic states and typically many tens, or possibly even hundreds, of sublevels.
 
@@ -93,9 +93,8 @@ along with many other optimizations and improvements to the code-base.
 
 RydIQule's primary improvement in version 2 is in handling state manifolds: degenerate sets of sublevel states defined by a magnetic interaction with the electron.
 It handles this sublevel structure by expanding the way nodes are labelled.
-Rather than only using integers, tuples of numbers can now be used as graph nodes.
-When lists, which we call specifications, are used within a tuple, they are automatically interpreted as all corresponding states individually
-(ie `(0, [-1, 0, 1])` maps to the group `[(0,-1), (0, 0), (0, 1)]`).
+Rather than only using integers, arbitrary tuples can now be used as graph nodes.
+This allows for the ready definition of a manifold by using tuples in a way that directly maps to the atomic structure.
 RydIQule's core functions relating to graph operations have been updated to interchangeably use individual states or entire manifolds.
 Its internals have been overhauled to not only ensure that all relevant states/couplings are added, but tracked as originating from a single manifold.
 
