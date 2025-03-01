@@ -33,7 +33,7 @@ Naval Air Warfare Center - Weapons Division\\
 
 release = importlib.metadata.version('rydiqule')
 
-version = '.'.join(release.split('.')[:3])  # strip off dev information, if present
+version = release
 
 # -- General configuration (should be identical across all projects) ------------------
 
@@ -120,7 +120,7 @@ myst_enable_extensions = [
 # a list of builtin themes.
 #
 html_theme = "furo"
-html_title = f"rydiqule v{version}"
+html_title = f"rydiqule v{release}"
 html_short_title = "rydiqule"
 html_show_copyright = False
 
