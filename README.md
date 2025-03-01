@@ -21,7 +21,7 @@ RydIQule: A Graph-based paradigm for modeling Rydberg and atomic sensors,
 ## Installation
 
 Installation can be done via pip or conda.
-See the [documentation](https://rydiqule.readthedocs.io/en/stable/installation.html) for details.
+See the [documentation](https://rydiqule.readthedocs.io/page/installation.html) for details.
 
 ## Documentation
 
