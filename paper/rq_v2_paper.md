@@ -17,6 +17,7 @@ authors:
     equal-contrib: true
     affiliation: 1
   - name: Omar Nagib
+    orcid: 0000-0003-3345-4781
     affiliation: 2
   - name: Teemu Virtanen
     orcid:
