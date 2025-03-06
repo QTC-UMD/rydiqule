@@ -119,8 +119,7 @@ fine and hyperfine respectively, lowering the total number of sublevels that nee
 
 Experimental support for Doppler-averaged models using an exact analytic solution has been added.
 This functionality is based on the theoretical work presented in [@nagib_exact_2025].
-That work derived a method for solving the Linblad master equation in the eigenbasis of the system,
-which allows for a separation of the Doppler-averaging integration from system diagonalization enabling a general, analytic result.
+That work derives the exact velocity dependence due to Doppler shifts for any system, and it effectively reduces the Doppler-averaging integration to two diagonalizations, avoiding velocity sampling, and enabling a general, analytic result.
 Replacing RydIQule's approximate numeric integration with this exact method results in faster and significantly higher accuracy solutions.
 At present, only 1-dimensional Doppler averages are supported, with extensions to higher dimensions planned for the next minor release.
 
