@@ -119,7 +119,7 @@ fine and hyperfine respectively, lowering the total number of sublevels that nee
 
 Experimental support for Doppler-averaged models using an exact analytic solution has been added.
 This functionality is based on the theoretical work presented in [@nagib_exact_2025].
-That work derives the exact velocity dependence due to Doppler shifts for any system, and it effectively reduces the Doppler-averaging integration to two diagonalizations, avoiding velocity sampling, and enabling a general, analytic result.
+That work derives the exact velocity dependence due to Doppler shifts for any system, and it effectively reduces the Doppler-averaging integration in one-dimensional geometries to two diagonalizations, avoiding velocity sampling, and enabling a general, analytic result.
 Replacing RydIQule's approximate numeric integration with this exact method results in faster and significantly higher accuracy solutions.
 At present, only 1-dimensional Doppler averages are supported, with extensions to higher dimensions planned for the next minor release.
 
@@ -143,4 +143,4 @@ as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elg
 # Acknowledgements
 
 Financial support for the development of RydIQule version 2 was provide by the DEVCOM Army Research Laboratory.
-The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government.
+The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government. Omar Nagib acknowledges helpful discussion with Thad G. Walker.
