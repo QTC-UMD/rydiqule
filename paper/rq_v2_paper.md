@@ -20,7 +20,6 @@ authors:
     orcid: 0000-0003-3345-4781
     affiliation: 2
   - name: Teemu Virtanen
-    orcid:
     affiliation: 3
   - name: Kevin C. Cox
     orcid: 0000-0001-5049-3999
@@ -121,7 +120,7 @@ Experimental support for Doppler-averaged models using an exact analytic solutio
 This functionality is based on the theoretical work presented in [@nagib_exact_2025].
 That work derives the exact velocity dependence due to Doppler shifts for any system, and it effectively reduces the Doppler-averaging integration in one-dimensional geometries to two diagonalizations, avoiding velocity sampling, and enabling a general, analytic result.
 Replacing RydIQule's approximate numeric integration with this exact method results in faster and significantly higher accuracy solutions.
-At present, only 1-dimensional Doppler averages are supported, with extensions to higher dimensions planned for the next minor release.
+At present, only 1-dimensional Doppler averages in the steady-state are supported, with extensions to higher dimensions planned for the next minor release.
 
 # Related Packages and Work
 
@@ -134,7 +133,7 @@ RydIQule's version 2 release aims to capture the functionality of the Atomic Den
 While very capable,
 it is built on a proprietary platform requiring a paid license which limits its accessibility.
 And since Mathematica is an interpreted language,
-it can lack the speed that complied libraries like NumPy enable, especially when exploring a large parameter space.
+it can lack the speed that compiled libraries like NumPy enable, especially when exploring a large parameter space.
 
 Since RydIQule version 1 has been publically released,
 it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024]
