@@ -20,6 +20,7 @@ authors:
     orcid: 0000-0003-3345-4781
     affiliation: 2
   - name: Teemu Virtanen
+    orcid: 0000-0002-0653-2564
     affiliation: 3
   - name: Kevin C. Cox
     orcid: 0000-0001-5049-3999
