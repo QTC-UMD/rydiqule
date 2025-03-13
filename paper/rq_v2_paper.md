@@ -36,7 +36,7 @@ affiliations:
     name: Naval Air Warfare Center, 1 Administration Circle, China Lake, CA, 93555, USA
     ror: 01f0pxq13
 
-date: 27 February 2025
+date: 13 March 2025
 bibliography: paper.bib
 aas-doi: 
 aas-journal:
@@ -47,7 +47,7 @@ aas-journal:
 Rydberg atomic radio-frequency (rf) sensors are an emerging technology platform that relies on vaporous atoms, interrogated with laser beams and nearly ionized, to receive rf signals.
 Rydberg rf sensors have a number of interesting fundamental distinctions from traditional receiver technologies,
 such as those based on metallic antennas,
-since they are goverened by the quantum physics of atom-light interactions [@fancher_rydberg_2021].
+since they are governed by the quantum physics of atom-light interactions [@fancher_rydberg_2021].
 As Rydberg sensors quickly advance from laboratory experiments into fieldable devices,
 there is a need for a general software modeling tool that fully encompasses the internal physics of the sensor.
 The Rydberg Interactive Quantum Module (RydIQule) is a Python package designed to fill this need.
@@ -66,7 +66,7 @@ allowing for efficient parameterization and computation of large sets of equatio
 All together, RydIQule provides a flexible platform for forward modeling Rydberg sensors while also providing a widely useful set of theoretical tools for fundamental exploration of atomic physics concepts.
 
 The initial public release of RydIQule in late 2023 built the core functionality described above [@miller_rydiqule_2024].
-Here we outline RyIQule's version 2 release which expands on its capability to more accurately model real-world atoms.
+Here we outline RydIQule's version 2 release which expands on its capabilities to more accurately model real-world atoms.
 
 # Statement of Need
 
@@ -74,14 +74,14 @@ The unique quantum properties of Rydberg atoms offer distinct advantages in the 
 and quantum information [@adams_rydberg_2019].
 However, the breadth of possible configurations and experimental parameters makes general modeling of an experiment difficult.
 One challenge is that many atomic energy levels consist of numerous magnetic sublevels that arise from the different possible orientations of the electron's and nucleus's angular momentum.
-These sublevels have different responses to applied magnetic and electric fields which leads measureable differences for most real-world atomic sensors.
+These sublevels have different responses to applied magnetic and electric fields which leads to measureable differences for most real-world atomic sensors.
 In some cases, this sublevel structure can be treated in average and safely ignored.
 More often however, they are ignored due to the significant complexity inherent in expanding the model size to account for them.
 
 For example, in accounting for magnetic splitting,
 a typical Rydberg spectroscopy experiment using the $5\text{S}_{1/2}\rightarrow5\text{P}_{3/2}\rightarrow n\text{D}$ set of transitions would have a total of 46 levels with up to 34 dipole-allowed couplings between them.
 In RydIQule's initial release, users would have no choice but to individually add each sublevel and the many associated electromagnetic couplings, making it of little functional use.
-For this reason, RydiQule was not easily scaled to realistic scenarios involving several atomic states and typically many tens, or possibly even hundreds, of sublevels.
+For this reason, RydIQule was not easily scaled to realistic scenarios involving several atomic states and typically many tens, or possibly even hundreds, of sublevels.
 
 The main advance of RydIQule version 2 is to allow user-friendly inclusion of large atomic manifolds that include the complete set of electronic and magnetic sublevels.
 In particular, this release introduces a new paradigm for structured labeling of states using arbitrary tuples,
@@ -104,7 +104,7 @@ It's internals have been overhauled to not only ensure that all relevant states/
 Version 2 of RydIQule also completely overhauls the `Cell` class, which provides automatic calculation of atomic properties of alkali atoms
 using the Alkali.ne Rydberg Calculator (ARC) package [@sibalic_arc_2017; @robertson_arc_2021].
 In version 1, this class could only handle simplified atomic models that treated manifolds of atomic sublevels as a single approximate state.
-Though this type of model is very fast and can be effective in many situtations,
+Though this type of model is very fast and can be effective in many situations,
 it breaks down for systems in the presence of magnetic fields (including those as weak as Earth's background magnetic field)
 or for large electric field amplitudes that result in inhomogeneous couplings due to sublevel structure.
 By leveraging the tuple labelling outlined above, `Cell` can now define states by their quantum numbers directly,
@@ -136,11 +136,11 @@ it is built on a proprietary platform requiring a paid license which limits its 
 And since Mathematica is an interpreted language,
 it can lack the speed that compiled libraries like NumPy enable, especially when exploring a large parameter space.
 
-Since RydIQule version 1 has been publically released,
+Since RydIQule version 1 has been publicly released,
 it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024]
 as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024].
 
 # Acknowledgements
 
-Financial support for the development of RydIQule version 2 was provide by the DEVCOM Army Research Laboratory.
+Financial support for the development of RydIQule version 2 was provided by the DEVCOM Army Research Laboratory.
 The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government. Omar Nagib acknowledges helpful discussion with Thad G. Walker.
