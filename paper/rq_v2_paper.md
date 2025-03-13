@@ -1,5 +1,5 @@
 ---
-title: "RydIQule Version 2: Enhancing Graph-Based modeling of Rydberg atoms"
+title: "RydIQule Version 2: Enhancing graph-based modeling of Rydberg atoms"
 tags:
   - Python
   - Rydberg
