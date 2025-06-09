@@ -140,13 +140,14 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
                       remove_ground_state=False,
                       real_eom=True)
 
+    
     ### Calculate rho0 via inverse power method and construct L0^minus using new Nagib/Walker method
-    rho0 = np.random.rand(np.shape(dummy_const))[..., np.newaxis]
+    rho0 = np.random.rand(stack_shape[0]*stack_shape[1], n**2)[..., np.newaxis]
     rho0 /= np.linalg.norm(rho0, axis=1, keepdims=True)
 
     I = np.eye(n**2)
     converged_flags = np.zeros(stack_shape[0]*stack_shape[1], dtype=bool)
-    L0_flat = L0.reshape(np.shape(dummy_const))
+    L0_flat = L0.reshape(stack_shape[0]*stack_shape[1], n**2, n**2)
         
     # Compute rho0 by finding the null vector of L0 via the shifted inverse power method
     for iteration in range(50):
@@ -174,7 +175,7 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
               
         rho0[remaining_flags_index] = rho0_new
 
-    rho0 = rho0.reshape(np.shape(dummy_const))
+    rho0 = rho0.reshape(stack_shape[0], stack_shape[1], n**2)
 
     assert not np.iscomplexobj(rho0), 'rho0 solution is not real; it is unphysical'
     rho0 *= np.sign(rho0[...,0])[...,None]  # remove arbitrary sign from null-vector so all pops are positive
@@ -184,7 +185,7 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     vec1 = np.eye(n).flatten() #Initialize vectorized identity
     L0m = (np.linalg.inv(L0 + rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]) 
            - rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :])
-
+    
     ### Liouvillian superoperator for doppler only
     # these are already multiplied by sqrt(2)*sigma_v by rydiqule
     # as such, lambdas are redefined as sqrt(2)*sigma_v*lambdas of Eq12 in the paper
