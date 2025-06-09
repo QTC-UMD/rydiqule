@@ -140,25 +140,50 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
                       remove_ground_state=False,
                       real_eom=True)
 
-    ### construct L0^minus
-    el0, ev0 = np.linalg.eig(L0)
-    #pseudo invert the eigenvalues
-    l_mask = np.isclose(el0, 0.0)
-    el0[l_mask] = 1 # prevent divide by zero
-    li = 1/el0
-    li[l_mask] = 0 # set masked elements to zero
-    # calculate Eq B2
-    L0m = (ev0*li[...,None, :])@np.linalg.pinv(ev0)
+    ### Calculate rho0 via inverse power method and construct L0^minus using new Nagib/Walker method
+    rho0 = np.random.rand(np.shape(dummy_const))[..., np.newaxis]
+    rho0 /= np.linalg.norm(rho0, axis=1, keepdims=True)
+
+    I = np.eye(n**2)
+    converged_flags = np.zeros(stack_shape[0]*stack_shape[1], dtype=bool)
+    L0_flat = L0.reshape(np.shape(dummy_const))
+        
+    # Compute rho0 by finding the null vector of L0 via the shifted inverse power method
+    for iteration in range(50):
+        if np.all(converged_flags):
+            break
+        
+        remaining_flags_index = np.where(~converged_flags)[0]
+        current_L0 = L0_flat[remaining_flags_index]
+        current_shifted_L0 = current_L0 + 1e-14 * I
     
-    ### calculate rho0 (doppler-free solution) from nullspace eigenvectors in L0m calculation
-    assert np.all(np.count_nonzero(l_mask, axis=-1) == 1), 'rho0 solution not unique'
-    # select right eigenvector corresponding to 0-eigenvalue (marked by l_mask) for each equation set
-    # using reshape restores stack axes after binary array indexing flatten
-    rho0 = np.real_if_close(np.swapaxes(ev0, axis1=-1, axis2=-2)[l_mask].reshape(*stack_shape, -1))
+        current_rho0 = rho0[remaining_flags_index]
+         
+        z = np.linalg.solve(current_shifted_L0, current_rho0) # compute (L0 + 1e-14)^-1 * rho0
+        rho0_new = z / (np.linalg.norm(z, axis=1, keepdims=True) + np.finfo(float).eps)
+        
+        # Estimate magnitude of eigenvalues by Rayleigh quotient
+        L0rho0 = np.einsum('nij,nj->ni', current_L0, rho0_new[..., 0])
+        numerator = np.sum( rho0_new[..., 0] * L0rho0, axis=1)
+        denominator = np.sum( rho0_new[..., 0] * rho0_new[..., 0], axis=1)
+        current_eigenvalues = np.abs(numerator / denominator)
+    
+        rho_0_diff = np.linalg.norm(current_rho0 - rho0_new, axis = 1)
+    
+        converged_flags[remaining_flags_index] = (rho_0_diff.flatten() < 1e-15) | (current_eigenvalues < 1e-14)
+              
+        rho0[remaining_flags_index] = rho0_new
+
+    rho0 = rho0.reshape(np.shape(dummy_const))
+
     assert not np.iscomplexobj(rho0), 'rho0 solution is not real; it is unphysical'
     rho0 *= np.sign(rho0[...,0])[...,None]  # remove arbitrary sign from null-vector so all pops are positive
     pops = np.sum(rho0[...,::n+1], axis=-1)  # calculate trace of each vector
     rho0 /= pops[..., None]  # normalize vectors by trace
+
+    vec1 = np.eye(n).flatten() #Initialize vectorized identity
+    L0m = (np.linalg.inv(L0 + rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]) 
+           - rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :])
 
     ### Liouvillian superoperator for doppler only
     # these are already multiplied by sqrt(2)*sigma_v by rydiqule
