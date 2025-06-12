@@ -66,7 +66,68 @@ def _doppler_eigvec_array(lamdas: np.ndarray, rtol: float = 1e-5, atol: float = 
     return doppler_array
 
 
-def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> Solution:
+def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
+    """
+    Helper function for computing rho0 (null vector) of a stack of equations of motion
+    via the inverse power method.
+
+    Paramaters
+    ----------
+    L0: np.ndarray
+        Stack of steady state Liouvillians
+    n: int
+        Basis size of sensor
+    
+    Returns
+    -------
+    numpy.ndarray
+        Stack of steady state (vectorized) density matrices
+    """
+
+    stack_shape = L0.shape[0:-2]
+    rho0 = np.random.rand(*stack_shape, n**2)[..., np.newaxis]
+    rho0 /= np.linalg.norm(rho0, axis=-1, keepdims=True)
+
+    I = np.eye(n**2)
+    converged_flags = np.zeros(stack_shape, dtype=bool)
+        
+    # Compute rho0 by finding the null vector of L0 via the shifted inverse power method
+    for iteration in range(50):
+        if np.all(converged_flags):
+            break
+        
+        remaining_flags_index = np.where(~converged_flags)
+        
+        current_L0 = L0[remaining_flags_index]
+        current_shifted_L0 = current_L0 + 1e-14 * I
+
+        current_rho0 = rho0[remaining_flags_index]
+            
+        z = np.linalg.solve(current_shifted_L0, current_rho0) # compute (L0 + 1e-14)^-1 * rho0
+        rho0_new = z / (np.linalg.norm(z, axis=1, keepdims=True) + np.finfo(float).eps)
+        
+        # Estimate magnitude of eigenvalues by Rayleigh quotient
+        L0rho0 = np.einsum('...ij,...j->...i', current_L0, rho0_new[..., 0])
+        numerator = np.sum(rho0_new[..., 0] * L0rho0, axis=-1)
+        denominator = np.sum(rho0_new[..., 0] * rho0_new[..., 0], axis=-1)
+        current_eigenvalues = np.abs(numerator / denominator)
+
+        rho_0_diff = np.linalg.norm(current_rho0 - rho0_new, axis=-1)
+
+        converged_flags[remaining_flags_index] = (rho_0_diff < 1e-15).any(axis=-1) | (current_eigenvalues < 1e-14)
+                
+        rho0[remaining_flags_index] = rho0_new
+
+    rho0 = rho0.squeeze(axis=-1)
+
+    assert not np.iscomplexobj(rho0), 'rho0 solution is not real; it is unphysical'
+    rho0 *= np.sign(rho0[...,0])[...,None]  # remove arbitrary sign from null-vector so all pops are positive
+    pops = np.sum(rho0[...,::n+1], axis=-1)  # calculate trace of each vector
+    rho0 /= pops[..., None]  # normalize vectors by trace
+
+    return rho0
+
+def doppler_1d_exact_new(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> Solution:
     """
     Analytically solves a sensor in steady-state in the presence of 1 dimensional
     Doppler broadening.
@@ -133,73 +194,33 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     if sensor.spatial_dim() != 1:
         raise RydiquleError(f'Sensor must have 1 spatial dimension of Doppler shifts, found {sensor.spatial_dim():d}')
 
-    stack_shape = sensor._stack_shape()
     n = sensor.basis_size
     # Liouvillian superoperator for the non-doppler-broadened components
     L0, dummy_const = generate_eom(sensor.get_hamiltonian(), sensor.decoherence_matrix(),
                       remove_ground_state=False,
                       real_eom=True)
 
-    
-    ### Calculate rho0 via inverse power method and construct L0^minus using new Nagib/Walker method
-    rho0 = np.random.rand(stack_shape[0]*stack_shape[1], n**2)[..., np.newaxis]
-    rho0 /= np.linalg.norm(rho0, axis=1, keepdims=True)
-
-    I = np.eye(n**2)
-    converged_flags = np.zeros(stack_shape[0]*stack_shape[1], dtype=bool)
-    L0_flat = L0.reshape(stack_shape[0]*stack_shape[1], n**2, n**2)
-        
-    # Compute rho0 by finding the null vector of L0 via the shifted inverse power method
-    for iteration in range(50):
-        if np.all(converged_flags):
-            break
-        
-        remaining_flags_index = np.where(~converged_flags)[0]
-        current_L0 = L0_flat[remaining_flags_index]
-        current_shifted_L0 = current_L0 + 1e-14 * I
-    
-        current_rho0 = rho0[remaining_flags_index]
-         
-        z = np.linalg.solve(current_shifted_L0, current_rho0) # compute (L0 + 1e-14)^-1 * rho0
-        rho0_new = z / (np.linalg.norm(z, axis=1, keepdims=True) + np.finfo(float).eps)
-        
-        # Estimate magnitude of eigenvalues by Rayleigh quotient
-        L0rho0 = np.einsum('nij,nj->ni', current_L0, rho0_new[..., 0])
-        numerator = np.sum( rho0_new[..., 0] * L0rho0, axis=1)
-        denominator = np.sum( rho0_new[..., 0] * rho0_new[..., 0], axis=1)
-        current_eigenvalues = np.abs(numerator / denominator)
-    
-        rho_0_diff = np.linalg.norm(current_rho0 - rho0_new, axis = 1)
-    
-        converged_flags[remaining_flags_index] = (rho_0_diff.flatten() < 1e-15) | (current_eigenvalues < 1e-14)
-              
-        rho0[remaining_flags_index] = rho0_new
-
-    rho0 = rho0.reshape(stack_shape[0], stack_shape[1], n**2)
-
-    assert not np.iscomplexobj(rho0), 'rho0 solution is not real; it is unphysical'
-    rho0 *= np.sign(rho0[...,0])[...,None]  # remove arbitrary sign from null-vector so all pops are positive
-    pops = np.sum(rho0[...,::n+1], axis=-1)  # calculate trace of each vector
-    rho0 /= pops[..., None]  # normalize vectors by trace
+    rho0 = _get_rho0(L0, n)
 
     vec1 = np.eye(n).flatten() #Initialize vectorized identity
-    L0m = (np.linalg.inv(L0 + rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]) 
-           - rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :])
+    L0m = np.linalg.inv(L0 + rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]) - rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]
     
     ### Liouvillian superoperator for doppler only
     # these are already multiplied by sqrt(2)*sigma_v by rydiqule
-    # as such, lambdas are redefined as sqrt(2)*sigma_v*lambdas of Eq12 in the paper
+    # as such, lambdas are redefined as sqrt(2)*sigma_v*lambdas of Eq14 in the paper
     dopp = sensor.get_doppler_shifts().squeeze()
     Lv_complex = _hamiltonian_term(dopp)
     Lv, _ = make_real(Lv_complex, dummy_const, ground_removed=False)
 
     ### Calculate doppler averaged steady-state density matrix from propagator
     el, R = np.linalg.eig(L0m@Lv)
-    L = np.linalg.pinv(np.swapaxes(R,-1,-2))
 
-    # calculate Eq 12
-    prefix = _doppler_eigvec_array(el, rtol, atol)
-    rho_dopp_complex = np.einsum('...j,...ij,...kj,...k->...i', prefix, R, L, rho0)
+    # calculate Eq 14
+    prefix = _doppler_eigvec_array(el)
+    suffix = np.linalg.solve(R, rho0[..., np.newaxis])
+    suffix = suffix.squeeze(axis=-1)
+    rho_dopp_complex = np.einsum('...j,...ij,...j->...i', prefix, R, suffix)
+
     # confirm that result is approximately real
     imag_tol = 10000
     rho_dopp = np.real_if_close(rho_dopp_complex, tol=imag_tol)  # chop complex parts if all are smaller than 10000*f64_eps
