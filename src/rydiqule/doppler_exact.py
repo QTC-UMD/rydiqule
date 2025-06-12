@@ -65,8 +65,7 @@ def _doppler_eigvec_array(lamdas: np.ndarray, rtol: float = 1e-5, atol: float = 
 
     return doppler_array
 
-
-def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
+def _get_rho0(L0: np.ndarray) -> np.ndarray:
     """
     Helper function for computing rho0 (null vector) of a stack of equations of motion
     via the inverse power method.
@@ -75,8 +74,6 @@ def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
     ----------
     L0: np.ndarray
         Stack of steady state Liouvillians
-    n: int
-        Basis size of sensor
     
     Returns
     -------
@@ -85,6 +82,7 @@ def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
     """
 
     stack_shape = L0.shape[0:-2]
+    n = int(np.sqrt(L0.shape[-1]))
     rho0 = np.random.rand(*stack_shape, n**2)[..., np.newaxis]
     rho0 /= np.linalg.norm(rho0, axis=-1, keepdims=True)
 
@@ -104,7 +102,7 @@ def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
         current_rho0 = rho0[remaining_flags_index]
             
         z = np.linalg.solve(current_shifted_L0, current_rho0) # compute (L0 + 1e-14)^-1 * rho0
-        rho0_new = z / (np.linalg.norm(z, axis=1, keepdims=True) + np.finfo(float).eps)
+        rho0_new = z / (np.linalg.norm(z, axis=-1, keepdims=True) + np.finfo(float).eps)
         
         # Estimate magnitude of eigenvalues by Rayleigh quotient
         L0rho0 = np.einsum('...ij,...j->...i', current_L0, rho0_new[..., 0])
@@ -120,7 +118,6 @@ def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
 
     rho0 = rho0.squeeze(axis=-1)
 
-    assert not np.iscomplexobj(rho0), 'rho0 solution is not real; it is unphysical'
     rho0 *= np.sign(rho0[...,0])[...,None]  # remove arbitrary sign from null-vector so all pops are positive
     pops = np.sum(rho0[...,::n+1], axis=-1)  # calculate trace of each vector
     rho0 /= pops[..., None]  # normalize vectors by trace
@@ -133,7 +130,7 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     Doppler broadening.
 
     Uses the method outlined in Ref [1]_.
-    In particular, it uses Eq. 12 to analytically evaluate the Doppler average in 1D.
+    In particular, it uses Eq. 14 to analytically evaluate the Doppler average in 1D.
 
     This solver is considered more accurate than :func:`~.solve_steady_state`
     since it replaces direct sampling and solving of the velocity classes
@@ -188,7 +185,7 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     .. [1] Omar Nagib and Thad G. Walker,
         Exact steady state of perturbed open quantum systems,
         arXiv 2501.06134 (2025)
-        http://arxiv.org/abs/2501.06134
+        http://arxiv.org/abs/2501.06134v3
     """
 
     if sensor.spatial_dim() != 1:
@@ -200,11 +197,12 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
                       remove_ground_state=False,
                       real_eom=True)
 
-    rho0 = _get_rho0(L0, n)
-
-    vec1 = np.eye(n).flatten() #Initialize vectorized identity
-    L0m = np.linalg.inv(L0 + rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]) - rho0[..., :, np.newaxis] * vec1[np.newaxis, np.newaxis, :]
+    rho0 = _get_rho0(L0)
     
+    vec1 = np.eye(n).flatten() #Initialize vectorized identity
+    L0m = (np.linalg.inv(L0 + rho0[..., np.newaxis] * vec1[np.newaxis, :])
+           - rho0[..., np.newaxis] * vec1[np.newaxis, :]
+    )
     ### Liouvillian superoperator for doppler only
     # these are already multiplied by sqrt(2)*sigma_v by rydiqule
     # as such, lambdas are redefined as sqrt(2)*sigma_v*lambdas of Eq14 in the paper
@@ -217,8 +215,7 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
 
     # calculate Eq 14
     prefix = _doppler_eigvec_array(el)
-    suffix = np.linalg.solve(R, rho0[..., np.newaxis])
-    suffix = suffix.squeeze(axis=-1)
+    suffix = np.linalg.solve(R, rho0[..., np.newaxis]).squeeze(axis=-1)
     rho_dopp_complex = np.einsum('...j,...ij,...j->...i', prefix, R, suffix)
 
     # confirm that result is approximately real
