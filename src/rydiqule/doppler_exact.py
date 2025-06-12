@@ -127,7 +127,7 @@ def _get_rho0(L0: np.ndarray, n) -> np.ndarray:
 
     return rho0
 
-def doppler_1d_exact_new(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> Solution:
+def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> Solution:
     """
     Analytically solves a sensor in steady-state in the presence of 1 dimensional
     Doppler broadening.
