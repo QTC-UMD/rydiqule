@@ -102,7 +102,7 @@ def _get_rho0(L0: np.ndarray) -> np.ndarray:
         current_rho0 = rho0[remaining_flags_index]
             
         z = np.linalg.solve(current_shifted_L0, current_rho0) # compute (L0 + 1e-14)^-1 * rho0
-        rho0_new = z / (np.linalg.norm(z, axis=-1, keepdims=True) + np.finfo(float).eps)
+        rho0_new = z / (np.linalg.norm(z, axis=-2, keepdims=True) + np.finfo(float).eps)
         
         # Estimate magnitude of eigenvalues by Rayleigh quotient
         L0rho0 = np.einsum('...ij,...j->...i', current_L0, rho0_new[..., 0])
