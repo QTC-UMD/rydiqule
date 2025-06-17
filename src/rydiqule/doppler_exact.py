@@ -211,12 +211,12 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     Lv, _ = make_real(Lv_complex, dummy_const, ground_removed=False)
 
     ### Calculate doppler averaged steady-state density matrix from propagator
-    el, R = np.linalg.eig(L0m@Lv)
+    lamdas, r_eigvecs = np.linalg.eig(L0m@Lv)
 
     # calculate Eq 14
-    prefix = _doppler_eigvec_array(el)
-    suffix = np.linalg.solve(R, rho0[..., np.newaxis]).squeeze(axis=-1)
-    rho_dopp_complex = np.einsum('...j,...ij,...j->...i', prefix, R, suffix)
+    prefix = _doppler_eigvec_array(lamdas)
+    suffix = np.linalg.solve(r_eigvecs, rho0[..., np.newaxis]).squeeze(axis=-1)
+    rho_dopp_complex = np.einsum('...j,...ij,...j->...i', prefix, r_eigvecs, suffix)
 
     # confirm that result is approximately real
     imag_tol = 10000
