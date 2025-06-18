@@ -17,12 +17,16 @@ import warnings
 import numpy as np
 from importlib.metadata import version
 from copy import deepcopy
+import psutil
+from typing import Optional
 
 from scipy.special import erf
 
 from .sensor import Sensor
 from .sensor_utils import _hamiltonian_term, generate_eom, make_real, _squeeze_dims
 from .sensor_solution import Solution
+from .doppler_utils import *
+from .slicing.slicing import matrix_slice
 from .exceptions import RydiquleError, RydiquleWarning, PopulationNotConservedWarning
 
 
@@ -124,32 +128,188 @@ def _get_rho0(L0: np.ndarray) -> np.ndarray:
 
     return rho0
 
-def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> Solution:
+def get_doppler_equations_full_space(base_eoms: np.ndarray,
+                                     doppler_hamiltonians: np.ndarray,
+                                     velocities: np.ndarray) -> np.ndarray:
     """
-    Analytically solves a sensor in steady-state in the presence of 1 dimensional
-    Doppler broadening.
+    Constructs a stack of Doppler-shifted Liouvillians in the full n^2 space.
 
-    Uses the method outlined in Ref [1]_.
-    In particular, it uses Eq. 14 to analytically evaluate the Doppler average in 1D.
+    This is a custom version of the library's `get_doppler_equations` that
+    does NOT remove the ground state, making it compatible with the analytical solvers.
 
-    This solver is considered more accurate than :func:`~.solve_steady_state`
+    Parameters
+    ----------
+    base_eoms : numpy.ndarray
+        The base Liouvillian for a stationary atom (size n^2 x n^2).
+    doppler_hamiltonians : numpy.ndarray
+        Stack of Hamiltonians (size n x n) for the Doppler shifts.
+    velocities : numpy.ndarray
+        Mesh of velocity classes to sample.
+
+    Returns
+    -------
+    numpy.ndarray
+        A stack of Doppler-shifted Liouvillians (size n^2 x n^2).
+    """
+
+    n_squared = base_eoms.shape[-1]
+    obes_complex = _hamiltonian_term(doppler_hamiltonians)
+    dummy_const = np.zeros(n_squared)
+    base_doppler_shift_eoms = make_real(obes_complex, dummy_const, ground_removed=False)[0]
+    doppler_shift_eoms = np.tensordot(velocities, base_doppler_shift_eoms, ((0),(0)))
+
+    n_stacks = len(base_eoms.shape[:-2])
+    spatial_dim = base_doppler_shift_eoms.shape[0]
+    exp_dims = tuple(range(spatial_dim, spatial_dim+n_stacks))
+    doppler_eqns = np.expand_dims(base_eoms, 0) + np.expand_dims(doppler_shift_eoms, exp_dims)
+
+    return doppler_eqns
+
+def memory_size(shape: Tuple[int, ...], item_size: int) -> int:
+    """
+    Helper function that calculates the memory size of an array in bytes.
+    """
+    return np.prod(shape, dtype=np.ulonglong).item() * item_size
+
+def get_slice_num_hybrid(n: int, 
+                         param_stack_shape: Tuple[int, ...], 
+                         numeric_doppler_shape: Tuple[int, ...],
+                         n_slices: Optional[int] = None,
+                         debug: bool = False) -> Tuple[int, Tuple[int, ...]]:
+    """
+    Estimates memory and determines the number of slices for the HYBRID solver.
+
+    This version is tailored to the memory footprint of the hybrid algorithm,
+    which includes large intermediate arrays like the propagator and eigenvector stacks.
+    
+    Parameters
+    ----------
+    n : int
+        Size of the system basis.
+    param_stack_shape : tuple of int
+        Tuple of sizes for the sensor's parameter axes (e.g., from L0.shape[:-2]).
+    numeric_doppler_shape : tuple of int
+        Tuple of sizes for the numeric doppler axes. Pass an empty tuple for the 1D case.
+    n_slices : int, optional
+        Manually override the minimum number of slices. If None, it's determined automatically.
+    debug : bool, optional
+        If True, prints detailed memory usage information.
+
+    Returns
+    -------
+    n_param_slices : int
+        Number of slices to use when iterating over the parameter stack.
+    out_sol_shape : tuple of int
+        Shape of the final, fully-solved solution array.
+    """
+    if n_slices is None:
+        n_slices = 1
+
+    # --- 1. Calculate Mandatory Memory (arrays that exist fully, regardless of slicing) ---
+    total_mem = psutil.virtual_memory().available
+    
+    # The full L0 matrix with all parameter stacks
+    l0_full_shape = (*param_stack_shape, n**2, n**2)
+    l0_full_mem = memory_size(l0_full_shape, 16) # complex128
+
+    # The final output solution array
+    out_sol_shape = (*param_stack_shape, n**2)
+    out_sol_mem = memory_size(out_sol_shape, 16) # Can be complex before final check
+    
+    mand_mem = l0_full_mem + out_sol_mem
+
+    # --- 2. Calculate Memory for a Single Slice ---
+    # This is the memory needed to process ONE parameter point through the hybrid algorithm.
+    
+    # Shape of the stacks over the numeric velocity grid
+    num_dop_stack_shape = (*numeric_doppler_shape, n**2, n**2)
+    num_dop_vec_shape = (*numeric_doppler_shape, n**2)
+
+    # Key arrays created inside the loop for a single slice
+    mem_l_base = memory_size(num_dop_stack_shape, 16)  # L_base_slice
+    mem_rho0 = memory_size(num_dop_vec_shape, 16)      # rho0_slice
+    mem_l0m = memory_size(num_dop_stack_shape, 16)      # L0m_slice (propagator)
+    mem_eigvecs = memory_size(num_dop_stack_shape, 16)  # r_eigvecs
+    mem_rho_dopp = memory_size(num_dop_vec_shape, 16)   # rho_dopp_slice
+
+    # Sum them up and add a safety buffer (e.g., 1.5x) for temporary copies
+    single_slice_mem = (mem_l_base + mem_rho0 + mem_l0m + mem_eigvecs + mem_rho_dopp) * 1.5
+
+    # --- 3. Determine the Number of Slices ---
+    available_mem = total_mem - mand_mem
+    
+    if available_mem < single_slice_mem:
+        raise RydiquleError(f'System is too large to solve. Need at least {single_slice_mem/1024**3} GiB')
+
+    num_param_points = np.prod(param_stack_shape, dtype=np.ulonglong)
+    if num_param_points == 0: num_param_points = 1 # Handle case with no parameter stacks
+
+    # Minimum slices needed based on memory
+    min_slices_needed = np.ceil(single_slice_mem * num_param_points / available_mem)
+    
+    # The number of slices is the larger of what's needed and what the user requested
+    n_param_slices = int(max(min_slices_needed, n_slices))
+    
+    if debug:
+        print('--- Hybrid Solver Memory Debug ---')
+        print(f'Total available RAM: {total_mem/1024**3:.4g} GiB')
+        print(f'Mandatory memory (full L0, final solution): {mand_mem/1024**3:.4g} GiB')
+        print(f'Peak memory for a single parameter slice: {single_slice_mem/1024**3:.4g} GiB')
+        print(f'Available memory for sliced calculations: {available_mem/1024**3:.4g} GiB')
+        print(f'Calculated minimum slices needed: {min_slices_needed}')
+        print(f'Final number of slices to be used: {n_param_slices}')
+        print('------------------------------------')
+        
+    return n_param_slices, out_sol_shape
+
+def doppler_hybrid_with_slicing(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = None, 
+                                analytic_axis: int = 0, n_slices: Optional[int] = None, rtol: float = 1e-5, 
+                                atol: float = 1e-9):
+    """
+    Solves a sensor in steady state in the presence of doppler broadening. If the broadening is 1 dimensional,
+    this function will solve analytically. If the broadening is 2 or 3 dimensional, this function will average
+    analytically over the specified axis and numerically over the remaining axes.
+
+    This function uses the method outlined in Ref [1] for the analytic dimension. 
+
+    This solver is considered more accurate than :func: `~.solve_steady_state`
     since it replaces direct sampling and solving of the velocity classes
     with a few tensor inversions and calculation of the numerical prefactor.
     This also leads to faster solves,
     approximately dictated by the ratio of samples along the doppler axis
-    relative to the other parameter dimensions.
+    relative to the other parameter dimensions. Additionally, in sensors with 2 or 3 dimensional doppler
+    broadening, this solver effectively reduces the dimension to 1 or 2, respectively, leading to faster
+    solves.
 
+    If insuffucent system memory is available to solve the system in a single call,
+    system is broken into "slices" of manageable memory footprint which are solved indivudually.
+    This slicing behavior does not affect the result.
+     
     Parameters
     ----------
     sensor : :class:`~.Sensor`
         The sensor for which the solution will be calculated.
         It must define 1 and only 1 dimension of doppler shifts
         (ie one or more couplings with `kvec` with non-zero values on the same dimension).
-    rtol: float, optional
+    doppler_mesh_method (dict,optional):
+        If not `None`, should be a dictionary of meshing parameters to be passed
+        to :func:`~.doppler_classes`. See :func:`~.doppler_classes` for more
+        information on supported methods and arguments. If `None, uses the
+        default doppler meshing. Default is `None`.
+    analytic_axis: int, optional
+        Specifies over which axis the solver will average analytically.
+        Defaults to 0.
+    n_slices : int or None, optional
+        How many sets of equations to break the full equations into.
+        The actual number of slices will be the largest between this value and the minumum
+        number of slices to solve the system without a memory error. If `None`, uses the minimum
+        number of slices to solve the system without a memory error. Detailed information about
+        slicing behavior can be found in :func:`~.slicing.slicing.matrix_slice`. Default is `None`.
+    rtol : float, optional
         Relative tolerance parameter for checking 0-eigenvalues when calculating the doppler prefactor.
         Passed to :external+numpy:func:`~numpy.isclose`.
         Defaults to 1e-5.
-    atol: float, optional
+    atol : float, optional
         Absolute tolerance parameter for checking 0-eigenvalues when calculating the doppler prefactor.
         Passed to :external+numpy:func:`~numpy.isclose`.
         Defaults to 1e-9.
@@ -158,28 +318,7 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     -------
     :class:`~.Solution`
         An object containing the solution and related information.
-
-    Raises
-    ------
-    RydiquleError
-        If the `sensor` does not have exactly 1 dimension of doppler shifts to average over.
-    AssertionError
-        If the initial rho0 calculation results in an unphysical result.
-
-    Warns
-    -----
-    RydiquleWarning
-        If the averaged result is not real within tolerances.
-        While rydiqule's computational basis is real,
-        the method employed here involves complex number floating point calculations.
-        If all is well, the complex parts should cancel to return a real result,
-        but imprecision in floating point operations can occur.
-    PopulationNotConservedWarning
-        Before removing the ground state in the final solution,
-        population conservation is confirmed.
-        If the resulting density matrices do not preserve trace, this warning is raised
-        indicating an issue in the calculation.
-
+    
     References
     ----------
     .. [1] Omar Nagib and Thad G. Walker,
@@ -188,60 +327,88 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
         http://arxiv.org/abs/2501.06134v3
     """
 
-    if sensor.spatial_dim() != 1:
-        raise RydiquleError(f'Sensor must have 1 spatial dimension of Doppler shifts, found {sensor.spatial_dim():d}')
-
+    spatial_dim = sensor.spatial_dim()
+    if analytic_axis >= spatial_dim:
+        raise ValueError(f"analytic_axis ({analytic_axis}) is out of bounds for spatial_dim ({spatial_dim})")
     n = sensor.basis_size
-    # Liouvillian superoperator for the non-doppler-broadened components
+
+    # 1. Get base Liouvillian (L0) and Doppler shifts
     L0, dummy_const = generate_eom(sensor.get_hamiltonian(), sensor.decoherence_matrix(),
-                      remove_ground_state=False,
-                      real_eom=True)
+                                   remove_ground_state=False, real_eom=True)
+    all_shifts = sensor.get_doppler_shifts()
 
-    rho0 = _get_rho0(L0)
+    # 2. Compute perturbation and velocity mesh
+    numeric_axes = [ax for ax in range(spatial_dim) if ax != analytic_axis]
+    num_numeric_dims = len(numeric_axes)
+    dopp_classes = doppler_classes(method = doppler_mesh_method)
+    dopp_velocities, dopp_volumes = doppler_mesh(dopp_classes, num_numeric_dims)
+
+    analytic_shift = np.take(all_shifts, analytic_axis, axis=0)
+    numeric_shifts = np.delete(all_shifts, analytic_axis, axis=0)
+    L_pert_complex = _hamiltonian_term(analytic_shift.squeeze())
+    L_pert, _ = make_real(L_pert_complex, dummy_const, ground_removed=False)
+
+    n_vel_points = len(dopp_classes)
+    numeric_doppler_shape = (n_vel_points,) * num_numeric_dims
+    param_stack_shape = L0.shape[:-2]
+
+    # 3. Compute number of slices and loop over each slice computing rho0, L0m, the analytic integral, 
+    #    and the numeric weighting/summing
+    n_slices, out_sol_shape = get_slice_num_hybrid(n, param_stack_shape, numeric_doppler_shape, 
+                                                   n_slices=n_slices, debug=True)
+
+    if n_slices > 1:
+        print(f"Breaking parameter stack into {n_slices} slices...")
+
+    sols = np.zeros(out_sol_shape, dtype = np.complex128)
     
-    vec1 = np.eye(n).flatten() #Initialize vectorized identity
-    L0m = (np.linalg.inv(L0 + rho0[..., np.newaxis] * vec1[np.newaxis, :])
-           - rho0[..., np.newaxis] * vec1[np.newaxis, :]
-    )
-    ### Liouvillian superoperator for doppler only
-    # these are already multiplied by sqrt(2)*sigma_v by rydiqule
-    # as such, lambdas are redefined as sqrt(2)*sigma_v*lambdas of Eq14 in the paper
-    dopp = sensor.get_doppler_shifts().squeeze()
-    Lv_complex = _hamiltonian_term(dopp)
-    Lv, _ = make_real(Lv_complex, dummy_const, ground_removed=False)
+    for i, (idx, L0_slice) in enumerate(matrix_slice(L0, n_slices=n_slices)):
+        if n_slices > 1:
+            print(f"Solving slice {i+1}/{n_slices}", end='\r')
+        
+        if num_numeric_dims == 0:
+            L_base_slice = L0_slice
+        else:
+            L_base_slice = get_doppler_equations_full_space(L0_slice, numeric_shifts, dopp_velocities)
 
-    ### Calculate doppler averaged steady-state density matrix from propagator
-    lamdas, r_eigvecs = np.linalg.eig(L0m@Lv)
+        rho0_slice = _get_rho0(L_base_slice)
 
-    # calculate Eq 14
-    prefix = _doppler_eigvec_array(lamdas)
-    suffix = np.linalg.solve(r_eigvecs, rho0[..., np.newaxis]).squeeze(axis=-1)
-    rho_dopp_complex = np.einsum('...j,...ij,...j->...i', prefix, r_eigvecs, suffix)
+        vec1 = np.eye(n).flatten()
+        L0m_slice = (np.linalg.inv(L_base_slice + rho0_slice[..., np.newaxis] * vec1[np.newaxis, :])
+                        - rho0_slice[..., np.newaxis] * vec1[np.newaxis, :])
+        lamdas, r_eigvecs = np.linalg.eig(L0m_slice @ L_pert)
 
-    # confirm that result is approximately real
+        prefix = _doppler_eigvec_array(lamdas)
+        suffix = np.linalg.solve(r_eigvecs, rho0_slice[..., np.newaxis]).squeeze(axis=-1)
+        rho_dopp_slice = np.einsum('...j,...ij,...j->...i', prefix, r_eigvecs, suffix)
+
+        sols_weighted = apply_doppler_weights(rho_dopp_slice, dopp_velocities, dopp_volumes)
+        axes_to_sum = tuple(range(num_numeric_dims))
+        sols_slice = np.sum(sols_weighted, axis=axes_to_sum)
+
+        sols[idx] = sols_slice
+
+    # 4. Postprocess solution
     imag_tol = 10000
-    rho_dopp = np.real_if_close(rho_dopp_complex, tol=imag_tol)  # chop complex parts if all are smaller than 10000*f64_eps
-    if np.iscomplexobj(rho_dopp):
-        rho_dopp_imag = np.abs(rho_dopp_complex.imag)
+    sols_real = np.real_if_close(sols, tol=imag_tol)
+    if np.iscomplexobj(sols_real):
+        rho_dopp_imag = np.abs(sols.imag)
         count = np.count_nonzero(rho_dopp_imag > np.finfo(float).eps*imag_tol)
         warnings.warn('Doppler-averaged solution has complex parts outside of tolerance, solution is suspect. ' +
-                      f'{count:d} of {rho_dopp.size:d} elments larger than cutoff {np.finfo(float).eps*imag_tol:.3g}. ' +
-                      f'Max Abs(Imag): {rho_dopp_imag.max():.3g}, Std Abs(Imag): {np.std(rho_dopp_imag):.3g}',
+                      f'{count:d} of {sols.size:d} elments larger than cutoff {np.finfo(float).eps*imag_tol:.3g}. ' +
+                      f'Max Abs(Imag): {sols.max():.3g}, Std Abs(Imag): {np.std(sols):.3g}',
                       RydiquleWarning)
-    # ensure trace is preserved before dropping ground state, which will implicitely enforce it
-    pops_dopp = np.sum(rho_dopp[...,::n+1], axis=-1)
+    pops_dopp = np.sum(sols_real[...,::n+1], axis=-1)
     if not np.isclose(pops_dopp, 1.0).all():
         warnings.warn('Doppler-averaged solution has populations not conserved, solution is suspect. ' +
                       f'{np.count_nonzero(~np.isclose(pops_dopp, 1.0)):d} of {pops_dopp.size:d} have non-unit trace. ' +
                       f'Min trace is {pops_dopp.min():f}',
                       PopulationNotConservedWarning)
 
-    ### make into a Solution object
+    # 5. Package into a solution object
     solution = Solution()
-    # match rydiqule convention for return (ie no ground population)
-    solution.rho = rho_dopp[...,1:]
+    solution.rho = sols_real[...,1:]
     
-    # specific to observable calculations
     solution._eta = sensor.eta
     solution._kappa = sensor.kappa
     solution._cell_length = sensor.cell_length
@@ -249,7 +416,6 @@ def doppler_1d_exact(sensor: Sensor, rtol: float = 1e-5, atol: float = 1e-9) -> 
     solution._probe_freq = sensor.probe_freq
     solution._probe_tuple = sensor.probe_tuple
 
-    # store the graph with fully_expanded dimensionality
     sensor._expand_dims()
     solution.couplings = deepcopy(sensor.couplings)
     _squeeze_dims(sensor.couplings)
