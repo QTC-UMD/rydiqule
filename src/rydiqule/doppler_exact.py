@@ -355,7 +355,7 @@ def doppler_hybrid_with_slicing(sensor: Sensor, doppler_mesh_method: Optional[Me
     # 3. Compute number of slices and loop over each slice computing rho0, L0m, the analytic integral, 
     #    and the numeric weighting/summing
     n_slices, out_sol_shape = get_slice_num_hybrid(n, param_stack_shape, numeric_doppler_shape, 
-                                                   n_slices=n_slices, debug=True)
+                                                   n_slices=n_slices)
 
     if n_slices > 1:
         print(f"Breaking parameter stack into {n_slices} slices...")
