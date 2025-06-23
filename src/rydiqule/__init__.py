@@ -5,7 +5,7 @@ Parent computational module.
 from .cell import Cell
 from .sensor import Sensor
 from .solvers import solve_steady_state
-from .doppler_exact import doppler_1d_exact
+from .doppler_exact import doppler_hybrid
 from .timesolvers import solve_time
 from .experiments import get_snr
 from .rydiqule_utils import about
