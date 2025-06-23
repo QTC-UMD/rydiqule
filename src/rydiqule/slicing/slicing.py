@@ -502,3 +502,95 @@ def get_slice_num_t(n: int, stack_shape: Tuple[int, ...],
         print(f'Number of stack slices to be used: {n_ham_slices:d}')
 
     return n_ham_slices, out_sol_shape
+
+
+def get_slice_num_hybrid(n: int, 
+                         param_stack_shape: Tuple[int, ...], 
+                         numeric_doppler_shape: Tuple[int, ...],
+                         n_slices: Optional[int] = None,
+                         debug: bool = False) -> Tuple[int, Tuple[int, ...]]:
+    """
+    Estimates memory and determines the number of slices for the HYBRID solver.
+
+    This version is tailored to the memory footprint of the hybrid algorithm,
+    which includes large intermediate arrays like the propagator and eigenvector stacks.
+    
+    Parameters
+    ----------
+    n : int
+        Size of the system basis.
+    param_stack_shape : tuple of int
+        Tuple of sizes for the sensor's parameter axes (e.g., from L0.shape[:-2]).
+    numeric_doppler_shape : tuple of int
+        Tuple of sizes for the numeric doppler axes. Pass an empty tuple for the 1D case.
+    n_slices : int, optional
+        Manually override the minimum number of slices. If None, it's determined automatically.
+    debug : bool, optional
+        If True, prints detailed memory usage information.
+
+    Returns
+    -------
+    n_param_slices : int
+        Number of slices to use when iterating over the parameter stack.
+    out_sol_shape : tuple of int
+        Shape of the final, fully-solved solution array.
+    """
+    if n_slices is None:
+        n_slices = 1
+
+    # --- 1. Calculate Mandatory Memory (arrays that exist fully, regardless of slicing) ---
+    total_mem = psutil.virtual_memory().available
+    
+    # The full L0 matrix with all parameter stacks
+    l0_full_shape = (*param_stack_shape, n**2, n**2)
+    l0_full_mem = memory_size(l0_full_shape, 16) # complex128
+
+    # The final output solution array
+    out_sol_shape = (*param_stack_shape, n**2)
+    out_sol_mem = memory_size(out_sol_shape, 16) # Can be complex before final check
+    
+    mand_mem = l0_full_mem + out_sol_mem
+
+    # --- 2. Calculate Memory for a Single Slice ---
+    # This is the memory needed to process ONE parameter point through the hybrid algorithm.
+    
+    # Shape of the stacks over the numeric velocity grid
+    num_dop_stack_shape = (*numeric_doppler_shape, n**2, n**2)
+    num_dop_vec_shape = (*numeric_doppler_shape, n**2)
+
+    # Key arrays created inside the loop for a single slice
+    mem_l_base = memory_size(num_dop_stack_shape, 16)  # L_base_slice
+    mem_rho0 = memory_size(num_dop_vec_shape, 16)      # rho0_slice
+    mem_l0m = memory_size(num_dop_stack_shape, 16)      # L0m_slice (propagator)
+    mem_eigvecs = memory_size(num_dop_stack_shape, 16)  # r_eigvecs
+    mem_rho_dopp = memory_size(num_dop_vec_shape, 16)   # rho_dopp_slice
+
+    # Sum them up and add a safety buffer (e.g., 1.5x) for temporary copies
+    single_slice_mem = (mem_l_base + mem_rho0 + mem_l0m + mem_eigvecs + mem_rho_dopp) * 1.5
+
+    # --- 3. Determine the Number of Slices ---
+    available_mem = total_mem - mand_mem
+    
+    if available_mem < single_slice_mem:
+        raise RydiquleError(f'System is too large to solve. Need at least {single_slice_mem/1024**3} GiB')
+
+    num_param_points = np.prod(param_stack_shape, dtype=np.ulonglong)
+    if num_param_points == 0: num_param_points = 1 # Handle case with no parameter stacks
+
+    # Minimum slices needed based on memory
+    min_slices_needed = np.ceil(single_slice_mem * num_param_points / available_mem)
+    
+    # The number of slices is the larger of what's needed and what the user requested
+    n_param_slices = int(max(min_slices_needed, n_slices))
+    
+    if debug:
+        print('--- Hybrid Solver Memory Debug ---')
+        print(f'Total available RAM: {total_mem/1024**3:.4g} GiB')
+        print(f'Mandatory memory (full L0, final solution): {mand_mem/1024**3:.4g} GiB')
+        print(f'Peak memory for a single parameter slice: {single_slice_mem/1024**3:.4g} GiB')
+        print(f'Available memory for sliced calculations: {available_mem/1024**3:.4g} GiB')
+        print(f'Calculated minimum slices needed: {min_slices_needed}')
+        print(f'Final number of slices to be used: {n_param_slices}')
+        print('------------------------------------')
+        
+    return n_param_slices, out_sol_shape
