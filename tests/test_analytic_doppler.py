@@ -38,7 +38,7 @@ def test_analytic_1D_doppler():
                                                              'width_coherent':0.28,
                                                              'n_coherent': 1001})
 
-    sol_exact = rq.doppler_1d_exact(cell)
+    sol_exact = rq.doppler_hybrid(cell)
 
     np.testing.assert_allclose(sol_exact.rho, sol_riemann.rho,
                                rtol=1e-5, atol=7e-5,
