@@ -575,7 +575,8 @@ def get_slice_num_hybrid(n: int,
         raise RydiquleError(f'System is too large to solve. Need at least {single_slice_mem/1024**3} GiB')
 
     num_param_points = np.prod(param_stack_shape, dtype=np.ulonglong)
-    if num_param_points == 0: num_param_points = 1 # Handle case with no parameter stacks
+    if num_param_points == 0: 
+        num_param_points = 1 # Handle case with no parameter stacks
 
     # Minimum slices needed based on memory
     min_slices_needed = np.ceil(single_slice_mem * num_param_points / available_mem)

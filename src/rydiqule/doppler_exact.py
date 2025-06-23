@@ -24,7 +24,7 @@ from scipy.special import erf
 from .sensor import Sensor
 from .sensor_utils import _hamiltonian_term, generate_eom, make_real, _squeeze_dims
 from .sensor_solution import Solution
-from .doppler_utils import doppler_classes, doppler_mesh, apply_doppler_weights
+from .doppler_utils import doppler_classes, doppler_mesh, apply_doppler_weights, MeshMethod
 from .slicing.slicing import matrix_slice, get_slice_num_hybrid
 from .exceptions import RydiquleError, RydiquleWarning, PopulationNotConservedWarning
 
@@ -231,7 +231,7 @@ def doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = N
 
     spatial_dim = sensor.spatial_dim()
     if analytic_axis >= spatial_dim:
-        raise ValueError(f"analytic_axis ({analytic_axis}) is out of bounds for spatial_dim ({spatial_dim})")
+        raise RydiquleError(f"analytic_axis ({analytic_axis}) is out of bounds for spatial_dim ({spatial_dim})")
     n = sensor.basis_size
 
     # 1. Get base Liouvillian (L0) and Doppler shifts
