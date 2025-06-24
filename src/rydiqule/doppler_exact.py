@@ -8,9 +8,6 @@ arXiv 2501.06134 (2025) http://arxiv.org/abs/2501.06134
 Solvers in this module are considered experimental.
 While we encourage raising issues encountered,
 issues with their use are considered features not fully implemented rather than bugs.
-
-At this point, only 1D doppler-averaged steady-state solutions are supported via
-:func:`doppler_1d_exact`.
 """
 
 import warnings
@@ -24,7 +21,7 @@ from scipy.special import erf
 from .sensor import Sensor
 from .sensor_utils import _hamiltonian_term, generate_eom, make_real, _squeeze_dims
 from .sensor_solution import Solution
-from .doppler_utils import doppler_classes, doppler_mesh, apply_doppler_weights, MeshMethod
+from .doppler_utils import doppler_classes, doppler_mesh, apply_doppler_weights, MeshMethod, get_doppler_equations
 from .slicing.slicing import matrix_slice, get_slice_num_hybrid
 from .exceptions import RydiquleError, RydiquleWarning, PopulationNotConservedWarning
 
@@ -73,7 +70,7 @@ def _get_rho0(L0: np.ndarray) -> np.ndarray:
     Helper function for computing rho0 (null vector) of a stack of equations of motion
     via the inverse power method.
 
-    Paramaters
+    Parameters
     ----------
     L0: np.ndarray
         Stack of steady state Liouvillians
@@ -127,44 +124,8 @@ def _get_rho0(L0: np.ndarray) -> np.ndarray:
 
     return rho0
 
-def get_doppler_equations_full_space(base_eoms: np.ndarray,
-                                     doppler_hamiltonians: np.ndarray,
-                                     velocities: np.ndarray) -> np.ndarray:
-    """
-    Constructs a stack of Doppler-shifted Liouvillians in the full n^2 space.
 
-    This is a custom version of the library's `get_doppler_equations` that
-    does NOT remove the ground state, making it compatible with the analytical solvers.
-
-    Parameters
-    ----------
-    base_eoms : numpy.ndarray
-        The base Liouvillian for a stationary atom (size n^2 x n^2).
-    doppler_hamiltonians : numpy.ndarray
-        Stack of Hamiltonians (size n x n) for the Doppler shifts.
-    velocities : numpy.ndarray
-        Mesh of velocity classes to sample.
-
-    Returns
-    -------
-    numpy.ndarray
-        A stack of Doppler-shifted Liouvillians (size n^2 x n^2).
-    """
-
-    n_squared = base_eoms.shape[-1]
-    obes_complex = _hamiltonian_term(doppler_hamiltonians)
-    dummy_const = np.zeros(n_squared)
-    base_doppler_shift_eoms = make_real(obes_complex, dummy_const, ground_removed=False)[0]
-    doppler_shift_eoms = np.tensordot(velocities, base_doppler_shift_eoms, ((0),(0)))
-
-    n_stacks = len(base_eoms.shape[:-2])
-    spatial_dim = base_doppler_shift_eoms.shape[0]
-    exp_dims = tuple(range(spatial_dim, spatial_dim+n_stacks))
-    doppler_eqns = np.expand_dims(base_eoms, 0) + np.expand_dims(doppler_shift_eoms, exp_dims)
-
-    return doppler_eqns
-
-def doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = None, 
+def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = None, 
                                 analytic_axis: int = 0, n_slices: Optional[int] = None, rtol: float = 1e-5, 
                                 atol: float = 1e-9):
     """
@@ -263,7 +224,7 @@ def doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = N
         print(f"Breaking parameter stack into {n_slices} slices...")
 
     sols = np.zeros(out_sol_shape, dtype = np.complex128)
-    
+
     for i, (idx, L0_slice) in enumerate(matrix_slice(L0, n_slices=n_slices)):
         if n_slices > 1:
             print(f"Solving slice {i+1}/{n_slices}", end='\r')
@@ -271,8 +232,7 @@ def doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = N
         if num_numeric_dims == 0:
             L_base_slice = L0_slice
         else:
-            L_base_slice = get_doppler_equations_full_space(L0_slice, numeric_shifts, dopp_velocities)
-
+            L_base_slice = get_doppler_equations(L0_slice, numeric_shifts, dopp_velocities, ground_removed=False)
         rho0_slice = _get_rho0(L_base_slice)
 
         vec1 = np.eye(n).flatten()

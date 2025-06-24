@@ -40,7 +40,7 @@ MeshMethod = Union[UniformMethod, IsoPopMethod, SplitMethod, DirectMethod]
 
 
 def get_doppler_equations(base_eoms: np.ndarray,
-                          doppler_hamiltonians: np.ndarray, Vs: np.ndarray) -> np.ndarray:
+                          doppler_hamiltonians: np.ndarray, Vs: np.ndarray, ground_removed : bool = True) -> np.ndarray:
     """
     Returns the equations for each slice of the doppler profile.
 
@@ -62,6 +62,9 @@ def get_doppler_equations(base_eoms: np.ndarray,
         Mesh of velocity classes to sample,
         with same spatial dimensions as `dop_ham`.
         See :func:`~.doppler_mesh` for details.
+    ground_removed : bool, optional
+        Whether to remove the ground state from the equations.
+        Default is True.
 
     Returns
     -------
@@ -82,7 +85,7 @@ def get_doppler_equations(base_eoms: np.ndarray,
     `doppler_hamiltonians` provides `k_i*vP`, `Vs` provides `det_i`.
 
     """
-    base_doppler_shift_eoms = generate_doppler_shift_eom(doppler_hamiltonians)
+    base_doppler_shift_eoms = generate_doppler_shift_eom(doppler_hamiltonians, ground_removed=ground_removed)
     # take outer product of velocities and base kvec eoms to get detunings.
     # Add shifts from each spatial dimension to each detuning
     doppler_shift_eoms = np.tensordot(Vs, base_doppler_shift_eoms, ((0),(0)))
@@ -96,7 +99,7 @@ def get_doppler_equations(base_eoms: np.ndarray,
     return doppler_eqns
 
 
-def generate_doppler_shift_eom(doppler_hamiltonians: np.ndarray) -> np.ndarray:
+def generate_doppler_shift_eom(doppler_hamiltonians: np.ndarray, ground_removed : bool = True) -> np.ndarray:
     """
     Generates the EOMs for the supplied doppler shifts.
 
@@ -108,6 +111,9 @@ def generate_doppler_shift_eom(doppler_hamiltonians: np.ndarray) -> np.ndarray:
     doppler_hamiltonians : numpy.ndarray
         Hamiltonians of only the doppler shifts,
         one for each spatial dimension to be averaged over.
+    ground_removed : bool, optional
+        Whether to remove the ground state from the equations.
+        Default is True.
 
     Returns
     -------
@@ -116,8 +122,13 @@ def generate_doppler_shift_eom(doppler_hamiltonians: np.ndarray) -> np.ndarray:
 
     """
     obes = _hamiltonian_term(doppler_hamiltonians)
-    obes, const = remove_ground(obes)
-    doppler_shift_obes = make_real(obes, const)[0]
+    if ground_removed:
+        obes, const = remove_ground(obes)
+        doppler_shift_obes = make_real(obes, const)[0]
+    else:
+        n_squared = doppler_hamiltonians.shape[-1]**2
+        const = np.zeros(n_squared)
+        doppler_shift_obes = make_real(obes, const, ground_removed=False)[0]
 
     return doppler_shift_obes
 
