@@ -72,9 +72,8 @@ Improvements
   Added an improved differential equation generation method `'flat'` which improves performance by ~30%.
   This new method is currently not compatible with doppler solves.
 - Extended the automated test suite to check docstring examples.
-- Added an analytic 1D doppler-averaged steady-state solver `doppler_1d_exact`.
+- Added a doppler-averaged steady-state solver, `doppler_hybrid`, that averages 1D systems analytically and 2D/3D systems using a hybrid method that averages one dimension analytically and the remaining dimensions numerically.
   This solver is significantly faster for Doppler-averaged solves.
-  For now, this solver is considered experimental.
 
 Bug Fixes
 +++++++++
