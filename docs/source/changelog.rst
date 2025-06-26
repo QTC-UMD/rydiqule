@@ -7,6 +7,16 @@ v2.1.0
 Improvements
 ++++++++++++
 
+- Edited physics docutmentation to include analytic doppler averaging.
+- Added function `solve_doppler_hybrid` which analytically averages over velocity classes in systems with one spatial dimension and, in systems with two or three spatial dimensions, analytically averages
+  over the user-specified analytic dimension and numerically averages over the remaining dimensions.
+- Added an example notebook, `2D Doppler Example`, showcasing the new `solve_doppler_hybrid` on a 2-spatial-dimension system.
+- Updated the testing notebook, `doppler_exact_profiling` to use the new `solve_doppler_hybrid` function.
+- Added utility function `get_slice_num_hybrid` for analytic doppler averaging.
+- Modified utility functions `get_doppler_equations` and `generate_doppler_shift_eom` to allow for the option to keep the ground state,
+  which is necessary for `solve_doppler_hybrid`.
+- Added unit test for 2D hybrid doppler-averaging. 
+
 Deprecations
 ++++++++++++
 
@@ -83,8 +93,7 @@ Improvements
   Added an improved differential equation generation method `'flat'` which improves performance by ~30%.
   This new method is currently not compatible with doppler solves.
 - Extended the automated test suite to check docstring examples.
-- Added a doppler-averaged steady-state solver, `doppler_hybrid`, that averages 1D systems analytically and 2D/3D systems using a hybrid method that averages one dimension analytically and the remaining dimensions numerically.
-  This solver is significantly faster for Doppler-averaged solves.
+- Added an analytic 1D doppler-averaged steady-state solver doppler_1d_exact. This solver is significantly faster for Doppler-averaged solves. For now, this solver is considered experimental.
 
 Bug Fixes
 +++++++++
