@@ -16,7 +16,7 @@ from importlib.metadata import version
 from copy import deepcopy
 from typing import Optional
 
-from scipy.special import erf
+from scipy.special import erfcx
 
 from .sensor import Sensor
 from .sensor_utils import _hamiltonian_term, generate_eom, make_real, _squeeze_dims
@@ -57,11 +57,11 @@ def _doppler_eigvec_array(lamdas: np.ndarray, rtol: float = 1e-5, atol: float = 
     idx = np.where(~np.isclose(lamdas, 0, rtol, atol))
 
     if len(idx[0]) > 0:
-        # split the calculation into three lines for readability
+        # split the calculation into two lines for readability, using the complementary error function to avoid 
+        # catastrophic cancellation when |lambda|~0
         p1 = np.sqrt(np.pi)/(np.sqrt(-1*lamdas[idx]**2))
-        p2 = np.exp(-1/(lamdas[idx]**2))
-        p3 = 1+erf(np.sqrt(-1*lamdas[idx]**2)/(lamdas[idx]**2))
-        doppler_array[idx] = p1*p2*p3
+        p2 = erfcx(-1*np.sqrt(-1*lamdas[idx]**2)/(lamdas[idx]**2))
+        doppler_array[idx] = p1*p2
 
     return doppler_array
 
