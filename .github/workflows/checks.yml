@@ -46,7 +46,7 @@ jobs:
   pytest-np2:
     name: Unit Tests with Numpy 2
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'QTC-UMD' || github.repository_owner == 'naqslab'
+    if: github.repository_owner == 'QTC-UMD'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,3 +64,19 @@ jobs:
       - name: Run Unit Tests
         run: |
           pytest . -m "not high_memory and not slow and not backend"
+
+  changelog:
+    # https://fredrikmeyer.net/2021/05/12/github-actions-changelog.html
+    name: Changelog Updated
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'QTC-UMD' || github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check up changelog updated
+        run: |
+          FILES_CHANGED=$(git diff --name-only origin/main...HEAD | grep -E 'changelog.rst' -c)
+          if [ "$FILES_CHANGED" != "1" ]; then echo >&2 "Remember to update changelog.rst"; exit 1; fi;
