@@ -1,6 +1,17 @@
 Changelog
 =========
 
+v2.1.0
+------
+
+Improvements
+++++++++++++
+
+Deprecations
+++++++++++++
+
+- `doppler_1d_exact` has been deprecated in favor of the more complete `solve_doppler_hybrid` which handles 1D/2D/3D analytic-enabled averaging
+
 v2.0.0
 ------
 
