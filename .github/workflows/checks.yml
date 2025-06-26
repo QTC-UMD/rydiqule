@@ -79,4 +79,4 @@ jobs:
       - name: Check up changelog updated
         run: |
           FILES_CHANGED=$(git diff --name-only origin/main...HEAD | grep -E 'changelog.rst' -c)
-          if [ "$FILES_CHANGED" != 1]; then echo "Remember to update changelog.rst"; exit 1; fi;
+          if [ "$FILES_CHANGED" != "1"]; then echo >&2 "Remember to update changelog.rst"; exit 1; fi;
