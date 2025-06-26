@@ -43,3 +43,55 @@ def test_analytic_1D_doppler():
     np.testing.assert_allclose(sol_exact.rho, sol_riemann.rho,
                                rtol=1e-5, atol=7e-5,
                                err_msg='Sampled and analytic 1D doppler do not match')
+    
+
+def test_analytic_2D_doppler():
+    """Test that 2D analytic doppler matches direct sampling regardless of analytic axis"""
+
+    atom = 'Rb85'
+
+    states = [
+        rq.ground_state(atom),
+        rq.A_QState(5, 1, 1/2),
+        rq.A_QState(6, 0, 1/2),
+        rq.A_QState(31, 1, 1/2)
+    ]
+
+    cell = rq.Cell(atom,states)
+
+    detunings = 2*np.pi*np.linspace(-10,10,201)
+    Omega_p = 2*np.pi*2
+    Omega_d = 2*np.pi*10
+    Omega_R = 2*np.pi*1
+
+    theta = 4.526
+    phi = 2.556
+
+    kunit1 = np.array([-1,0,0])
+    kunit2 = np.array([-1*np.cos(theta),-1*np.sin(theta),0])
+    kunit3 = np.array([-1*np.cos(phi),-1*np.sin(phi),0])
+
+    probe = {'states': (states[0],states[1]), 'detuning': 0, 'rabi_frequency': Omega_p, 'kunit': kunit1}
+    dressing = {'states': (states[1],states[2]), 'detuning': 0, 'rabi_frequency': Omega_d, 'kunit': kunit2}
+    Rydberg = {'states': (states[2],states[3]), 'detuning': detunings, 'rabi_frequency': Omega_R, 'kunit': kunit3}
+
+    cell.add_couplings(probe, dressing, Rydberg)
+
+    cell.vP = 20
+
+    m = {"method":"split", "n_coherent":151, "n_doppler":101, "width_doppler":2.5, "width_coherent":0.2}
+    sol_hyb_0 = rq.solve_doppler_hybrid(cell, analytic_axis=0, doppler_mesh_method=m)
+    sol_hyb_1 = rq.solve_doppler_hybrid(cell, analytic_axis=1, doppler_mesh_method=m)
+    sol_riemann = rq.solve_steady_state(cell, doppler=True,doppler_mesh_method=m)
+
+    np.testing.assert_allclose(sol_hyb_0.rho, sol_riemann.rho,
+                               rtol=1e-3, atol=7e-3,
+                               err_msg='Sampled and hybrid with analytic axis 0 do not match')
+    
+    np.testing.assert_allclose(sol_hyb_1.rho, sol_riemann.rho,
+                               rtol=1e-3, atol=7e-3,
+                               err_msg='Sampled and hybrid with analytic axis 1 do not match')
+    
+    np.testing.assert_allclose(sol_hyb_0.rho, sol_hyb_1.rho,
+                               rtol=1e-3, atol=7e-3,
+                               err_msg='Hybrid wtih analytic axis 0 and hybrid with analytic axis 1 do not match')
