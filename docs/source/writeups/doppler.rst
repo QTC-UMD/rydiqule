@@ -21,12 +21,6 @@ Both assumptions greatly simplify doppler averaging.
 Specifically, these assumptions allow us to further assume that atoms in different velocity classes do not interact,
 meaning that doppler averaging entails a simple weighted average of the atomic response at different velocities by the velocity distribution.
 
-.. The basic process under these assumptions is as follows:
-
-.. #. Calculate the density matrix solutions to the equations of motion for a wide range of velocity classes.
-.. #. Weight the density matrix solutions with the Maxwell-Distribution, assigning the relative atomic density per velocity class to each solution.
-.. #. Sum the weighted solutions.
-
 Note that rydiqule assumes a three dimensional distribution of velocities, as is the case for a vapor.
 
 Choosing Velocity Classes to Calculate
@@ -201,7 +195,8 @@ Thus,
 
     \rho_v = G_v \rho_0 = \sum_{\lambda = \lambda_1}^{\lambda_N} \frac{1}{1 + v \lambda} r_{\lambda} l_{\lambda}^T \rho_0
 
-Then the ensemble average can be computed by integrating over :math:`v`:
+Note that this approach extracts all :math:`v`-dependence into a single function. 
+To compute the ensemble average, we can simply integrate analytically over :math:`v`:
 
 .. math::
 
@@ -209,13 +204,15 @@ Then the ensemble average can be computed by integrating over :math:`v`:
     + \sum_{\lambda \not= 0} \frac{\sqrt{\pi/2}}{\sqrt{-\lambda^2} \sigma_v} \exp{\frac{-1}{2 \lambda^2 \sigma_v^2}} 
     \left(1 + \text{erf}\left[ \frac{\sqrt{-\lambda^2}}{\sqrt{2} \lambda^2 \sigma_v} \right] \right) r_{\lambda} l_{\lambda}^T \rho_0
 
-Note that by rydiqule convention, :math:`\mathcal{L}_v` contains the prefactor :math:`\sqrt{2}\sigma_v`. Thus, the equation implemented in :func:`~.solve_doppler_hybrid` is
+Note that by rydiqule convention, :math:`\mathcal{L}_v` contains the prefactor :math:`\sqrt{2}\sigma_v`. Additionally, for numeric stability,
+rydiqule utilizes `scipy.special.erfcx <https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.erfcx.html>`_.
+Thus, the equation implemented in :func:`~.solve_doppler_hybrid` is
 
 .. math::
 
     \bar{\rho} = \sum_{\lambda = 0} r_{\lambda} l_{\lambda}^T \rho_0 
-    + \sum_{\lambda \not= 0} \frac{\sqrt{\pi}}{\sqrt{-\lambda^2}} \exp{\frac{-1}{\lambda^2}} 
-    \left(1 + \text{erf}\left[ \frac{\sqrt{-\lambda^2}}{\lambda^2} \right] \right) r_{\lambda} l_{\lambda}^T \rho_0
+    + \sum_{\lambda \not= 0} \frac{\sqrt{\pi}}{\sqrt{-\lambda^2}} 
+    \text{erfcx}\left( \frac{-\sqrt{-\lambda^2}}{\lambda^2} \right) r_{\lambda} l_{\lambda}^T \rho_0
 
 Rydiqule's Implementation (Analytic Method)
 ++++++++++++++++++++++++++++++++++++++++++

@@ -35,13 +35,16 @@ This class relies on ARC to provide physical parameters.
 Solve the System
 ----------------
 
-We currently have two solvers implemented.
+We currently have three solvers implemented.
 
 #. A steady state solver (:func:`~.solve_steady_state`) that finds the steady state density matrix of the system.
    This can solve in a few different conditions:
 
    #. Optically-thin, cold ensemble
    #. Optically-thin, doppler-averaged ensemble
+
+#. A steady state doppler solver (:func:`~.solve_doppler_hybrid`) that analytically finds the steady state density 
+    matrix of an optically-thin, doppler-averaged ensemble.
 
 #. A time solver (:func:`~.solve_time`) that allows for fields to be defined arbitrarily in time.
 
