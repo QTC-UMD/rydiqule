@@ -77,6 +77,8 @@ def test_analytic_2D_doppler():
 
     cell.add_couplings(probe, dressing, Rydberg)
 
+    # Lower cell temperature to narrow the velocity distribution, allowing coarser mesh.
+    # This reduces memory requirements and computation time for unit testing.
     cell.vP = 20
 
     m = {"method":"split", "n_coherent":151, "n_doppler":101, "width_doppler":2.5, "width_coherent":0.2}

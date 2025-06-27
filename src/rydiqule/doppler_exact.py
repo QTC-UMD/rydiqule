@@ -5,9 +5,10 @@ Code in this module implements analytical doppler averaging techniques described
 Omar Nagib and Thad G. Walker, *Exact steady state of perturbed open quantum systems*,
 arXiv 2501.06134 (2025) http://arxiv.org/abs/2501.06134
 
-Solvers in this module are considered experimental.
-While we encourage raising issues encountered,
-issues with their use are considered features not fully implemented rather than bugs.
+This solver computes the doppler averaged steady state of a sensor.
+In 1 spatial dimension problems, it averages analytically.
+In 2 or 3 spatial dimension problems, it averages one axis analytically
+and the remaining numerically.
 """
 
 import warnings
@@ -126,23 +127,28 @@ def _get_rho0(L0: np.ndarray) -> np.ndarray:
 
 
 def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = None, 
-                                analytic_axis: int = 0, n_slices: Optional[int] = None, rtol: float = 1e-5, 
-                                atol: float = 1e-9):
+                                analytic_axis: Optional[int] = None, n_slices: Optional[int] = None, rtol: float = 1e-5, 
+                                atol: float = 1e-9) -> Solution:
     """
-    Solves a sensor in steady state in the presence of doppler broadening. If the broadening is 1 dimensional,
-    this function will solve analytically. If the broadening is 2 or 3 dimensional, this function will average
-    analytically over the specified axis and numerically over the remaining axes.
+    Solves a sensor in steady state in the presence of doppler broadening,
+    with one dimension analytically averaged. 
+    
+    If the broadening is 1 dimensional, this function will solve analytically. 
+    If the broadening is 2 or 3 dimensional, 
+    this function will average analytically over the specified axis 
+    and numerically over the remaining axes.
 
     This function uses the method outlined in Ref [1] for the analytic dimension. 
 
-    This solver is considered more accurate than :func: `~.solve_steady_state`
+    This solver is considered more accurate than :func:`~.solve_steady_state`
     since it replaces direct sampling and solving of the velocity classes
     with a few tensor inversions and calculation of the numerical prefactor.
     This also leads to faster solves,
     approximately dictated by the ratio of samples along the doppler axis
-    relative to the other parameter dimensions. Additionally, in sensors with 2 or 3 dimensional doppler
-    broadening, this solver effectively reduces the dimension to 1 or 2, respectively, leading to faster
-    solves.
+    relative to the other parameter dimensions. 
+    Additionally, in sensors with 2 or 3 dimensional doppler broadening, 
+    this solver effectively reduces the dimension to 1 or 2, respectively, 
+    leading to faster solves.
 
     If insuffucent system memory is available to solve the system in a single call,
     system is broken into "slices" of manageable memory footprint which are solved indivudually.
@@ -161,7 +167,7 @@ def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMetho
         default doppler meshing. Default is `None`.
     analytic_axis: int, optional
         Specifies over which axis the solver will average analytically.
-        Defaults to 0.
+        Defaults to the first nonzero axis.
     n_slices : int or None, optional
         How many sets of equations to break the full equations into.
         The actual number of slices will be the largest between this value and the minumum
@@ -191,8 +197,29 @@ def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMetho
     """
 
     spatial_dim = sensor.spatial_dim()
-    if analytic_axis >= spatial_dim:
-        raise RydiquleError(f"analytic_axis ({analytic_axis}) is out of bounds for spatial_dim ({spatial_dim})")
+
+    if spatial_dim == 0:
+        raise RydiquleError(f"Sensor must have at least 1 spatial dimension of Doppler shifts, found {spatial_dim}")
+
+    # Create a sorted array of nonzero axes
+    kvecs = sensor.get_value_dictionary('kvec')
+    nonzero_axes = set()
+    for k, v in kvecs.items():
+        current_nonzero_axes = np.where(np.abs(v) > 1e-15)[0]
+        nonzero_axes.update(current_nonzero_axes)
+    nonzero_axes = np.array(sorted(list(nonzero_axes)))
+
+    # Set the default analytic axis to the first nonzero axis
+    if analytic_axis is None:
+        analytic_axis = nonzero_axes[0]
+    
+    # Account for analytic axis set to a zero axis, e.g., kvec of (1,1,0) and inputted analytic axis of 2
+    if analytic_axis not in nonzero_axes:
+        raise RydiquleError(f"analytic_axis ({analytic_axis}) is out of bounds for nonzero_axes ({nonzero_axes})")
+    
+    # Remap the physical axes to the reduced problem space, e.g., kvec of (0,0,1) and inputted analytic axis of 2
+    analytic_axis = np.where(nonzero_axes == analytic_axis)[0][0]
+
     n = sensor.basis_size
 
     # 1. Get base Liouvillian (L0) and Doppler shifts
