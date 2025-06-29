@@ -199,7 +199,7 @@ def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMetho
     spatial_dim = sensor.spatial_dim()
 
     if spatial_dim == 0:
-        raise RydiquleError(f"Sensor must have at least 1 spatial dimension of Doppler shifts, found {spatial_dim}")
+        raise RydiquleError("System must have at least 1 spatial dimension of Doppler shifts")
 
     # Create a sorted array of nonzero axes
     kvecs = sensor.get_value_dictionary('kvec')
@@ -215,8 +215,8 @@ def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMetho
     
     # Account for analytic axis set to a zero axis, e.g., kvec of (1,1,0) and inputted analytic axis of 2
     if analytic_axis not in nonzero_axes:
-        raise RydiquleError(f"analytic_axis ({analytic_axis}) is out of bounds for nonzero_axes ({nonzero_axes})")
-    
+        raise RydiquleError(f"analytic_axis={analytic_axis} has no doppler shifts, "
+                            + f" valid options are: {nonzero_axes}")
     # Remap the physical axes to the reduced problem space, e.g., kvec of (0,0,1) and inputted analytic axis of 2
     analytic_axis = np.where(nonzero_axes == analytic_axis)[0][0]
 
