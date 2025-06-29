@@ -2,9 +2,60 @@ import numpy as np
 import rydiqule as rq
 import pytest
 
+
+@pytest.mark.exception
+def test_analytic_exceptions():
+    """Test input validation of solve_doppler_hybrid"""
+
+    atom = 'Rb87'
+
+    states = [
+        rq.ground_state(atom),
+        rq.D2_excited(atom),
+        rq.A_QState(41, 2, 5/2),
+    ]
+
+    cell = rq.Cell(atom, states)
+
+    with pytest.raises(rq.RydiquleError, match='at least 1'):
+
+        red = {'states': (states[0],states[1]),
+               'detuning': 1, 'rabi_frequency': 2}
+        blue = {'states': (states[1],states[2]),
+                'detuning': 0, 'rabi_frequency': 4}
+
+        cell.add_couplings(red, blue)
+
+        rq.solve_doppler_hybrid(cell)
+
+    with pytest.raises(rq.RydiquleError, match='no doppler shifts'):
+        kunit_r = np.array([1, 0, 0])
+        kunit_b = np.array([-1, 0, 0])
+
+        red = {'states': (states[0],states[1]),
+               'detuning': 1, 'rabi_frequency': 2, 'kunit': kunit_r}
+        blue = {'states': (states[1],states[2]),
+                'detuning': 0, 'rabi_frequency': 4, 'kunit': kunit_b}
+
+        cell.add_couplings(red, blue)
+
+        rq.solve_doppler_hybrid(cell, analytic_axis=1)
+
+    with pytest.raises(rq.RydiquleError, match='no doppler shifts'):
+        kunit_r = np.array([1, 0, 0])
+        kunit_b = np.array([0, 0, -1])
+
+        red = {'states': (states[0],states[1]),
+               'detuning': 1, 'rabi_frequency': 2, 'kunit': kunit_r}
+        blue = {'states': (states[1],states[2]),
+                'detuning': 0, 'rabi_frequency': 4, 'kunit': kunit_b}
+
+        cell.add_couplings(red, blue)
+
+        rq.solve_doppler_hybrid(cell, analytic_axis=1)
+
 @pytest.mark.steady_state
 @pytest.mark.doppler
-@pytest.mark.dev
 def test_analytic_1D_doppler():
     """Test that 1D analytic doppler matches direct sampling"""
 
@@ -45,6 +96,8 @@ def test_analytic_1D_doppler():
                                err_msg='Sampled and analytic 1D doppler do not match')
     
 
+@pytest.mark.steady_state
+@pytest.mark.doppler
 def test_analytic_2D_doppler():
     """Test that 2D analytic doppler matches direct sampling regardless of analytic axis"""
 
