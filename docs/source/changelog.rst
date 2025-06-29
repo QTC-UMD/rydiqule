@@ -7,7 +7,6 @@ v2.1.0
 Improvements
 ++++++++++++
 
-- Edited physics documentation to include analytic doppler averaging.
 - Fully support 1D/2D/3D doppler solves using the analytic-enabled solver, `solve_doppler_hybrid`. The anlytic average
   is applied to a single dimension, with other present dimensions treated numerically. This provides notable decreases in
   computation times and memory footprints and increases in solution accuracy in all spatial dimensions.

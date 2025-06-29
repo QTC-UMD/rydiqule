@@ -195,8 +195,8 @@ Thus,
 
     \rho_v = G_v \rho_0 = \sum_{\lambda = \lambda_1}^{\lambda_N} \frac{1}{1 + v \lambda} r_{\lambda} l_{\lambda}^T \rho_0
 
-Note that this approach extracts all :math:`v`-dependence into a single function. 
-To compute the ensemble average, we can simply integrate analytically over :math:`v`:
+Note that this approach extracts all :math:`v`-dependence into the algebraic prefactor :math:`1/1+v\lambda`.
+As a result, we can simply integrate analytically over :math:`v` to compute the ensemble average:
 
 .. math::
 
