@@ -547,9 +547,9 @@ def get_slice_num_hybrid(n: int,
 
     # The final output solution array
     out_sol_shape = (*param_stack_shape, n**2)
-    out_sol_mem = memory_size(out_sol_shape, 16) # Can be complex before final check
+    out_sol_mem = memory_size(out_sol_shape, 8)
     
-    mand_mem = l0_full_mem + out_sol_mem
+    mand_mem = l0_full_mem + out_sol_mem*2 # Sol is complex before final check
 
     # --- 2. Calculate Memory for a Single Slice ---
     # This is the memory needed to process ONE parameter point through the hybrid algorithm.
@@ -579,7 +579,8 @@ def get_slice_num_hybrid(n: int,
         num_param_points = 1 # Handle case with no parameter stacks
 
     # Minimum slices needed based on memory
-    min_slices_needed = np.ceil(single_slice_mem * num_param_points / available_mem)
+    full_sol_mem = single_slice_mem * num_param_points
+    min_slices_needed = np.ceil(full_sol_mem / available_mem)
     
     # The number of slices is the larger of what's needed and what the user requested
     n_param_slices = int(max(min_slices_needed, n_slices))
@@ -587,8 +588,9 @@ def get_slice_num_hybrid(n: int,
     if debug:
         print('--- Hybrid Solver Memory Debug ---')
         print(f'Total available RAM: {total_mem/1024**3:.4g} GiB')
-        print(f'Mandatory memory (full L0, final solution): {mand_mem/1024**3:.4g} GiB')
-        print(f'Peak memory for a single parameter slice: {single_slice_mem/1024**3:.4g} GiB')
+        print(f'Min Req memory to solve: {single_slice_mem/1024**3:.4g} GiB')
+        print(f'Req memory for full solve: {full_sol_mem/1024**3:.4g} GiB')
+        print(f'\tFull output solution size: {out_sol_mem/1024**3:.5g} GiB')
         print(f'Available memory for sliced calculations: {available_mem/1024**3:.4g} GiB')
         print(f'Calculated minimum slices needed: {min_slices_needed}')
         print(f'Final number of slices to be used: {n_param_slices}')
