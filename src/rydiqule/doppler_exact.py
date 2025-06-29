@@ -15,7 +15,7 @@ import warnings
 import numpy as np
 from importlib.metadata import version
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, Set
 
 from scipy.special import erfcx
 
@@ -203,20 +203,21 @@ def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMetho
 
     # Create a sorted array of nonzero axes
     kvecs = sensor.get_value_dictionary('kvec')
-    nonzero_axes = set()
-    for k, v in kvecs.items():
-        current_nonzero_axes = np.where(np.abs(v) > 1e-15)[0]
-        nonzero_axes.update(current_nonzero_axes)
-    nonzero_axes = np.array(sorted(list(nonzero_axes)))
+    nonzero: Set[int] = set()
+    for _, v in kvecs.items():
+        current_nonzero_axes = np.where(~np.isclose(v, 0.0))[0]
+        nonzero.update(current_nonzero_axes)
+    nonzero_axes = np.array(sorted(list(nonzero)))
 
     # Set the default analytic axis to the first nonzero axis
     if analytic_axis is None:
-        analytic_axis = nonzero_axes[0]
+        analytic_axis: int = nonzero_axes[0]
     
     # Account for analytic axis set to a zero axis, e.g., kvec of (1,1,0) and inputted analytic axis of 2
-    if analytic_axis not in nonzero_axes:
+    elif analytic_axis not in nonzero_axes:
         raise RydiquleError(f"analytic_axis={analytic_axis} has no doppler shifts, "
                             + f" valid options are: {nonzero_axes}")
+
     # Remap the physical axes to the reduced problem space, e.g., kvec of (0,0,1) and inputted analytic axis of 2
     analytic_axis = np.where(nonzero_axes == analytic_axis)[0][0]
 
