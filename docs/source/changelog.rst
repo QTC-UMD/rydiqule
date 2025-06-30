@@ -11,6 +11,7 @@ Improvements
   is applied to a single dimension, with other present dimensions treated numerically. This provides notable decreases in
   computation times and memory footprints and increases in solution accuracy in all spatial dimensions.
 - Added an example notebook, `2D Doppler Example`, showcasing the new `solve_doppler_hybrid` on a 2-spatial-dimension system.
+- Added an example notebook, `3D Doppler Example`, showcasing the new `solve_doppler_hybrid` on a 3-spatial-dimension system.
 - Extended documentation and unit unit-testing to include hybrid solver implementation.
 
 Deprecations
