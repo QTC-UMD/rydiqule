@@ -43,7 +43,7 @@ We currently have three solvers implemented.
    #. Optically-thin, cold ensemble
    #. Optically-thin, doppler-averaged ensemble
 
-#. A steady state doppler solver (:func:`~.solve_doppler_hybrid`) that analytically finds the steady state density 
+#. A steady state doppler solver (:func:`~.solve_doppler_analytic`) that analytically finds the steady state density 
     matrix of an optically-thin, doppler-averaged ensemble.
 
 #. A time solver (:func:`~.solve_time`) that allows for fields to be defined arbitrarily in time.

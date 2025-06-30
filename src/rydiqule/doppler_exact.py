@@ -126,7 +126,7 @@ def _get_rho0(L0: np.ndarray) -> np.ndarray:
     return rho0
 
 
-def solve_doppler_hybrid(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = None, 
+def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMethod] = None, 
                                 analytic_axis: Optional[int] = None, n_slices: Optional[int] = None, rtol: float = 1e-5, 
                                 atol: float = 1e-9) -> Solution:
     """

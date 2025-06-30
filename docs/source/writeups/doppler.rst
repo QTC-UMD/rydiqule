@@ -3,7 +3,7 @@ Doppler Averaging
 
 This document discusses the methods rydiqule uses to implement doppler-averaging of modelling results. 
 As of version 2.1.0, rydiqule now provides two functions for implementing doppler-averaging: :func:`~.solve_steady_state` that averages numerically by sampling 
-and :func:`~.solve_doppler_hybrid` that averages one spatial dimension analytically and the remaining spatial dimensions numerically.
+and :func:`~.solve_doppler_analytic` that averages one spatial dimension analytically and the remaining spatial dimensions numerically.
 The theoretical background is provided for completeness,
 but is fairly standard.
 Rydiqule's implementation of this is less obvious in order to optimize computational efficiency by fully leveraging numpy's vectorized operations.
@@ -206,7 +206,7 @@ As a result, we can simply integrate analytically over :math:`v` to compute the 
 
 Note that by rydiqule convention, :math:`\mathcal{L}_v` contains the prefactor :math:`\sqrt{2}\sigma_v`. Additionally, for numeric stability,
 rydiqule utilizes `scipy.special.erfcx <https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.erfcx.html>`_.
-Thus, the equation implemented in :func:`~.solve_doppler_hybrid` is
+Thus, the equation implemented in :func:`~.solve_doppler_analytic` is
 
 .. math::
 
@@ -218,8 +218,8 @@ Rydiqule's Implementation (Analytic Method)
 ++++++++++++++++++++++++++++++++++++++++++
 
 Rydiqule's implementation of Doppler averaging is optimized to minimize duplicate calculations and fully leverage numpy's vectorized and broadcasting operations.
-In the case of one spatial dimension, :func:`~.solve_doppler_hybrid` computes the doppler-averaged solution as outlined above.
-In the case of two or three spatial dimensions, :func:`~.solve_doppler_hybrid` computes the doppler-averaged solution as follows:
+In the case of one spatial dimension, :func:`~.solve_doppler_analytic` computes the doppler-averaged solution as outlined above.
+In the case of two or three spatial dimensions, :func:`~.solve_doppler_analytic` computes the doppler-averaged solution as follows:
 
 #. Choose the doppler velocities to use for the numeric axes in the average.
 #. Generate the Equations of Motion (EOMs) for the base zero velocity class using the machinery described in :doc:`Equations of Motion Generation <eom_notes>`.
