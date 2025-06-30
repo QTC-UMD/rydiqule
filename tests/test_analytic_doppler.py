@@ -5,7 +5,7 @@ import pytest
 
 @pytest.mark.exception
 def test_analytic_exceptions():
-    """Test input validation of solve_doppler_hybrid"""
+    """Test input validation of solve_doppler_analytic"""
 
     atom = 'Rb87'
 
@@ -26,7 +26,7 @@ def test_analytic_exceptions():
 
         cell.add_couplings(red, blue)
 
-        rq.solve_doppler_hybrid(cell)
+        rq.solve_doppler_analytic(cell)
 
     with pytest.raises(rq.RydiquleError, match='no doppler shifts'):
         kunit_r = np.array([1, 0, 0])
@@ -39,7 +39,7 @@ def test_analytic_exceptions():
 
         cell.add_couplings(red, blue)
 
-        rq.solve_doppler_hybrid(cell, analytic_axis=1)
+        rq.solve_doppler_analytic(cell, analytic_axis=1)
 
     with pytest.raises(rq.RydiquleError, match='no doppler shifts'):
         kunit_r = np.array([1, 0, 0])
@@ -52,7 +52,7 @@ def test_analytic_exceptions():
 
         cell.add_couplings(red, blue)
 
-        rq.solve_doppler_hybrid(cell, analytic_axis=1)
+        rq.solve_doppler_analytic(cell, analytic_axis=1)
 
 @pytest.mark.steady_state
 @pytest.mark.doppler
@@ -89,7 +89,7 @@ def test_analytic_1D_doppler():
                                                              'width_coherent':0.28,
                                                              'n_coherent': 1001})
 
-    sol_exact = rq.solve_doppler_hybrid(cell)
+    sol_exact = rq.solve_doppler_analytic(cell)
 
     np.testing.assert_allclose(sol_exact.rho, sol_riemann.rho,
                                rtol=1e-5, atol=7e-5,
@@ -135,8 +135,8 @@ def test_analytic_2D_doppler():
     cell.vP = 20
 
     m = {"method":"split", "n_coherent":151, "n_doppler":101, "width_doppler":2.5, "width_coherent":0.2}
-    sol_hyb_0 = rq.solve_doppler_hybrid(cell, analytic_axis=0, doppler_mesh_method=m)
-    sol_hyb_1 = rq.solve_doppler_hybrid(cell, analytic_axis=1, doppler_mesh_method=m)
+    sol_hyb_0 = rq.solve_doppler_analytic(cell, analytic_axis=0, doppler_mesh_method=m)
+    sol_hyb_1 = rq.solve_doppler_analytic(cell, analytic_axis=1, doppler_mesh_method=m)
     sol_riemann = rq.solve_steady_state(cell, doppler=True,doppler_mesh_method=m)
 
     np.testing.assert_allclose(sol_hyb_0.rho, sol_riemann.rho,

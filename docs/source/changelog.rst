@@ -7,16 +7,16 @@ v2.1.0
 Improvements
 ++++++++++++
 
-- Fully support 1D/2D/3D doppler solves using the analytic-enabled solver, `solve_doppler_hybrid`. The anlytic average
+- Fully support 1D/2D/3D doppler solves using the analytic-enabled solver, `solve_doppler_analytic`. The anlytic average
   is applied to a single dimension, with other present dimensions treated numerically. This provides notable decreases in
   computation times and memory footprints and increases in solution accuracy in all spatial dimensions.
-- Added an example notebook, `2D Doppler Example`, showcasing the new `solve_doppler_hybrid` on a 2-spatial-dimension system.
+- Added an example notebook, `Analyic Doppler Solver`, showcasing the new `solve_doppler_analytic`.
 - Extended documentation and unit unit-testing to include hybrid solver implementation.
 
 Deprecations
 ++++++++++++
 
-- `doppler_1d_exact` has been deprecated in favor of the more complete `solve_doppler_hybrid` which handles 1D/2D/3D analytic-enabled averaging
+- `doppler_1d_exact` has been deprecated in favor of the more complete `solve_doppler_analytic` which handles 1D/2D/3D analytic-enabled averaging
 
 v2.0.0
 ------
