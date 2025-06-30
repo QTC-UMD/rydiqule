@@ -510,9 +510,9 @@ def get_slice_num_hybrid(n: int,
                          n_slices: Optional[int] = None,
                          debug: bool = False) -> Tuple[int, Tuple[int, ...]]:
     """
-    Estimates memory and determines the number of slices for the HYBRID solver.
+    Estimates memory and determines the number of slices for the analytic solver.
 
-    This version is tailored to the memory footprint of the hybrid algorithm,
+    This version is tailored to the memory footprint of the analytic algorithm,
     which includes large intermediate arrays like the propagator and eigenvector stacks.
     
     Parameters
@@ -586,7 +586,7 @@ def get_slice_num_hybrid(n: int,
     n_param_slices = int(max(min_slices_needed, n_slices))
     
     if debug:
-        print('--- Hybrid Solver Memory Debug ---')
+        print('--- Analytic Solver Memory Debug ---')
         print(f'Total available RAM: {total_mem/1024**3:.4g} GiB')
         print(f'Min Req memory to solve: {single_slice_mem/1024**3:.4g} GiB')
         print(f'Req memory for full solve: {full_sol_mem/1024**3:.4g} GiB')
