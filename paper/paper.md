@@ -16,12 +16,18 @@ authors:
     orcid: 0000-0003-2452-2017
     equal-contrib: true
     affiliation: 1
+  - name: Carter A. Montag
+    orcid: 0009-0000-9583-3854
+    affiliation: 2
   - name: Omar Nagib
     orcid: 0000-0003-3345-4781
-    affiliation: 2
+    affiliation: 3
   - name: Teemu Virtanen
     orcid: 0000-0002-0653-2564
-    affiliation: 3
+    affiliation: 4
+  - name: Peter K. Elgee
+    orcid: 0000-0002-5055-3039
+    affiliation: 1
   - name: Kevin C. Cox
     orcid: 0000-0001-5049-3999
     affiliation: 1
@@ -30,9 +36,12 @@ affiliations:
     name: DEVCOM Army Research Laboratory, 2800 Powder Mill Rd, Adelphi, MD, 20783, USA
     ror: 011hc8f90
   - index: 2
+    name: Program in Applied Mathematics, University of Arizona, 1200 E University Blvd, Tuscon, AZ 85721, USA
+    ror: 03m2x1q45
+  - index: 3
     name: Department of Physics, University of Wisconsin-Madison, 1150 University Avenue, Madison, WI, 53706, USA
     ror: 01y2jtd41
-  - index: 3
+  - index: 4
     name: Naval Air Warfare Center, 1 Administration Circle, China Lake, CA, 93555, USA
     ror: 01f0pxq13
 
@@ -146,4 +155,6 @@ as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elg
 # Acknowledgements
 
 Financial support for the development of RydIQule version 2 was provided by the DEVCOM Army Research Laboratory.
-The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government. Omar Nagib acknowledges helpful discussion with Thad G. Walker.
+Carter Montag acknowledges financial support from the Department of Defense Historically Black Colleges & Universities and Minority Serving Institutions (HBCU/MI) Summer Research Internship Program.
+Omar Nagib acknowledges helpful discussion with Thad G. Walker.
+The views, opinions and/or findings expressed are those of the authors and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government.
