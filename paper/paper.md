@@ -87,7 +87,7 @@ The main advance of RydIQule version 2 is to allow user-friendly inclusion of la
 In particular, this release introduces a new paradigm for structured labeling of states using arbitrary tuples,
 and expands the automated calculation of relevant atomic properties on alkali atoms commonly used in Rydberg physics
 to include sublevels.
-This release also includes a new steady-state Doppler-averaging method that improves speed and accuracy,
+This release also includes a new steady-state Doppler-averaging method that greatly improves speed and accuracy,
 along with many other optimizations and improvements to the code-base.
 
 ## Handling Sublevel Structure
@@ -117,11 +117,14 @@ fine and hyperfine respectively, lowering the total number of sublevels that nee
 
 ## Analytic Doppler Averaging
 
-Experimental support for Doppler-averaged models using an exact analytic solution has been added.
+Support for steady-state Doppler-averaged models leveraging an exact analytic method has been added.
 This functionality is based on the theoretical work presented in [@nagib_exact_2025].
-That work derives the exact velocity dependence due to Doppler shifts for any system, and it effectively reduces the Doppler-averaging integration in one-dimensional geometries to two diagonalizations, avoiding velocity sampling, and enabling a general, analytic result.
-Replacing RydIQule's approximate numeric integration with this exact method results in faster and significantly higher accuracy solutions.
-At present, only 1-dimensional Doppler averages in the steady-state are supported, with extensions to higher dimensions planned for the next minor release.
+That work derives the exact velocity dependence due to Doppler shifts for a system along a single axis.
+It effectively reduces the Doppler-averaging integration along that single dimension to two diagonalizations,
+avoiding velocity sampling that dimension, and enabling a general, analytic result.
+For example, a two-dimensional Doppler-average only needs to be numerically sampled along one axis, with the other performed analytically.
+This reduction in dimensionality results in over an order of magnitude reduction in calculation time and memory footprint while returning significantly higher accuracy solutions.
+Experimental support for 1D solves only was released in version 2.0.0, with RydIQule v2.1.0 providing full support.
 
 # Related Packages and Work
 
@@ -137,8 +140,8 @@ And since Mathematica is an interpreted language,
 it can lack the speed that compiled libraries like NumPy enable, especially when exploring a large parameter space.
 
 Since RydIQule version 1 has been publicly released,
-it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024]
-as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024].
+it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024, @glick_warm_2025]
+as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024, @cui_realizing_2025].
 
 # Acknowledgements
 
