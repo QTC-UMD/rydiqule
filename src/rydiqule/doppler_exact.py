@@ -138,7 +138,7 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
     this function will average analytically over the specified axis 
     and numerically over the remaining axes.
 
-    This function uses the method outlined in Ref [1] for the analytic dimension. 
+    This function uses the method outlined in Ref [1]_ for the analytic dimension. 
 
     This solver is considered more accurate than :func:`~.solve_steady_state`
     since it replaces direct sampling and solving of the velocity classes
@@ -160,7 +160,7 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
         The sensor for which the solution will be calculated.
         It must define 1 and only 1 dimension of doppler shifts
         (ie one or more couplings with `kvec` with non-zero values on the same dimension).
-    doppler_mesh_method (dict,optional):
+    doppler_mesh_method: dict, optional
         If not `None`, should be a dictionary of meshing parameters to be passed
         to :func:`~.doppler_classes`. See :func:`~.doppler_classes` for more
         information on supported methods and arguments. If `None, uses the

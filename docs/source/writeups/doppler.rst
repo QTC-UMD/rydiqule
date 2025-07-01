@@ -215,7 +215,7 @@ Thus, the equation implemented in :func:`~.solve_doppler_analytic` is
     \text{erfcx}\left( \frac{-\sqrt{-\lambda^2}}{\lambda^2} \right) r_{\lambda} l_{\lambda}^T \rho_0
 
 Rydiqule's Implementation (Analytic Method)
-++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++
 
 Rydiqule's implementation of Doppler averaging is optimized to minimize duplicate calculations and fully leverage numpy's vectorized and broadcasting operations.
 In the case of one spatial dimension, :func:`~.solve_doppler_analytic` computes the doppler-averaged solution as outlined above.
@@ -245,13 +245,13 @@ making them easily re-usable for any velocity distribution that obeys the Maxwel
 .. _kvec update:
 
 Migrating Doppler averaging from v1 to v2
-+++++++++++++++++++++++++++++++++++++++++
+-----------------------------------------
 
 With the release of v2 of rydiqule, how the user provides the above quantities has changed for both :class:`~.Sensor` and :class:`~.Cell`.
 
 In v1, the `'kvec'` parameter of the coupling was defined as the most probable Doppler shift vector (ie :math:`\vec{k}*v_P`).
 This has been changed in v2 such that `'kvec'` is now defined as the optical k-vector only (in units of Mrad/m),
-and :math:`v_P` is provided separately at :class:`~.Sensor` instantiation or by manually updating the :attr:`~.Sensor.vP`.
+and :math:`v_P` is provided separately at :class:`~.Sensor` instantiation or by manually updating the :attr:`~.Sensor.vP` class attribute.
 Put simply, moving :class:`~.Sensor` simulations from v1 to v2 means no longer multiplying the k-vector by :math:`v_P`,
 and providing the :attr:`~.Sensor.vP` attribute.
 
