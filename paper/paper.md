@@ -149,8 +149,8 @@ And since Mathematica is an interpreted language,
 it can lack the speed that compiled libraries like NumPy enable, especially when exploring a large parameter space.
 
 Since RydIQule version 1 has been publicly released,
-it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024, @glick_warm_2025]
-as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024, @cui_realizing_2025].
+it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024; @glick_warm_2025]
+as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024; @cui_realizing_2025].
 
 # Acknowledgements
 
