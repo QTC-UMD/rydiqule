@@ -9,7 +9,8 @@ It also functions as a general master equation solver based on the semi-classica
 [![Python Version](https://img.shields.io/pypi/pyversions/rydiqule.svg)](https://python.org)
 [![License](https://img.shields.io/pypi/l/rydiqule.svg)](https://github.com/QTC-UMD/rydiqule/raw/main/LICENSE)
 [![Docs](https://readthedocs.org/projects/rydiqule/badge/?version=latest)](https://rydiqule.readthedocs.io/)
-[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.cpc.2023.108952-goldenrod.svg)](https://doi.org/10.1016/j.cpc.2023.108952)
+[![DOI](https://img.shields.io/badge/Comp%20Phys%20Comms-10.1016%2Fj.cpc.2023.108952-goldenrod.svg)](https://doi.org/10.1016/j.cpc.2023.108952)
+[![status](https://joss.theoj.org/papers/95777dc6ef319c09d9ace33178787137/status.svg)](https://joss.theoj.org/papers/95777dc6ef319c09d9ace33178787137)
 
 ### Please cite as
 
