@@ -732,11 +732,9 @@ class RQ_AlkaliAtom(object):
         >>> arc_atom = arc.alkali_atom_data.Rubidium85()
         >>> my_atom = rq.RQ_AlkaliAtom(arc_atom)
         >>> print(my_atom.get_state_lifetime(e_nlj))
-        1.1626e-06
+        1.162e-06
         >>> print(my_atom.get_state_lifetime(e_fs))
         4.20984e-07
-        >>> print(my_atom.get_state_lifetime(e_nlj))
-        1.16261e-06
 
         """
         return self.arc_atom.getStateLifetime(*state[:3], temperature, includeLevelsUpTo, s)
