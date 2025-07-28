@@ -23,10 +23,10 @@ def solve_steady_state(
     """
     Finds the steady state solution for a system characterized by a sensor.
 
-    If insuffucent system memory is available to solve the system in a single call,
-    system is broken into "slices" of manageable memory footprint which are solved indivudually.
+    If insufficient system memory is available to solve the system in a single call,
+    system is broken into "slices" of manageable memory footprint which are solved individually.
     This slicing behavior does not affect the result.
-    Can be performed with or without doppler averging.
+    Can be performed with or without doppler averaging.
 
     Parameters
     ----------
@@ -34,8 +34,8 @@ def solve_steady_state(
         The sensor for which the solution will be calculated.
     doppler : bool, optional
         Whether to calculate the solution for a doppler-broadened
-        gas. If `True`, only uses dopper brodening defined by `kvec` parameters
-        for couplings in the `sensoe`, so setting this `True` without `kvec` definitions
+        gas. If `True`, only uses doppler broadening defined by `kvec` parameters
+        for couplings in the `sensor`, so setting this `True` without `kvec` definitions
         will have no effect. Default is `False`.
     doppler_mesh_method (dict,optional):
         If not `None`, should be a dictionary of meshing parameters to be passed
@@ -56,7 +56,7 @@ def solve_steady_state(
         Default is `True`.
     n_slices : int or None, optional
         How many sets of equations to break the full equations into.
-        The actual number of slices will be the largest between this value and the minumum
+        The actual number of slices will be the largest between this value and the minimum
         number of slices to solve the system without a memory error. If `None`, uses the minimum
         number of slices to solve the system without a memory error. Detailed information about
         slicing behavior can be found in :func:`~.slicing.slicing.matrix_slice`. Default is `None`.
@@ -81,7 +81,7 @@ def solve_steady_state(
     Returns
     -------
     :class:`~.Solution`
-        An object contining the solution and related information.
+        An object containing the solution and related information.
 
     Examples
     --------
@@ -229,7 +229,7 @@ def _solve_hamiltonian_stack(
     """
     Solves a the equations of motion corresponding to the given set of hamiltonians.
 
-    Typically used as an auxillary function for :meth:`~.solve_steady_state`. Hamiltonian and
+    Typically used as an auxiliary function for :meth:`~.solve_steady_state`. Hamiltonian and
     gamma matrices must be of broadcastable shapes.
     """
     eom, const = generate_eom(hamiltonians, gamma_matrix)
@@ -267,7 +267,7 @@ def steady_state_solve_stack(eom: np.ndarray, const: np.ndarray) -> np.ndarray:
     Solves an equation of the form :math:`\\dot{x} = Ax + b`, or a set of such equations
     arranged into stacks.
     Essentially just wraps numpy.linalg.solve(), but included as its own
-    function for modularity if another solver is found to be worth invesitigating.
+    function for modularity if another solver is found to be worth investigating.
 
     Parameters
     ----------

@@ -45,7 +45,7 @@ def set_debug_state(state: bool):
     ----------
     state: bool
         If True, full error tracebacks for RydiquleErrors will be shown.
-        If False (default behavior), final raise statement is suppresed in the traceback.
+        If False (default behavior), final raise statement is suppressed in the traceback.
     """
 
     global DEBUG

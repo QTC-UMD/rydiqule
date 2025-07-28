@@ -33,7 +33,7 @@ class Cell(Sensor):
     In addition to the core functionality of `~.Sensor`, this class requires labelling states
     with `namedtuple`s of quantum numbers, automatically calculating of state lifetimes and
     decoherences and tracking of of some physical laser parameters.
-    A key distictinction between a :class:`~.Cell` and a :class:`~.Sensor` is that
+    A key distinction between a :class:`~.Cell` and a :class:`~.Sensor` is that
     a cell supports (and requires) and absolute ordering of energy between states,
     which allows for implicit calculation of decay rates and transition frequencies.
 
@@ -55,7 +55,7 @@ class Cell(Sensor):
         atomic_states : list of A_QState
             List of :class:`~.atom_utils.A_QState` representing the states of the atom. 
             More details about the `A_QState` class can be found in its documentation, but it
-            includes the elemends (`n`, `l`, `j`, `m_j`, `f`, `m_f`). These represent the 
+            includes the elements (`n`, `l`, `j`, `m_j`, `f`, `m_f`). These represent the 
             usual Hydrogen-like atom quantum numbers with the usual restrictions:
                 
                 - `n` must be a positive integer.
@@ -75,7 +75,7 @@ class Cell(Sensor):
             they will be expanded into a list of states, with one corresponding to each value. If
             multiple quantum numbers are specified with lists, the resulting list of states will
             contain all combinations of values. Furthermore, the `j`, `m_j`, `f`, and `m_f` 
-            quantum numbers can each be specifed using `"all"`, which corresponds to a list of
+            quantum numbers can each be specified using `"all"`, which corresponds to a list of
             all physically allowed values for that quantum number. This convention allows quick
             specifications of entire manifolds of states to be added to the sensor. See the 
             `Examples` section to see how to use these powerful specifications.
@@ -88,22 +88,22 @@ class Cell(Sensor):
             on value of `beam_area`. See :meth:`~.Sensor.add_transit_broadening` for
             details on how transit broadening is treated. Default is None.
         gamma_mismatch : str or dict
-            How to resolve discrepancies between calculated eacb state lifetime and the sum of 
-            all transtion rates out of each state. In practice, these discrepancies are a result of
+            How to resolve discrepancies between calculated each state lifetime and the sum of 
+            all transition rates out of each state. In practice, these discrepancies are a result of
             transition pathways which exist between states when one is accounted for is `states`
             and one is not. For example, if there is a decoherent transition between states 3->1
             and states 3->2, but `states` only includes states 0, 1, and 3, the calculated 
             `gamma_lifetime` of state 3 will be greater than the sum of all computed
             `gamma_transition` values. In many cases, it is desirable to account for this
-            decoherence in other ways. The options for handling the dicrepancy are:
+            decoherence in other ways. The options for handling the discrepancy are:
 
                 - `"ground"` which adds a decoherent coupling coupling between a state `s` with
                   a discrepancy :math:`\\Delta \\gamma` and divides :math:`\\Delta \\gamma` among 
                   all the ground states (states matching the `n,l,j` values of the lowest energy
                   state). 
-                - `"all"` which divides :math:`\\Delta \\gamma` amongst all states in the 
-                  :class:`~.Cell` which already have a `"gamma_transition"` value. The fraction
-                  each transition gets is weighted by the fraction of the total thdat transitions
+                - `"all"` which divides :math:`\\Delta \\gamma` amongst all transitions in the 
+                  :class:`~.Cell` which already have a `"gamma_transition"` value from that state. The fraction
+                  each transition gets is weighted by the fraction of the total that that transition's
                   `"gamma_transition"` value accounts for. 
                 - `"none"` which will not account for this discrepancy at all. In this case this
                   physics is not guaranteed to be accurate and it is assumed the decoherence will
@@ -117,13 +117,13 @@ class Cell(Sensor):
         beam_area : float, optional
             Area of probing field cross-section in m^2.
             Used to calculate `kappa` and `gamma_transit`. Default is 1e-6.
-        beam_diam : float, optonal 
+        beam_diam : float, optional 
             Diameter of the probing field cross section in meters.
             Used to calculate `gamma_transit`. If `None`, it is calculated from
             `beam_area` assuming the beam cross-section is a circle. Default is `None`.
         temp : float, optional
             Temperature of the gas in Kelvin.
-            Used in calculations of enery level lifetime. Default is 300 K.
+            Used in calculations of energy level lifetime. Default is 300 K.
 
         Raises
         ------
@@ -252,7 +252,7 @@ class Cell(Sensor):
 
         Notes
         -----
-        This setter is often uneccesary to call directly, as the `probe_tuple` attibute is also
+        This setter is often unnecessary to call directly, as the `probe_tuple` attribute is also
         set implicitly by the first coupling added to the system using the 
         :meth:`~.Sensor.add_coupling` method.
 
@@ -291,7 +291,7 @@ class Cell(Sensor):
         Returns
         -------
         list of A_QState
-            The Cell states in order of decending energy
+            The Cell states in order of descending energy
             relative to the ground state :math:`nS^{\\frac{1}{2}}`.
 
         Examples
@@ -319,7 +319,7 @@ class Cell(Sensor):
 
         If we scramble the states in the constructor, the output of this function remains
         the same even though the order of basis states changes to match the list ordering
-        in the constuctor.
+        in the constructor.
 
         >>> from rydiqule import A_QState
         >>> atom = "Rb85"
@@ -385,8 +385,8 @@ class Cell(Sensor):
         nlj_match_e = not any([s[:3] != probe_e_nlj[:3] for s in excited_manifold])
 
         if not (nlj_match_g and nlj_match_e):
-            msg = "automatic kappa calcuations not supported for probing transitons between state manifolds "\
-                "containg differing values of j quantum numbers. kappa can be set manually using <Cell>.kappa "\
+            msg = "automatic kappa calculations not supported for probing transitions between state manifolds "\
+                "containing differing values of j quantum numbers. kappa can be set manually using <Cell>.kappa "\
                     " = <value> prior to running calculations"
             warnings.warn(msg)
 
@@ -475,8 +475,8 @@ class Cell(Sensor):
         nlj_match_e = not any([s[:3] != probe_e_nlj[:3] for s in excited_manifold])
 
         if not (nlj_match_g and nlj_match_e):
-            msg = "automatic eta calcuations not supported for probing transitons between state manifolds "\
-                "containg differing values of j quantum numbers. eta can be set manually using <Cell>.eta "\
+            msg = "automatic eta calculations not supported for probing transitions between state manifolds "\
+                "containing differing values of j quantum numbers. eta can be set manually using <Cell>.eta "\
                     " = <value> prior to running calculations"
             warnings.warn(msg)
 
@@ -532,7 +532,7 @@ class Cell(Sensor):
         Returns
         -------
         float
-            Probe transitiion frequency, in rad/s, between probing nlj states. 
+            Probe transition frequency, in rad/s, between probing nlj states. 
         """
 
         if hasattr(self, '_probe_freq'):
@@ -667,7 +667,7 @@ class Cell(Sensor):
         time_dependence: scalar function, optional
             A scalar function that
             specifies a time-dependent field. The time dependence function
-            is defined as a funtion that returns a unitless value as a function
+            is defined as a function that returns a unitless value as a function
             of time that is multiplied by the `rabi_frequency` parameter.
         label: str, optional
             The user-defined name of the coupling. This does not change
@@ -675,7 +675,7 @@ class Cell(Sensor):
             will be reflected in the output of :meth:`~.Sensor.axis_labels`
             Default None results in using the states tuple as the label.
         e_field: float, optional
-            Electric field strenth of the coupling in Volts/meter.
+            Electric field strength of the coupling in Volts/meter.
             If specified, `rabi_frequency`, `beam_power`, and `beam_waist` cannot
             be specified.
         beam_power: float, optional
@@ -807,7 +807,7 @@ class Cell(Sensor):
             else:
                 msg = ' lower energy, but it is actually higher. '
             raise RydiquleError(f'Coupling {states} implies second state is'
-                                + msg + 'Please reverse indeces of states tuple.')
+                                + msg + 'Please reverse indices of states tuple.')
         
         if 'suppress_dipole_warn' in extra_kwargs:
             warnings.warn("The 'suppress_dipole_warn' kwarg is deprecated.",

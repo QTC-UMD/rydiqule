@@ -31,7 +31,7 @@ def scipy_solve(eoms_base: np.ndarray, const: np.ndarray,
     const: numpy.ndarray
         The array of shape `(*l, n)` representing the non time-varying portion of the vector b in the
         equations of motion.
-    eoms_time_r: numpy.ndarraynumpy
+    eoms_time_r: numpy.ndarray
         The matrix of shape `(n_t, *l, n, n)` representing the real time-varying portion of the matrix A,
         where n_t is the length of `time_inputs`.
         The ith slice along the first axis should be multiplied by the real part

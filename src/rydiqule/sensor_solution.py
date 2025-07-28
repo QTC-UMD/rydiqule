@@ -257,7 +257,7 @@ class Solution():
         value_is_match = np.all([np.isclose(r, rabi_as_np[0]) for r in rabi_as_np])
 
         if not (shape_is_match and value_is_match):
-            raise ValueError("rabi freqencies do not match for all couplings in group")
+            raise ValueError("rabi frequencies do not match for all couplings in group")
         
         coupling_rabi_final = cast(ComplexResult, rabis[0])
         
@@ -266,13 +266,13 @@ class Solution():
 
     def rho_ij(self, i: sensor_utils.State, j: sensor_utils.State) -> ComplexResult:
         """
-        Gets the full complex density matrix element corresponding to a given pair of indeces.
+        Gets the full complex density matrix element corresponding to a given pair of indices.
 
         Returns the entire array of density matrix elements corresponding to every combination of 
         parameters defined by the mesh of parameters in the system. The shape of the output
         array will match the `stack_shape` of the solution.
         
-        Indeces can be provided either as integers which number the states, or using state
+        Indices can be provided either as integers which number the states, or using state
         labels (integers, tuples, or strings). For the case of tuples, only individual states
         can be used, full state specifications are invalid
 
@@ -289,11 +289,11 @@ class Solution():
         Returns
         -------
         complex or numpy.ndarray
-            `[i,j]` complex elment(s) of the density matrix
+            `[i,j]` complex element(s) of the density matrix
 
         Examples
         --------
-        State labels and integer indeces can be used interchangeably.
+        State labels and integer indices can be used interchangeably.
 
         >>> rabis = np.linspace(1, 6, 5)
         >>> my_sensor = rq.Sensor(["g","e"])
@@ -415,12 +415,12 @@ class Solution():
 
     def get_observable(self, matrix: np.ndarray):
         """Returns the trace of a matrix product of the density matrix with a provided matrix.
-        This is the standard definition of an measuremt of observable :math:`A` taken on a
+        This is the standard definition of an measurement of observable :math:`A` taken on a
         density matrix :math:`\\rho` given by :math:`tr(\\rho A)`. Note that this function
         first converts the density matrix into the standard complex basis rather than rydiqule's
         real basis, leading to potential round-off errors for *very* small density matrix elements. 
 
-        The proveded observable wil respect `rydiqule` stacking convention, and the labels for
+        The provided observable wil respect `rydiqule` stacking convention, and the labels for
         each axis can be recovered via the `axis_labels` attribute.
 
         Parameters
@@ -463,7 +463,7 @@ class Solution():
         Returns
         -------
         np.ndarray
-            The observable or array of observables correspondinging to the coupling coefficients. 
+            The observable or array of observables corresponding to the coupling coefficients. 
 
         """
         if coupling is None:

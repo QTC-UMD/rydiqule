@@ -34,14 +34,14 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     """
     Solves the response of the optical sensor in the time domain given the its time-dependent inputs
     
-    If insuffucent system memory is available to solve the system all at once, 
-    system is broken into "slices" of manageable memory footprint which are solved indivudually. 
+    If insufficient system memory is available to solve the system all at once, 
+    system is broken into "slices" of manageable memory footprint which are solved individually. 
     This slicing behavior does not affect the result.
     All couplings that include a "time_dependence" argument will be solved in the time domain. 
     
     A number of solver backends work with rydiqule, but the default `"scipy"` ivp solver is the
     is recommended backend in almost all cases, as it is the most fully-featured and
-    documented. Advanced users have the ablity to define their own solver backends
+    documented. Advanced users have the ability to define their own solver backends
     by creating a function that follows the call signature for rydiqule timesolver
     backends. Additional arguments to the solver backend can be supplied with `**kwargs`.
     
@@ -53,7 +53,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
         Amount of time, in microseconds, for which to simulate the system
     num_pts : int
         The number of points along the range `(0, end_time)` for which
-        the solution is evaluated. This does not affect the number of funtion
+        the solution is evaluated. This does not affect the number of function
         evaluations during the solve, rather the spacing of the points in 
         the reported solution.
     init_cond : numpy.ndarray or `None`, optional 
@@ -93,7 +93,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
         Default is `True`.
     n_slices : int or None, optional
         How many sets of equations to break the full equations into.
-        The actual number of slices will be the largest between this value and the minumum
+        The actual number of slices will be the largest between this value and the minimum
         number of slices to solve the system without a memory error. If `None`, solver uses the
         minimum number of slices required to solve without a `memoryError`. Defaults to None.
     solver : {"scipy", "cyrk"} or callable
@@ -124,7 +124,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     Returns
     -------
     :class:`~.Solution`
-        An object contining the solution and related information.
+        An object containing the solution and related information.
         Timesolver-specific defined attributes are `t`  and `init_cond`,
         corresponding respectively to the times at which the solution is sampled and
         the initial conditions used for the solve.
@@ -141,7 +141,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     >>> s.add_coupling((1,2), detuning = 2, rabi_frequency=2, time_dependence=td)
     >>> s.add_transit_broadening(0.1)
     >>> end_time = 10 #microseconds
-    >>> n_pts = 1000 #interpoleted points in solution
+    >>> n_pts = 1000 #interpolated points in solution
     >>> sol = rq.solve_time(s, end_time, n_pts)
     >>> print(type(sol))
     <class 'rydiqule.sensor_solution.Solution'>
@@ -193,7 +193,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     >>> s.add_coupling((1,2), detuning = 2, rabi_frequency=2, kvec=(-4,0,0), time_dependence=td)
     >>> s.add_transit_broadening(0.1)
     >>> end_time = 10 #microseconds
-    >>> n_pts = 1000 #interpoleted points in solution
+    >>> n_pts = 1000 #interpolated points in solution
     >>> sol_dop = rq.solve_time(s, end_time, n_pts, doppler=True)
     >>> sol_dop_nosum = rq.solve_time(s, end_time, n_pts, doppler=True, sum_doppler=False)
     >>> print(sol_dop.rho.shape)
@@ -338,7 +338,7 @@ def _solve_hamiltonian_stack(hamiltonians_base: np.ndarray, hamiltonians_time: n
                              ) -> np.ndarray:
 
     """
-    Internal funtions which solve the equations of a given hamiltonian stack 
+    Internal functions which solve the equations of a given hamiltonian stack 
     with the given parameters.
     """
     eom_base, const = generate_eom(hamiltonians_base, gamma_matrix,
@@ -389,7 +389,7 @@ def solve_eom_stack(eoms_base: np.ndarray, const: np.ndarray,
     Parameters
     ----------
     eoms_base : numpy.ndarray
-        Array of shape `(*l, n, n)` represnting the part of
+        Array of shape `(*l, n, n)` representing the part of
         equations of motion of the system which do not respond to external fields.
     const : numpy.ndarray
         constant term of shape (n,) added in differential equations. Typically
@@ -444,8 +444,8 @@ def solve_eom_stack(eoms_base: np.ndarray, const: np.ndarray,
         init_cond = np.broadcast_to(init_cond, solution_shape[:-1])
 
     elif init_cond.shape != solution_shape[:-1]:
-        msg = f"""Inital condition shape {init_cond.shape} does not match expected
-        soulution shape {solution_shape[:-1]}"""
+        msg = f"""Initial condition shape {init_cond.shape} does not match expected
+        solution shape {solution_shape[:-1]}"""
         raise RydiquleError(msg)
     
     solutions = solver(eoms_base, const, eom_time_r, const_r, eom_time_i, const_i,

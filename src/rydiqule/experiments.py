@@ -26,7 +26,7 @@ def get_snr(sensor: Sensor,
     assuming a homodyne measurement of optical field.
 
     SNR is calculated with respect to the signal parameter,
-    relative to the inital value of the signal parameter.
+    relative to the initial value of the signal parameter.
     The returned mesh is similarly transformed from the typical sensor mesh,
     by replacing the total value of the signal parameter
     with the deviation in the signal parameter.
