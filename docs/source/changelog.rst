@@ -1,6 +1,26 @@
 Changelog
 =========
 
+Latest
+------
+
+Improvements
+++++++++++++
+
+
+Bug Fixes
++++++++++
+
+- Minor changes to the precision of hard-coded values in unit tests.
+  ARC v3.9.0 updated the precision of a constant used in its internal calculations
+  that shifts calculated dipole moment values by a small amount.
+  It is expected that other plots and values will differ by small amounts when using `Cell` and ARC v3.9.0
+
+Deprecations
+++++++++++++
+
+
+
 v2.1.0
 ------
 
