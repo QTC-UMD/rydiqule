@@ -5,8 +5,6 @@ from rydiqule.atom_utils import A_QState
 from arc import Rubidium85
 
 
-import numpy as np
-
 @pytest.mark.exception
 def test_RQ_AlkaliAtom_Exceptions_Dipole():
     """Confirms that input validations work for RQ_AlkaliAtom functions"""
@@ -35,13 +33,14 @@ def test_average_dipole_moment():
 
     atom = rq.RQ_AlkaliAtom(Rubidium85())
 
-    expected_ame = 0.011090367580708254
+    #expected_ame = 0.011090367580708254 # ARC<=3.8.0
+    expected_ame =  0.01108137  # ARC>=3.9.0
 
     s1 = A_QState(5, 1, 1.5)
     s2 = A_QState(50, 2, 2.5)
     ame = atom.get_dipole_matrix_element(s1, s2, 0)
 
-    assert ame == pytest.approx(expected_ame), 'Average Matrix element between NLJ states changed'
+    assert ame == pytest.approx(expected_ame, abs=1e-5), 'Average Matrix element between NLJ states changed'
 
 
 @pytest.mark.structure
