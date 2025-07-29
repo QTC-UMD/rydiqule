@@ -138,7 +138,7 @@ Experimental support for 1D solves only was released in version 2.0.0, with RydI
 # Related Packages and Work
 
 Modeling quantum systems using the semi-classical Lindblad formalism is a common task that has been implemented by many physicists for their bespoke problems.
-Other tools that implement this type of simulation for specific types of problems include: qubits in QuTiP [@johansson_qutip_2013], atomic magnetometers in ElecSus [@keaveney_elecsus_2018], and laser cooling in PyLCP [@eckel_pylcp_2020].
+Other tools that implement this type of simulation for specific types of problems include: qubits in QuTiP [@johansson_qutip_2013], atomic magnetometers in ElecSus [@keaveney_elecsus_2018], and laser cooling in PyLCP [@eckel_pylcp_2022].
 Ultimately, the goal of RydIQule has not been to develop a new modeling technique,
 but rather to make a common, flexible, and most importantly efficient tool that solves a ubiquitous problem.
 
@@ -149,8 +149,8 @@ And since Mathematica is an interpreted language,
 it can lack the speed that compiled libraries like NumPy enable, especially when exploring a large parameter space.
 
 Since RydIQule version 1 has been publicly released,
-it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2024; @glick_warm_2025]
-as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2023; @gokhale_deep_2024; @cui_realizing_2025].
+it has been used in several publications to model both general Rydberg atom physics [@backes_performance_2024; @su_two-photon_2025; @glick_warm_2025]
+as well as Rydberg sensor development [@santamaria-botello_comparison_2022; @elgee_satellite_2023; @richardson_study_2025; @gokhale_deep_2024; @cui_realizing_2025].
 
 # Acknowledgements
 
