@@ -15,6 +15,8 @@ Bug Fixes
   ARC v3.9.0 updated the precision of a constant used in its internal calculations
   that shifts calculated dipole moment values by a small amount.
   It is expected that other plots and values will differ by small amounts when using `Cell` and ARC v3.9.0
+- Fixed bug where `solve_doppler_analytic` ignored parameter time-dependence. 
+  It now follows the behavior of other steady-state solvers by constructing the Hamiltonian and equations of motion at `t=0`.
 
 Deprecations
 ++++++++++++
