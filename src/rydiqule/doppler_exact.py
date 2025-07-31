@@ -150,6 +150,9 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
     this solver effectively reduces the dimension to 1 or 2, respectively, 
     leading to faster solves.
 
+    If the sensor contains couplings with `time_dependence`, this solver will add those
+    couplings at their :math:`t=0` value to the steady-state hamiltonian to solve. 
+
     If insufficient system memory is available to solve the system in a single call,
     system is broken into "slices" of manageable memory footprint which are solved individually.
     This slicing behavior does not affect the result.
@@ -224,7 +227,7 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
     n = sensor.basis_size
 
     # 1. Get base Liouvillian (L0) and Doppler shifts
-    L0, dummy_const = generate_eom(sensor.get_hamiltonian(), sensor.decoherence_matrix(),
+    L0, dummy_const = generate_eom(sensor.get_time_hamiltonian(t=0), sensor.decoherence_matrix(),
                                    remove_ground_state=False, real_eom=True)
     all_shifts = sensor.get_doppler_shifts()
 
