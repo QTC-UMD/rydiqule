@@ -287,7 +287,7 @@ def D1_excited(n: Union[int, str],
     Examples
     --------
     The simplest use is to return the nlj quantum numbers for a particular atom's excited state of
-    the D1 transtion. Principle quantum number and string atom flags can be used interchangeably.
+    the D1 transition. Principle quantum number and string atom flags can be used interchangeably.
 
     >>> atom = "Rb85"
     >>> print(rq.D1_excited(atom))
@@ -369,7 +369,7 @@ def D2_excited(n: Union[int, str],
     Examples
     --------
     The simplest use is to return the nlj quantum numbers for a particular atom's excited state of
-    the D2 transtion. Principle quantum number and string atom flags can be used interchangeably.
+    the D2 transition. Principle quantum number and string atom flags can be used interchangeably.
 
     >>> atom = "Rb85"
     >>> print(rq.D2_excited(atom))
@@ -453,13 +453,13 @@ def D1_states(n: Union[int, str],
     Returns
     -------
     list of A_QState
-        Ground and D1 excited state specifications of the provided atom or pricipal quantum number.
+        Ground and D1 excited state specifications of the provided atom or principal quantum number.
 
     
     Examples
     --------
     The basic use of this function is to return the A_QStates associated with the states of the D1
-    transtition of a particular Rydberg atom. String flags and principle quantum numbers can be used
+    transition of a particular Rydberg atom. String flags and principle quantum numbers can be used
     interchangeably.
 
     >>> atom = "Rb85"
@@ -535,12 +535,12 @@ def D2_states(n: Union[int, str],
     Returns
     -------
     list of A_QState
-        Ground and D2 excited state specifications of the provided atom or pricipal quantum number.
+        Ground and D2 excited state specifications of the provided atom or principal quantum number.
 
     Examples
     --------
     The basic use of this function is to return the A_QStates associated with the states of the D2
-    transtition of a particular Rydberg atom. String flags and principle quantum numbers can be used
+    transition of a particular Rydberg atom. String flags and principle quantum numbers can be used
     interchangeably.
 
     >>> atom = "Rb85"
@@ -658,12 +658,12 @@ def expand_qnums(qstates: List[A_QState], I: Optional[float] = None,
 
     List-like quantum numbers are defined either with a list of quantum numbers or the string
     "all". In the "all" case, that quantum number will be expanded into all physically allowed
-    values of that quantum number given the preceeeding numbers. 
+    values of that quantum number given the preceding numbers. 
 
-    Iterates through the list, expanding each A_QState specifcation into a list of all states
+    Iterates through the list, expanding each A_QState specification into a list of all states
     matching that specification. For each state specification in the list, quantum numbers are
     expanded from left to right. The final list of A_QStates will respect the ordering of the
-    intial states by ordering the states corresponding to each specification by 
+    initial states by ordering the states corresponding to each specification by 
     n, l, j, m_j, f, and finally m_f
 
     Parameters
@@ -682,7 +682,7 @@ def expand_qnums(qstates: List[A_QState], I: Optional[float] = None,
     Notes
     -----
     ..note::
-        While this funcion can expand arbitrary states, it should be noted that the resulting
+        While this function can expand arbitrary states, it should be noted that the resulting
         lists of states can be quite long. If they are to be used as the states of a 
         :class:`~.Cell`, these long state lists can dramatically increase computation time, and 
         it is often worth ensuring that tracking hyperfine states individually is absolutely
@@ -691,7 +691,7 @@ def expand_qnums(qstates: List[A_QState], I: Optional[float] = None,
 
     Examples
     --------
-    A basic piece of functionality for this function is as a shorthand for allstates in a
+    A basic piece of functionality for this function is as a shorthand for all states in a
     given manifold.
 
     >>> D1_ground = A_QState(5,0,0.5, f="all")
@@ -742,7 +742,7 @@ def validate_qnums(qstate:A_QState, I: Optional[float]=None):
         Named tuple to check, should have fields `("n","l","j","m_j","f","m_f")`
     I : Union[None,float], optional
         Nuclear spin of the rydberg atom of which this is a state. If `None`, all f
-        values are invalid automaticaly. Defaults to `None`
+        values are invalid automatically. Defaults to `None`
 
     Raises
     ------
@@ -792,22 +792,22 @@ def expand_single_qnum(qstate: A_QState, I: Optional[float] = None, wildcard: st
     """Generates a list of all valid states given a particular quantum number to be expanded.
 
     For a given `A_Qstate` spec with one or more tuple elements specified as either a list or
-    the "all" string, returns a list of all valid state specifcations matching that state
-    specification with the first list or string element only expanded. If multiple elemens of the
+    the "all" string, returns a list of all valid state specifications matching that state
+    specification with the first list or string element only expanded. If multiple elements of the
     statespec are specified with a list or string, only the first one is expanded. This function
     is intended as a helper function for a single quantum number, and is not designed to be
     used at the top-level
 
     The the case that the element to be expanded is a list, the list returned will have a single
     state specification corresponding to each element of that list, and allowed quantum number
-    rules will not be enforced. In the case that the element to be expaned is the "all" string, 
+    rules will not be enforced. In the case that the element to be expanded is the "all" string, 
     all valid values of that particular quantum number will be used. Note
     that only the `m_j`, `f`, and `m_f` quantum numbers can be expanded in this way.
 
     Parameters
     ----------
     qstate : A_QState
-        NamedTuple with fields `(n, l, j, m_j, f, m_f)` representng the quantum numbers of
+        NamedTuple with fields `(n, l, j, m_j, f, m_f)` representing the quantum numbers of
         the state. Each, element must be either a float, list of floats, or the "all" string. 
         Only `m_j`, `f`, and `m_f` may be specified with a "all". 
     I : float, optional
@@ -917,21 +917,21 @@ def get_valid_j(state: A_QState, I:Optional[float]=None) -> List[float]:
     """
     L_qnum = state[1]
     if not isinstance(L_qnum, (int, float)):
-        raise RydiquleError(f"Invalid J qunatum number type {type(L_qnum)}.")
+        raise RydiquleError(f"Invalid J quantum number type {type(L_qnum)}.")
     return list(set(L_qnum + s for s in [-.5,.5]))
 
 
 def get_valid_mj(state: A_QState, I:Optional[float]=None) -> List[float]:
     """Return the valid values of m_J for given other quantum numbers.
 
-    For a given quantum state with principl, orbital, and total quantum numbers 
+    For a given quantum state with principal, orbital, and total quantum numbers 
     :math:`(n,L,J)`, the valid values of m_J are given by 
     
     .. math:: m_J = -J, -J+1, -J+2, ... , J-2, J-1, J
     """
     J_qnum = state[2]
     if not isinstance(J_qnum, (int, float)):
-        raise RydiquleError(f"Invalid J qunatum number type {type(J_qnum)}.")
+        raise RydiquleError(f"Invalid J quantum number type {type(J_qnum)}.")
     return np.arange(-1*J_qnum,J_qnum + 1).tolist()
 
 
@@ -946,7 +946,7 @@ def get_valid_f(state: A_QState, I: Optional[float]=None) -> List[float]:
     """
     J_qnum=state[2]
     if not isinstance(J_qnum, (int, float)) or not isinstance(I, (int, float)):
-        raise ValueError(f"Invalid I,J qunatum number types {(type(I),type(J_qnum))}.")
+        raise ValueError(f"Invalid I,J quantum number types {(type(I),type(J_qnum))}.")
     return np.arange(np.abs(J_qnum - I), J_qnum + I + 1).tolist()
 
 
@@ -960,7 +960,7 @@ def get_valid_mf(state: A_QState, I: Optional[float]=None) -> List[float]:
     """
     f_qnum = state[4]
     if not isinstance(f_qnum, (float, int)):
-        raise RydiquleError(f"Invalid f qunatum number type {type(f_qnum)}.")
+        raise RydiquleError(f"Invalid f quantum number type {type(f_qnum)}.")
     return np.arange(-1*f_qnum,f_qnum + 1).tolist()
 
 

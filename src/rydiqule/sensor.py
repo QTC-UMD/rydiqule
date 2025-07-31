@@ -21,7 +21,7 @@ BASE_SCANNABLE_KEYS = ["detuning",
                        "rabi_frequency",
                        "phase",
                        "e_shift"]
-"""Reference list of all coherent coupling keys that support rydiqules stacking convention.
+"""Reference list of all coherent coupling keys that support rydiqule's stacking convention.
 Note that all decoherence keys (keys beginning with `gamma_`) are supported, but handled separately.
 """
 
@@ -35,7 +35,7 @@ BASE_EDGE_KEYS = ["states",
                    "label",
                    "dipole_moment",
                    "coherent_cc"]
-"""Reference list of all keys that can be specified with values in a coheroaddenct coupling.
+"""Reference list of all keys that can be specified with values in a coherent coupling.
 Subclasses which inherit from :class:`~.Sensor` should override the `valid_parameters` attribute,
 NOT this list. The `valid_parameters` attribute is initialized as a copy of `BASE_EDGE_KEYS`."""
 
@@ -332,7 +332,7 @@ class Sensor():
         specification provided.
 
         Note that an energy shifts are applied to the underlying graph as a self-edge connecting a
-        node to itsself, not as data on the node itsself.
+        node to its self, not as data on the node its self.
 
         Additional arguments for either dispatched function are passed normally via `**kwargs`
 
@@ -340,7 +340,7 @@ class Sensor():
         ----------
         state_spec : StateSpec
             Integer or string label matching a state in the `Sensor`, or state specification
-            matchingone or more states in the `Sensor`. The number of states this corresponds
+            matching one or more states in the `Sensor`. The number of states this corresponds
             to will affect which internal function is dispatched.
         shift : float or array-like
             The energy shift to apply to the matching state or states in Mrad/s. Note that if it
@@ -394,7 +394,7 @@ class Sensor():
     def add_single_energy_shift(self, state: State, shift: ScannableParameter, label=None):
         """Add an energy shift to a state.
 
-        First perfoms validation that the provided `state` is actually a node in the graph, then
+        First performs validation that the provided `state` is actually a node in the graph, then
         adds the shift specified by `shift` to a self-loop edge keyed with `"e_shift"`. This value
         will be added to the corresponding diagonal term when the hamiltonian is generated.
 
@@ -467,7 +467,7 @@ class Sensor():
             Dictionary of values by which to multiply the base `shift` parameter for each
             each state. Keys are elements of the `states` list, entries are the corresponding
             factor by which to multiply `shift` for that state. If `None`, all prefactors are
-            set to 1. If not `None`, the prefactors for any nonspecified values will be set
+            set to 1. If not `None`, the prefactors for any non-specified values will be set
             to zero. Default is `None`.
         zip_label : str or `None`, optional
             Label passed to :meth:`~.Sensor.zip_parameters` when the shift is provided as an
@@ -524,7 +524,7 @@ class Sensor():
 
         If this is the first time `add_coupling` has been called for this `Sensor`, sets the
         `probe_tuple` attribute to the `states` specification , which is used as the default,
-        for calculating observable values, in a :class:`~.sensor_soution.Solution` after solving.
+        for calculating observable values, in a :class:`~.sensor_solution.Solution` after solving.
         For this reason, this function is preferred over :meth:`~.Sensor.add_single_coupling`
         and :meth:`~.Sensor.add_coupling_group` outside of special circumstances. If couplings
         are added with either of the specific dispatched functions, `probe_tuple` should be set
@@ -538,7 +538,7 @@ class Sensor():
             is dispatched. If either argument is a string pattern matching multiple states,
             :meth:`~.Sensor.add_coupling_group` is dispatched.
         **kwargs
-            Additional keyword argumets passed to the relevant function. See the documentation for
+            Additional keyword arguments passed to the relevant function. See the documentation for
             :meth:`~.Sensor.add_single_coupling` and :meth:`~.Sensor.add_coupling_group` for
             details on valid keyword arguments.
 
@@ -548,7 +548,7 @@ class Sensor():
             Outside of specific use cases for users well-versed in the `rydiqule` code base, this
             method is preferred over :meth:`~.Sensor.add_single_coupling` and
             :meth:`~.Sensor.add_coupling_group` since it appropriately handles necessary
-            backend bookeeping.
+            backend bookkeeping.
 
         Examples
         --------
@@ -591,7 +591,7 @@ class Sensor():
         ...     (g, e1): 0.25,
         ...     (g, e2): 0.5,
         ...     (g, e3): 0.25,
-        ... } # coupling coefficiens
+        ... } # coupling coefficients
         >>> s = rq.Sensor([g, excited])
         >>> s.add_coupling((g, excited), rabi_frequency=10, detuning=1, coupling_coefficients=cc, label="laser")
         >>> print(s.get_hamiltonian())
@@ -666,7 +666,7 @@ class Sensor():
         """
         Adds a single coupling of states to the system.
 
-        One or more of these paramters can be a list or array-like of values to represent
+        One or more of these parameters can be a list or array-like of values to represent
         a laser that can take on a set of discrete values during a field scan.
         Designed to be a user-facing wrapper for :meth:`~._add_coupling` with arguments
         for states and coupling parameters.
@@ -696,7 +696,7 @@ class Sensor():
             The transition frequency between a particular pair of states. Must be a positive number.
             Only used directly in calculations if `detuning` is `None`, ignored otherwise.
             Note that on its own, it only defines the spacing between two energy levels and not the
-            field itsself. To define a field, the `time_dependence` argument must be specified, or else
+            field its self. To define a field, the `time_dependence` argument must be specified, or else
             the off-diagonal terms to drive transitions will not be generated in the Hamiltonian matrix.
         phase : float, optional
             Static phase offset in the rotating frame.
@@ -711,11 +711,11 @@ class Sensor():
             Defaults to `(0,0,0)`.
         time_dependence : scalar function, optional
             A scalar function specifying a time-dependent field. The time dependence function is defined
-            as a python funtion that returns a unitless value as a function of time (in microseconds)
+            as a python function that returns a unit-less value as a function of time (in microseconds)
             that is multiplied by the `rabi_frequency` parameter to get a  field strength scaled to units
             of Mrad/s.
         coherent_cc: float, optional
-            Addtional information regarding coupling strength for the `states` coupling. Does
+            Additional information regarding coupling strength for the `states` coupling. Does
             **not** modify the `rabi_frequency` before adding to the graph. Rather, when the
             Hamiltonians and physical observables in :class:`~.sensor_solution.Solution` are
             computed, first multiplies the `rabi_frequency` by this value. The `rabi_frequency`
@@ -890,7 +890,7 @@ class Sensor():
         Add any number of couplings between pairs of states.
 
         Acts as an alternative to calling :meth:`~.Sensor.add_coupling`
-        individually for each pair of states. Can be used interchangably up to preference,
+        individually for each pair of states. Can be used interchangeably up to preference,
         and all of keyword :meth:`~.Sensor.add_coupling` are supported dictionary
         keys for dictionaries passed to this function.
 
@@ -901,8 +901,8 @@ class Sensor():
         ----------
         couplings : tuple of dicts
             Any number of dictionaries, each specifying the parameters of a single field
-            coupling 2 states. For more details on the keys of each dictionry see the arguments
-            for :meth:`~.Sensor.add_coupling`. Equivalent to passing each dictiories keys and
+            coupling 2 states. For more details on the keys of each dictionary see the arguments
+            for :meth:`~.Sensor.add_coupling`. Equivalent to passing each dictionaries keys and
             values to :meth:`~.Sensor.add_coupling` individually.
         **extra_kwargs : dict
             Additional keyword-only arguments to pass to the relevant `add_coupling` method.
@@ -951,7 +951,7 @@ class Sensor():
         with keys corresponding to state pairs in the groups,
         and the value being the multiplicative factor applied to `rabi_frequency`
         when the Hamiltonian is generated. Note that these `cc` values cannot be arrays.
-        The corrollary for state energy (e.g. for `detuning` or `transition_frequency`)
+        The corollary for state energy (e.g. for `detuning` or `transition_frequency`)
         is handled via :meth:`~.Sensor.add_energy_shifts`. If no dictionary is supplied for
         for `coherent_cc`, *all* coupling coefficients are set to 1.0, effectively meaning that
         the base `rabi_frequency` supplied is what is added to the Hamiltonian. If a
@@ -991,20 +991,20 @@ class Sensor():
             Individual states can be shifted via :meth:`~.Sensor.add_energy_shift`.
             Default is None.
         coupling_coefficients : dict, optional
-            Individual coupling coeffients passed to the :meth:`~.Sensor.add_single_coupling`
+            Individual coupling coefficients passed to the :meth:`~.Sensor.add_single_coupling`
             method. If provided, defined by a dictionary keyed with tuples of states corresponding
-            to couplings in this group, with values equal to the coupling coeffient to be passed
+            to couplings in this group, with values equal to the coupling coefficient to be passed
             to the `add_single_coupling` call for that coupling. If any entries are absent in the
             provided dictionary, they are assumed to not be coupled, and no coupling will be added
             for that transition. If `None`, defaults to a dictionary containing every coupling in
             coupling in the group with `None` for all values (defaulting to 1.0 when passed to
             `add_single coupling`). Defaults to `None`.
         time_dependence : scalar function or dict of scalar functions, optional
-            Time-dependendent scalar factor that is multiplied by the rabi frequency in Hamiltonian
+            Time-dependent scalar factor that is multiplied by the rabi frequency in Hamiltonian
             generation. Can be specified as a single function, in which case the function will be
             used as the `time_dependence` argument for each coupling in the group
-            (see :meth:`~.Sensor.add_single_coupling`),  Can also bespecified as a dictionary
-            mapping state pairs in the coupling to individual functionswhich will be applied to
+            (see :meth:`~.Sensor.add_single_coupling`),  Can also be specified as a dictionary
+            mapping state pairs in the coupling to individual functions which will be applied to
             the associated coupling in the same manner. In the case of a dictionary specification,
             each unspecified coupling will default to `time_dependence=None`.
 
@@ -1040,7 +1040,7 @@ class Sensor():
 
         If the cc dictionary is specified, any unspecified terms are skipped on the graph. Note that
         although `(0,3)` is in the coupling group, it is omitted from the graph since it is
-        not in `coupling_coeffiecients`.
+        not in `coupling_coefficients`.
 
         >>> s = rq.Sensor(4)
         >>> cc = {(0,1):0.5, (0,2):0.5}
@@ -1149,8 +1149,8 @@ class Sensor():
             states : tuple
                 The integer pair of states to be coupled.
             **field_params : dict
-                The dictionry of couplings parameters. For details
-                on the keys of the dictionry see :meth:`~.Sensor.add_coupling`.
+                The dictionary of couplings parameters. For details
+                on the keys of the dictionary see :meth:`~.Sensor.add_coupling`.
 
         """
         states = self._states_valid(states)
@@ -1179,7 +1179,7 @@ class Sensor():
         motion, such as the `gamma_matrix` and `hamiltonian` are generated. So for 2 list-like
         parameters, the first elements in each are solved at the same time, then the second, etc
         Note that calling
-        this function does not affect internal quanties directly, but flags them to be zipped
+        this function does not affect internal quantities directly, but flags them to be zipped
         at calculation time for relevant quantities.
 
         Internally, adds the `label` value to the internal list of zipped parameter labels, and
@@ -1484,8 +1484,8 @@ class Sensor():
 
         If the labels provided are not a match, a message is printed and nothing is altered.
         In the case where simulations are scripted and the printed message is annoying, the
-        print behaviour can be modified with `verbose=False`, potentially useful for scripting
-        cases where the desired behavior is to silently countinue over non-existant zip labels.
+        print behavior can be modified with `verbose=False`, potentially useful for scripting
+        cases where the desired behavior is to silently continue over non-existent zip labels.
 
         >>> s = rq.Sensor(3)
         >>> det = np.linspace(-1,1,11)
@@ -1669,7 +1669,7 @@ class Sensor():
         Notes
         -----
         .. note::
-            Adding a decoherece with a particular label (including `None`) will override an existing
+            Adding a decoherence with a particular label (including `None`) will override an existing
             decoherent transition with that label.
 
         Examples
@@ -1683,7 +1683,7 @@ class Sensor():
          [0.  0.  0. ]
          [0.1 0.  0. ]]
 
-        To add multiple decoherence effects to the same term, provida a differnt label for each.
+        To add multiple decoherence effects to the same term, provide a different label for each.
 
         >>> s = rq.Sensor(3)
         >>> s.add_coupling(states=(0,1), detuning=1, rabi_frequency=1)
@@ -1695,7 +1695,7 @@ class Sensor():
          [0.   0.   0.  ]
          [0.25 0.   0.  ]]
 
-        Decoherence values can also be scanned. Here decoherece from states 2->0 is scanned
+        Decoherence values can also be scanned. Here decoherence from states 2->0 is scanned
         between 0 and 0.5 for 11 values. We can also see how the Hamiltonian shape accounts
         for this to allow for clean broadcasting, indicating that the hamiltonian is identical
         across all decoherence values.
@@ -1737,12 +1737,12 @@ class Sensor():
     def add_decoherence_group(self, states1: List[State], states2: List[State],
                               gamma: ScannableParameter, label: str,
                               coupling_coefficients: Optional[Dict[States,float]] = None):
-        """Adds a group of dechorences to the Sensor.
+        """Adds a group of decoherences to the Sensor.
 
         Given 2 lists of states, adds a single coupling across each combination of states
         between the first and second lists. Then, if gamma is a array-like of values, automatically
         performs :meth:`~.Sensor.zip_parameters` on all decoherences added as part of this
-        funtion so they share an axis when :meth:`~.Sensor.decoherence_matrix` is called.
+        function so they share an axis when :meth:`~.Sensor.decoherence_matrix` is called.
 
         Scaling multiplicative factors for `gamma` must be applied per pair of states
         using `decoherent_cc`, a dictionary of coefficients determining coupling strengths.
@@ -1763,9 +1763,9 @@ class Sensor():
             apply a label to the zip.
         gamma : ScannableParameter
             Base decoherence rate between the two groups of states, in units of Mrad/s.
-            Mutliplied by the corresponding values in the `decoherent_coupling` dictionary.
+            Multiplied by the corresponding values in the `decoherent_coupling` dictionary.
         coupling_coefficients : dict, optional
-            Coefficiants describing the relative coupling strengths for decoherences in the group.
+            Coefficients describing the relative coupling strengths for decoherences in the group.
             Treated as modifications to the "base" dephasing rate specified by the `gamma`
             argument. The gamma of individual decoherences will be the `gamma` argument
             multiplied by the corresponding value in this dictionary.
@@ -1869,13 +1869,13 @@ class Sensor():
             The transit broadening rate in Mrad/s.
         repop: dict, optional
             Dictionary of states for transit to repopulate in to.
-            The keys represent tshe state labels. The values represent
+            The keys represent the state labels. The values represent
             the fractional amount that goes to that state.
             If the sum of value does not equal 1, population will not be conserved.
             Default is to repopulate everything into the ground state (either state 0
             or the first state in the basis passed to the :meth:`~.Sensor.__init__` method).
             If `None`, all population decays to the ground state, defined as the first state
-            in the state list passed to the constuctor. Defaults to `None`.
+            in the state list passed to the constructor. Defaults to `None`.
         label: str, optional
             Label to be passed to :meth:`~.Sensor.add_decoherence`. Defaults to "transit"
 
@@ -2015,8 +2015,8 @@ class Sensor():
         example, "collisional" for easier bookkeeping and to ensure no values
         are overwritten.
 
-        Note that this function applies decohernce terms to every combiniation of states
-        in the group, not just from each state to itsself.
+        Note that this function applies decoherence terms to every combination of states
+        in the group, not just from each state to its self.
 
         Parameters
         ----------
@@ -2120,7 +2120,7 @@ class Sensor():
 
         The axes of a hamiltonian
         stack are defined as the axes preceding the usual hamiltonian, which are always
-        the last 2. These axes only exist if one of the parametes used to define
+        the last 2. These axes only exist if one of the parameters used to define
         a Hamiltonian are lists.
 
         Be default, labels which have been zipped using :meth:`~.Sensor.zip_parameters`
@@ -2392,7 +2392,7 @@ class Sensor():
         Hamiltonian will be of shape `(N1,...,Nm, n, n)`.
 
         In the case where the basis of the `Sensor` was explicitly defined with a list
-        of states, the ordering of rows and coulumns in the hamiltonian corresponds to the
+        of states, the ordering of rows and columns in the hamiltonian corresponds to the
         ordering of states passed in the basis.
 
         See rydiqule's conventions for matrix stacking for more details.
@@ -2449,7 +2449,7 @@ class Sensor():
         #adjust array parameters to be the appropriate shape
         self._expand_dims()
 
-        #dictionary of state ordering used to determine indeces in ham
+        #dictionary of state ordering used to determine indices in ham
         int_states = {state: i for (i, state) in enumerate(self.states)}
 
         stack_shape = self._stack_shape(time_dependence='steady')
@@ -2471,7 +2471,7 @@ class Sensor():
             idx = (...,*states_n)
             conj_idx = (...,*states_n[::-1])
 
-            #get the coupling coeffiecient to multiply the rabi frequency by from the graph
+            #get the coupling coefficient to multiply the rabi frequency by from the graph
             cc = self.couplings.edges[states].get('coherent_cc', 1.0)
             # factor of 1/2 accounts for implicit rotating wave approximation
             hamiltonian[idx] = cc * f['rabi_frequency']*np.exp(1j*f['phase'])/2
@@ -2497,7 +2497,7 @@ class Sensor():
 
         Returns the list of matrices of all couplings in the system defined with
         a `time_dependence` key.
-        The ouput will be two lists of matricies representing terms of the hamiltonian which
+        The output will be two lists of matrices representing terms of the hamiltonian which
         are dependent on each time-dependent coupling.
         The lists will be of length M and shape `(*l_time, n, n)`,
         where M is the number of time-dependent couplings, `l_time` is time-dependent stack shape
@@ -2565,7 +2565,7 @@ class Sensor():
 
         stack_shape = self._stack_shape(time_dependence='time')
 
-        #dictionary of state ordering used to determine indeces in ham
+        #dictionary of state ordering used to determine indices in ham
         int_states = {state: i for (i, state) in enumerate(self.states)}
 
         for states, param, arr, _ in self.variable_parameters(apply_mesh=True):
@@ -2985,7 +2985,7 @@ class Sensor():
             Method to see if a given field matches the keys
             given. Choosing "all" will return couplings
             which have keys matching all of the values provided in the keys
-            argument, while coosing "any", will return all couplings with keys
+            argument, while choosing "any", will return all couplings with keys
             matching at least one of the values specified by keys. For example,
             `sensor.couplings_with("rabi_frequency")` returns a dictionary of
             all couplings for which a rabi_frequency was specified.
@@ -3005,7 +3005,7 @@ class Sensor():
 
         Examples
         --------
-        Can be used, for example, to return couplings in the roating wave approximation.
+        Can be used, for example, to return couplings in the rotating wave approximation.
 
         >>> s = rq.Sensor(3)
         >>> sinusoid = lambda t: 0 if t<1 else sin(100*t)
@@ -3095,22 +3095,22 @@ class Sensor():
         -------
         int
             Number of dimensions, between 0 and 3,
-            where 0 means no doppler averaging kvectors have been specified
+            where 0 means no doppler averaging k-vectors have been specified
             or are too small to be calculates.
 
         Examples
         --------
-        No spatial dimesions specified
+        No spatial dimensions specified
 
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1)
+        >>> s.add_coupling((0,1), detuning = 1, rabi_frequency=1)
         >>> print(s.spatial_dim())
         0
 
         One spatial dimension specified
 
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(0,0,4))
+        >>> s.add_coupling((0,1), detuning = 1, rabi_frequency=1, kvec=(0,0,4))
         >>> print(s.spatial_dim())
         1
 
@@ -3118,13 +3118,13 @@ class Sensor():
         across multiple couplings
 
         >>> s = rq.Sensor(2)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(3,0,3))
+        >>> s.add_coupling((0,1), detuning = 1, rabi_frequency=1, kvec=(3,0,3))
         >>> print(s.spatial_dim())
         2
 
         >>> s = rq.Sensor(3)
-        >>> s.add_coupling((0,1), detuning = 1, rabi_freqency=1, kvec=(3,0,3))
-        >>> s.add_coupling((1,2), detuning = 2, rabi_freqency=2, kvec=(0,4,0))
+        >>> s.add_coupling((0,1), detuning = 1, rabi_frequency=1, kvec=(3,0,3))
+        >>> s.add_coupling((1,2), detuning = 2, rabi_frequency=2, kvec=(0,4,0))
         >>> print(s.spatial_dim())
         3
         """

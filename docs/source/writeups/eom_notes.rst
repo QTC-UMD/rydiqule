@@ -43,23 +43,27 @@ where :math:`\sigma^+ = \ket{g}\!\bra{e}` and
 Equations of Motion
 -------------------
 
-The Master equation is,
+The Master equation that governs system dynamics used by Rydiqule is the `Linbladian <https://en.wikipedia.org/wiki/Lindbladian>`_.
+It is a semi-classical formulation of the Schoedinger equation for use in open quantum systems.
 
-.. math:: \dot{\rho} = -i[H,\rho]-\mathcal{L}
+.. math:: \dot{\rho} = -\frac{i}{\hbar}[H,\rho]-\mathcal{L}
 
-We write this in summation notation,
+This can be written in summation notation (using Kronnecker deltas),
 
-.. math:: \dot{\rho}_{ij} = -i(H_{ik}\rho_{kj}-\rho_{ik}H_{kj}) - L_{ij}
+.. math::
 
-More, generally, we can re-write this equation as a matrix equation,
+   \dot{\rho}_{ij}=-\frac{i}{\hbar}\left(H_{ik}\rho_{kj}
+   - \rho_{ik}H_{kj}\right)
+   + \sum_{m,n}\frac{\Gamma_{mn}}{2}\left(2\delta_{ij}\rho_{mm}
+   - \delta_{mi}\rho_{ij}-\delta_{mj}\rho_{ij}\right)
+
+More generally, we can re-write the system of equations as a super-operator,
 
 .. math:: \dot{\rho}_{ij} = R_{ik}\rho_{kj}
 
-By re-shaping these equations, using ``numpy.reshape``, we can convert
-this into a linear set of differential equations in matrix form (see,
-for example ``Sensor._hamiltonian_term()`` and
-``Sensor._decoherence_term()`` in Rydiqule). I am not going to focus on
-these right now. I will call the re-shaped density vector :math:`p`
+By re-shaping these equations, using :external+numpy:func:`numpy.reshape`, we can convert
+this into a linear set of differential equations in matrix form (see :func:`~.generate_eom()`).
+With the re-shaped density vector :math:`p`, the equations of motion become
 
 .. math::
 
@@ -67,8 +71,10 @@ these right now. I will call the re-shaped density vector :math:`p`
        \dot{p}_l = M_{li}p_{i}
 
 This is a linear set of equations we can easily solve with
-``linalg.solve``. As a note, our reshaping procedure produces a **basis
-that is**, for basis size **b**
+:external+numpy:func:`numpy.linalg.solve`. 
+
+Our reshaping procedure defines a new computational basis
+that is, for basis size b,
 
 .. math:: l = b\times j+i
 
@@ -99,9 +105,9 @@ instability is to algebraically remove one of the equations of motion
 (ie the ground state). To remove the ground state, we apply the
 constraint
 
-.. math:: \rho_{00} = 1-\rho_{ii}.
+.. math:: \rho_{00} = 1-\sum_i\rho_{ii}.
 
-Writing this in terms of :math:`\rho'` gives,
+Writing this in terms of :math:`p` gives,
 
 .. math:: p_0 = 1-\sum_{x} p_{[(b+1)\times x]}
 
@@ -110,12 +116,12 @@ We use this to re-write Eq. \\ref{eq:master},
 .. math::
 
    \label{eq:groundRemoved}
-       \dot{p}_l =  M_{li}p_{i} - M_{l0}p_{0} + M_{l0}(1-\sum_{x} p_{[(b+1)\times x]})
+       \dot{p}_l =  M_{li}p_{i} - M_{l0}p_{0} + M_{l0}\left(1-\sum_{x} p_{[(b+1)\times x]}\right)
 
 This is the equation we must implement to remove the ground state.
 
 In the code, we can apply Eq. \\ref{eq:groundRemoved}
-and then we can simply remove the first column of :math:`M_{il}`. In the
+and then we can simply remove the first column of :math:`M_{li}`. In the
 code, we implement this transformation by replacing the set of equations
 :math:`M_{li}`,
 
@@ -139,7 +145,7 @@ where :math:`M_{i0}` is just :math:`M[:,0]` and
 generated with list comprehension.
 
 The end result is an equation where each ground state term of the
-density matrix :math:`\rho_00` is replaced by the sum of all excited
+density matrix :math:`\rho_{00}` is replaced by the sum of all excited
 states.
 
 Making the Equations Real
@@ -194,7 +200,7 @@ up to a scale factor,
        M_r &= U\cdot M_c \cdot U^{-1}\\
        c_r &= U\cdot c_c \end{aligned}
 
-This matrix is calculated in the ``get_basis_transformation()`` helper
+This matrix is calculated in the :func:`~.get_basis_transform` helper
 function and is subsequently used to transform between the complex and
 real bases.
 

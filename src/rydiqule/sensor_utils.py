@@ -64,7 +64,7 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
         Transform the equations of motion from the complex basis
         to the real basis. Setting to `False` is intended for internal use only
         and is not officially supported.
-        Seee :func:`~.make_real` for details.
+        See :func:`~.make_real` for details.
 
     Returns
     -------
@@ -574,7 +574,7 @@ def _get_rho(n: int) -> np.ndarray:
     """
     Helper function which gets the projectors for calculating the EOMs.
 
-    Uses a gobal dictionary to cache results and avoid recalculating.
+    Uses a global dictionary to cache results and avoid recalculating.
 
     Parameters
     ----------

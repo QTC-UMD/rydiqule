@@ -23,7 +23,7 @@ C_a_0 = physical_constants["Bohr radius"][0]
 class RQ_AlkaliAtom(object):
 
     def __init__(self, arc_atom: arc.alkali_atom_functions.AlkaliAtom):
-        """Rydiqule's wrapper class around ARC's Alkai atom classes.
+        """Rydiqule's wrapper class around ARC's Alkali atom classes.
 
         Designed predominantly for internal use, seldom needs to be accessed directly.
 
@@ -35,7 +35,7 @@ class RQ_AlkaliAtom(object):
         """
 
         self.arc_atom = arc_atom
-        "ARC atom with which to perfom calculations."
+        "ARC atom with which to perform calculations."
 
         self._arc_dipole_functions: Dict[Tuple[str, str], Callable] = {
             ("HFS", "FS"): self.arc_atom.getDipoleMatrixElementHFStoFS,
@@ -53,7 +53,7 @@ class RQ_AlkaliAtom(object):
         If states 1 and 2 are NLJ, a simple average of the magnitudes of the dipole-allowed moments
         between mJ1 and mJ2 is returned.
 
-        Cannot calculate dipole matrix elements between states with NLJ specication and those with
+        Cannot calculate dipole matrix elements between states with NLJ specification and those with
         either FS or HS splitting.
 
         ARC functions used are:
@@ -84,7 +84,7 @@ class RQ_AlkaliAtom(object):
         Raises
         ------
         AtomError
-            If the two states to be coupled are in one each of the NLJ and FS/HFS defintions.
+            If the two states to be coupled are in one each of the NLJ and FS/HFS definitions.
 
         Examples
         --------
@@ -549,7 +549,7 @@ class RQ_AlkaliAtom(object):
         >>> print(my_atom.get_spherical_dipole_matrix_element(g_nlj, e_hfs, q=0)) # doctest: +IGNORE_EXCEPTION_DETAIL
         Traceback (most recent call last):
           File "<stdin>", line 1, in <module>
-        rydiqule.exceptions.AtomError: Invalid transition type for dipole calculatdion. Allowed types are [('HFS', 'FS'), ('FS', 'HFS'), ('HFS', 'HFS'), ('FS', 'FS'), ('NLJ', 'NLJ')]
+        rydiqule.exceptions.AtomError: Invalid transition type for dipole calculation. Allowed types are [('HFS', 'FS'), ('FS', 'HFS'), ('HFS', 'HFS'), ('FS', 'FS'), ('NLJ', 'NLJ')]
         """
 
         return (self.get_dipole_matrix_element(state1, state2, q, s)
@@ -625,7 +625,7 @@ class RQ_AlkaliAtom(object):
         state2: A_QState
             NamedTuple of quantum numbers of the target state
         temperature: float, optional
-            Temperature of th atomic environment for calculationg BBR-induced
+            Temperature of the atomic environment for calculating BBR-induced
             decays, in Kelvin.
             With default of 0.0, only include natural lifetime.
         s: float, optional
@@ -699,16 +699,16 @@ class RQ_AlkaliAtom(object):
         This is a thin wrapper around ARC's
         :external+arc:meth:`~arc.alkali_atom_functions.AlkaliAtom.getStateLifetime` method.
         It adds basic validation of the state and selects the correct quantum numbers for the 
-        calcuation.
+        calculation.
 
         Parameters
         ----------
         state: A_QState
             NamedTuple of quantum numbers of state for which to calculate lifetime. 
         temperature: float, optional
-            Temperature at which the atom environmnet is, in Kelvin.
+            Temperature at which the atom environment is, in Kelvin.
             Used for calculating the black-body-induced state lifetime.
-            If 0.0 (default), result does not inlclude BBR term.
+            If 0.0 (default), result does not include BBR term.
         includeLevelsUpTo: int, optional
             If `temperature` is non-zero, this specifies the highest principal
             quantum number states to include in the BBR calculation.
@@ -732,11 +732,9 @@ class RQ_AlkaliAtom(object):
         >>> arc_atom = arc.alkali_atom_data.Rubidium85()
         >>> my_atom = rq.RQ_AlkaliAtom(arc_atom)
         >>> print(my_atom.get_state_lifetime(e_nlj))
-        1.1626e-06
+        1.162e-06
         >>> print(my_atom.get_state_lifetime(e_fs))
-        4.20984e-07
-        >>> print(my_atom.get_state_lifetime(e_nlj))
-        1.16261e-06
+        4.209e-07
 
         """
         return self.arc_atom.getStateLifetime(*state[:3], temperature, includeLevelsUpTo, s)

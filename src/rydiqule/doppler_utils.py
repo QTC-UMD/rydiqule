@@ -193,7 +193,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
                 - `"n_uniform"`: Int that specifies how many points to use. Defaults to 1601.
 
             - `"isopop"`: Defines a grid with uniform population in each interval.
-              This method highly emphasises physics happening near the 0 velocity class.
+              This method highly emphasizes physics happening near the 0 velocity class.
               If stuff is happening for non-zero velocity classes,
               it is likely to alias it unless `n_isopop` is large.
               See Ref [1]_ for details.
@@ -338,7 +338,7 @@ def doppler_mesh(doppler_velocities: np.ndarray, spatial_dim: int) -> Tuple[np.n
     Vs : numpy.ndarray
         Velocity evaluation points array of shape `(spatial_dim,spatial_dim*[len(dop_vel)])`.
     Vols : numpy.ndarray
-        "Volume" of each meshpoint. Has same shape as `Vs`.
+        "Volume" of each mesh point. Has same shape as `Vs`.
 
     Examples
     --------

@@ -150,8 +150,8 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
     this solver effectively reduces the dimension to 1 or 2, respectively, 
     leading to faster solves.
 
-    If insuffucent system memory is available to solve the system in a single call,
-    system is broken into "slices" of manageable memory footprint which are solved indivudually.
+    If insufficient system memory is available to solve the system in a single call,
+    system is broken into "slices" of manageable memory footprint which are solved individually.
     This slicing behavior does not affect the result.
      
     Parameters
@@ -170,7 +170,7 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
         Defaults to the first nonzero axis.
     n_slices : int or None, optional
         How many sets of equations to break the full equations into.
-        The actual number of slices will be the largest between this value and the minumum
+        The actual number of slices will be the largest between this value and the minimum
         number of slices to solve the system without a memory error. If `None`, uses the minimum
         number of slices to solve the system without a memory error. Detailed information about
         slicing behavior can be found in :func:`~.slicing.slicing.matrix_slice`. Default is `None`.
@@ -285,7 +285,7 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
         rho_dopp_imag = np.abs(sols.imag)
         count = np.count_nonzero(rho_dopp_imag > np.finfo(float).eps*imag_tol)
         warnings.warn('Doppler-averaged solution has complex parts outside of tolerance, solution is suspect. ' +
-                      f'{count:d} of {sols.size:d} elments larger than cutoff {np.finfo(float).eps*imag_tol:.3g}. ' +
+                      f'{count:d} of {sols.size:d} elements larger than cutoff {np.finfo(float).eps*imag_tol:.3g}. ' +
                       f'Max Abs(Imag): {sols.max():.3g}, Std Abs(Imag): {np.std(sols):.3g}',
                       RydiquleWarning)
     pops_dopp = np.sum(sols_real[...,::n+1], axis=-1)
