@@ -240,7 +240,7 @@ def _solve_hamiltonian_stack(
 
         eom = get_doppler_equations(eom, doppler_shifts, dop_velocities)
 
-        # this is required for linalg.solve boadcasting to work
+        # this is required for linalg.solve broadcasting to work
         const = np.expand_dims(const, tuple(np.arange(spatial_dim)))
         sols_full = steady_state_solve_stack(eom, const)
 

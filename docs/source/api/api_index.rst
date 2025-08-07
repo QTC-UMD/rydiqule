@@ -1,4 +1,4 @@
-API Documenation
+API Documentation
 =================
 
 .. autosummary::

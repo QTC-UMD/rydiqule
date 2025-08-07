@@ -2704,7 +2704,7 @@ class Sensor():
         Returns
         -------
         numpy.ndarray
-            The digonal of the hamiltonian of the system of shape `(*l,n)`,
+            The diagonal of the hamiltonian of the system of shape `(*l,n)`,
             where `l` is the shape of the hamiltonian stack for the sensor.
 
         """

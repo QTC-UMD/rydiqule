@@ -304,7 +304,7 @@ Bug Fixes
 +++++++++
 
 - Changed an `isinstance` check to `hasattr`, fixing an occasional issue with reloading `rydiqule` in jupyter notebooks.
-- Fixed issue where submodules wree not installed outside of editable mode.
+- Fixed issue where submodules were not installed outside of editable mode.
 - Fixed a bug where additional arguments like warning suppression could not be passed to Sensor.add_couplings
 
 Deprecations

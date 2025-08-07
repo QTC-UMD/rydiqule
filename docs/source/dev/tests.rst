@@ -33,7 +33,7 @@ For example, this command will only run tests relating to the steady state solvi
   pytest -m steady_state
 
 You can also exclude a specific group of tests.
-For example, this command will exlcude tests marked as slow.
+For example, this command will exclude tests marked as slow.
 
 .. code-block:: shell
 
@@ -68,7 +68,7 @@ The markers we use are
   * - experiments
     - Marks a test that represents a full experiment.
   * - util
-    - Marks a test of the ancillary utilties.
+    - Marks a test of the ancillary utilities.
   * - structure
     - Marks a test of the definition of the atomic system.
   * - exception
