@@ -81,7 +81,7 @@ One can write this total field as
     E_{tot} = E_{LO} + E_{S} = E_{LO}\cos((\omega_0+\Delta_{LO}) t) + E_S\cos((\omega_0+\Delta_{LO} +\delta_S)t)
 
 To convert to rydiqule parameters, we first move to the rotating frame defined by the field frequency :math:`\omega=\omega_0+\Delta_{LO}`.
-Mathematically this is done by multipling the total field by :math:`e^{-i\omega t}`
+Mathematically this is done by multiplying the total field by :math:`e^{-i\omega t}`
 and dropping the fast-rotating terms (i.e. that have components like :math:`e^{-i2\omega_0 t}`).
 We then separate the constant amplitude prefactor from the normalized time-dependence.
 
@@ -215,7 +215,7 @@ Modelling a diamond scheme in a four-level atom would have the following four co
     \Omega^{(d)}(t) &= \Omega_d\cos((\omega_4 + \delta_d)t + \phi_d)
     \end{align}
 
-The atomic transition frequenicies obey the relationship :math:`\omega_1 + \omega_2 - \omega_3 - \omega_4 = 0`,
+The atomic transition frequencies obey the relationship :math:`\omega_1 + \omega_2 - \omega_3 - \omega_4 = 0`,
 with fields 1 and 4 coupling to the ground state,
 and fields 2 and 3 coupling the highest excited state.
 Note that the detunings for each field are defined such that a positive value corresponds to a blue detuning from atomic resonance.

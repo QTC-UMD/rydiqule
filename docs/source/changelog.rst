@@ -29,10 +29,10 @@ v2.1.0
 Improvements
 ++++++++++++
 
-- Fully support 1D/2D/3D doppler solves using the analytic-enabled solver, `solve_doppler_analytic`. The anlytic average
+- Fully support 1D/2D/3D doppler solves using the analytic-enabled solver, `solve_doppler_analytic`. The analytic average
   is applied to a single dimension, with other present dimensions treated numerically. This provides notable decreases in
   computation times and memory footprints and increases in solution accuracy in all spatial dimensions.
-- Added an example notebook, `Analyic Doppler Solver`, showcasing the new `solve_doppler_analytic`.
+- Added an example notebook, `Analytic Doppler Solver`, showcasing the new `solve_doppler_analytic`.
 - Extended documentation and unit unit-testing to include hybrid solver implementation.
 
 Deprecations
@@ -188,7 +188,7 @@ Improvements
 
 - Level diagrams now use `Sensor.get_rotating_frames` to provide better plotting of energy ordering of levels.
 - Level diagrams now allow for optional control of plotting parameters by manually specifying `ld_kw` options on nodes and edges.
-- Added the ability to specify energy level shifts (additional Hamiltonian digonal terms) not accounted for by the coupling infrastructure.
+- Added the ability to specify energy level shifts (additional Hamiltonian diagonal terms) not accounted for by the coupling infrastructure.
 
 
 Bug Fixes
@@ -210,8 +210,8 @@ v1.1.0
 Improvements
 ++++++++++++
 
-- Added the ability to specify hyperfine states in a `Cell`. They are distiguished by having 5 quantum numbers `[n, l, j, f, m_f]`.
-- `kappa` and `eta` are now proprties of `Cell` which are calculated on the fly.
+- Added the ability to specify hyperfine states in a `Cell`. They are distinguished by having 5 quantum numbers `[n, l, j, f, m_f]`.
+- `kappa` and `eta` are now properties of `Cell` which are calculated on the fly.
 - Separated rotating frame logic from hamiltonian diagonal generation into a new function `Sensor.get_rotating_frames()`.
   Allows for simple inspection of what rotating frame rydiqule is using in a solve.
 - Reworked the under-the-hood parameter zipping framework. This should have minimal impact on user-facing functionality.
@@ -264,7 +264,7 @@ Deprecations
   It is now `rabi_frequency` times the `time_dependence`.
 - Multiple sign errors have been corrected in `Sensor` and `Cell` with regards to detunings.
   Results that are asymmetric about zero detuning are likely to change.
-  Please ensure all couplings are following correct sign conventions for consisten results
+  Please ensure all couplings are following correct sign conventions for consistent results
   (ie second state of `states` tuple has higher energy).
 - most of the functions in experiments.py have been moved to become methods of `Solution` class.
 
@@ -327,7 +327,7 @@ Bug Fixes
 +++++++++
 
 - Fixed issue where solvers would save doppler axes labels and values even when they are summed over to the solution object
-- Fixed a bug where energy level diagrams broke when decochernce rates were scanned.
+- Fixed a bug where energy level diagrams broke when decoherence rates were scanned.
 - Fixed issue where compiled timesolvers could not solve doppler averaged problems.
 - Fixed issue where certain doppler solves could not be sliced correctly
 
@@ -386,16 +386,16 @@ Improvements
   
   - Gamma matrix is now calculated on the fly with the `decoherence__matrix()` method.
   - Decoherent transitions are now added with with the `add_decoherence()` function in `Sensor`.
-  - `Cell` now calculates tranistion frequencies and decay rates automatically and places them on the appropriate graph edges.
+  - `Cell` now calculates transition frequencies and decay rates automatically and places them on the appropriate graph edges.
 
 - Changed the `Sensor.couplings` attribute from a `nx.Graph` to an `nx.DiGraph`. This has multiple advantages:
   
   - A less vague definition of detuning convention.
   - Precise definition of energy ordering: couplings now always point from lower to higher absolute energy.
-  - More flexibility in decoherence. Decoherent transions now point "from" one state "to" another rather than just "between" 2 states. This fixes a limitation where gamma matrices no longer must be lower triangular.
+  - More flexibility in decoherence. Decoherent transitions now point "from" one state "to" another rather than just "between" 2 states. This fixes a limitation where gamma matrices no longer must be lower triangular.
 
 - `get_snr()` function in `rq.experiments` now takes `kappa` and `eta` as optional arguments to allow for running on any `Sensor` object. They can still be inferred from a `Sensor` subclass that has them as attributes if unspecified.
-- time solver now properly handles complex time dependences in the rotating wave approximation
+- time solver now properly handles complex time dependencies in the rotating wave approximation
 - Added type hints to code base that can be used to static type check with mypy
 - Added functions `rq.calc_kappa` and `rq.calc_eta` to properly calculate kappa and eta constants for experimental parameters.
 - Added function `rq.get_OD` that calculates the optical depth of a solution
@@ -408,8 +408,8 @@ Bug Fixes
 - Fixed an issue with time dependence in the probe laser
 - Modified solver to allow for complex time dependence
 - Fixed non-hermitian hamiltonians in time solver
-- Fixed error with multiple time-dependences in time solver
-- Added functionality to solver error with complex time dependences
+- Fixed error with multiple time-dependencies in time solver
+- Added functionality to solver error with complex time dependencies
 - Modified experimental return functions (`get_transmission_coef()`, `get_phase_shift()`, and `get_susceptibility()``) to allow scanning of probe rabi frequency
 - Fixed `get_rho_ij` so that it correctly calculates the `(0,0)` population element
 - Fix error in `test_sensor_management` which fails if temporary directory does not exist.
@@ -432,7 +432,7 @@ v0.3.0
 Improvements
 ++++++++++++
 
-- Expanded documention
+- Expanded documentation
 - Removed restrictions on ARC and numpy versions during installation.
 - Vectorized equation of motion generation to support prepending axes to a hamiltonian
 - Updated the internal mechanism for sensor handling fields of various type
@@ -458,7 +458,7 @@ Improvements
 - Quantum numbers and absolute energies are now stored on the nodes of a Cell couplings graph
 - Cell now adds decay rates and decoherences to the nodes and edges of the Cell couplings graph
 - Cell now calculates the gamma matrix in an arbitrary way, and is no longer limited to two laser, ladder schemes
-- Added function to calculate sensor SNR with repect to any varied sensor coupling parameter
+- Added function to calculate sensor SNR with respect to any varied sensor coupling parameter
 - Added function to return sensor parameter mesh
 
 Bug Fixes
@@ -475,9 +475,9 @@ Deprecations
 
 - All "field" functionality are being deprecated in favor of "coupling"
 - The `rf_couplings`, `target_state`, and `rf_dipole_matrix` arguments of `solve_time()`
-- All functions relating to sensor.transtion_map are deprecated
+- All functions relating to sensor.transition_map are deprecated
 - Cell now does not accept gamma_excited or gamma_Rydberg as these are always calculated or Sensor can be used with a given gamma matrix
-- Cell now does not accept  gamma_doppler as Doppler broadening width is given by mutiplying the most proable velocity and the laser k-vector
+- Cell now does not accept  gamma_doppler as Doppler broadening width is given by multiplying the most probable velocity and the laser k-vector
 
 v0.2.0
 ------
