@@ -2,27 +2,58 @@
 Utilities for interacting with atomic parameters and ARC.
 """
 
-import arc.alkali_atom_data as arc_atoms
 from scipy.constants import epsilon_0, hbar, c
 import numpy as np
 import re 
 from .sensor_utils import expand_statespec
 
-from typing import Union, Optional, Literal, Tuple, List, Dict, Callable, NamedTuple
+from typing import Union, Optional, Literal, Tuple, List, Dict, Callable, NamedTuple, Any
 
 from .exceptions import RydiquleError
 
-ATOMS = {
-    'H': arc_atoms.Hydrogen,
-    'Li6': arc_atoms.Lithium6, 'Li7': arc_atoms.Lithium7,
-    'Na': arc_atoms.Sodium,
-    'K39': arc_atoms.Potassium39, 'K40': arc_atoms.Potassium40, 'K41': arc_atoms.Potassium41,
-    'Rb85': arc_atoms.Rubidium85, 'Rb87': arc_atoms.Rubidium87,
-    'Cs': arc_atoms.Caesium
-}
-"""
-Alkali atoms defined by ARC that can be used with :class:`~.Cell`.
-"""
+__all__ = [
+    'QSpec',
+    'A_QState',
+    'QState',
+    'D1_excited',
+    'D1_states',
+    'D2_excited',
+    'D2_states',
+    'ground_state',
+    'expand_qnums',
+    'calc_eta',
+    'calc_kappa',
+    'validate_qnums',
+]
+__lazy_loads = [
+    'ATOMS'
+]
+
+def __dir__() -> List[str]:
+
+    return sorted(__all__ + __lazy_loads)
+
+
+def __getattr__(name: str) -> Any:
+
+    if name == 'ATOMS':
+        import arc.alkali_atom_data as arc_atoms
+
+        ATOMS = {
+            'H': arc_atoms.Hydrogen,
+            'Li6': arc_atoms.Lithium6, 'Li7': arc_atoms.Lithium7,
+            'Na': arc_atoms.Sodium,
+            'K39': arc_atoms.Potassium39, 'K40': arc_atoms.Potassium40, 'K41': arc_atoms.Potassium41,
+            'Rb85': arc_atoms.Rubidium85, 'Rb87': arc_atoms.Rubidium87,
+            'Cs': arc_atoms.Caesium
+        }
+        """
+        Alkali atoms defined by ARC that can be used with :class:`~.Cell`.
+        """
+        return ATOMS
+    else:
+        raise AttributeError(f'Module {__name__} does not have attribute {name}')
+
 
 ground_n = {
     "H": 1,

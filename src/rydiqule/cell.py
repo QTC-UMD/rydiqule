@@ -14,7 +14,7 @@ from scipy.constants import Boltzmann, e
 from .sensor import Sensor
 from .sensor_utils import scale_dipole
 from .sensor_utils import ScannableParameter, TimeFunc
-from .atom_utils import ATOMS, calc_kappa, calc_eta, expand_qnums, validate_qnums, A_QState, ground_state
+from .atom_utils import calc_kappa, calc_eta, expand_qnums, validate_qnums, A_QState, ground_state
 from .arc_utils import RQ_AlkaliAtom
 from .exceptions import RydiquleError, AtomError, CouplingNotAllowedError
 from .exceptions import RydiquleWarning, debug_state
@@ -165,6 +165,7 @@ class Cell(Sensor):
         (5, 0, 0.5, f=2.0, m_f=2.0)
 
         """
+        from .atom_utils import ATOMS
         if atom_flag not in ATOMS.keys():
             raise AtomError(f"Atom flag must be one of {ATOMS.keys()}")
 
