@@ -10,12 +10,12 @@ from .sensor_solution import Solution
 from .exceptions import RydiquleError
 import scipy.constants
 from scipy.constants import hbar, e
-from leveldiagram import LD
 
 from typing import Dict, Tuple, Union, List, Callable, TYPE_CHECKING
 if TYPE_CHECKING:
     # only import when type checking, avoid circular import
     from .sensor import Sensor
+    from leveldiagram import LD
 
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
 
@@ -713,7 +713,7 @@ def scale_dipole(dipole: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     return dipole
 
 
-def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
+def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> "LD":
     """
     Draw a matplotlib plot that shows the energy level diagram, couplings, and dephasing paths.
 
@@ -745,6 +745,9 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> LD:
         Diagram handle
 
     """
+    # lazy import of leveldiagram to avoid matplotlib import when not needed
+    from leveldiagram import LD
+
     rq_g = sensor.couplings.copy()
     sensor_states = sensor.states
 
