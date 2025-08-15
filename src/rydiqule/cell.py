@@ -14,9 +14,9 @@ from scipy.constants import Boltzmann, e
 from .sensor import Sensor
 from .sensor_utils import scale_dipole
 from .sensor_utils import ScannableParameter, TimeFunc
-from .atom_utils import ATOMS, calc_kappa, calc_eta, expand_qnums, validate_qnums, A_QState, ground_state
+from .atom_utils import calc_kappa, calc_eta, expand_qnums, validate_qnums, A_QState, ground_state, _load_arc_atom
 from .arc_utils import RQ_AlkaliAtom
-from .exceptions import RydiquleError, AtomError, CouplingNotAllowedError
+from .exceptions import RydiquleError, CouplingNotAllowedError
 from .exceptions import RydiquleWarning, debug_state
 
 from typing import Literal, Optional, Sequence, List, Tuple, Callable, Union, Dict
@@ -165,11 +165,9 @@ class Cell(Sensor):
         (5, 0, 0.5, f=2.0, m_f=2.0)
 
         """
-        if atom_flag not in ATOMS.keys():
-            raise AtomError(f"Atom flag must be one of {ATOMS.keys()}")
 
         self.atom_flag = atom_flag
-        self.atom = RQ_AlkaliAtom(ATOMS[atom_flag]())
+        self.atom = RQ_AlkaliAtom(_load_arc_atom(atom_flag))
         self.I = self.atom.arc_atom.I
 
         #prepare states by expanding statespec into list and initialize graph
