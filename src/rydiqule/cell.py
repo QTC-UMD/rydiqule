@@ -16,7 +16,7 @@ from .sensor_utils import scale_dipole
 from .sensor_utils import ScannableParameter, TimeFunc
 from .atom_utils import calc_kappa, calc_eta, expand_qnums, validate_qnums, A_QState, ground_state, _load_arc_atom
 from .arc_utils import RQ_AlkaliAtom
-from .exceptions import RydiquleError, AtomError, CouplingNotAllowedError
+from .exceptions import RydiquleError, CouplingNotAllowedError
 from .exceptions import RydiquleWarning, debug_state
 
 from typing import Literal, Optional, Sequence, List, Tuple, Callable, Union, Dict
