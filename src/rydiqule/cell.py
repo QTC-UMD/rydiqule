@@ -172,7 +172,7 @@ class Cell(Sensor):
         self.atom = RQ_AlkaliAtom(ATOMS[atom_flag]())
         self.I = self.atom.arc_atom.I
 
-        #prepare states by expanding statespec into list and intialize graph
+        #prepare states by expanding statespec into list and initialize graph
         qstates_list = expand_qnums(atomic_states, I=self.I)
         if len(qstates_list) < 2:
             raise RydiquleError(("At least 2 states must be specified in a Cell"))
@@ -299,7 +299,7 @@ class Cell(Sensor):
         For the following example, states are in the list passed to the constructor in
         ascending energy order, so the ordering the basis is identical to the `level_ordering`.
         Computed `Cell` attributes the Hamiltonian will, for clarity, always appear in the
-        ording of levels in the list passed to the constructor.
+        ordering of levels in the list passed to the constructor.
         
         >>> from rydiqule import A_QState
         >>> atom = "Rb85"
@@ -698,7 +698,7 @@ class Cell(Sensor):
             If an invalid combination of `rabi_frequency`, `e_field`,
             `beam_power`, and `beam_waist` is provided.
         RydiquleError
-            If `tranistion_frequency` is passed as an argument (it is
+            If `transition_frequency` is passed as an argument (it is
             calculated from atomic properties).
         RydiquleError
             If `beam_power` and `beam_waist` are both sequences.
@@ -902,7 +902,7 @@ class Cell(Sensor):
             # doppler not requested for this coupling, pass default along
             kvec = kunit
         elif np.isclose(k_norm_sq, 1.0):
-            # apply standard dopper shift
+            # apply standard doppler shift
             lam = abs(self.atom.get_transition_wavelength(state1, state2)) # in m
             kvec = 2*np.pi/lam*np.asarray(kunit)*1e-6 # scaled to Mrad/m
         else:
@@ -932,7 +932,7 @@ class Cell(Sensor):
         Parameters
         ----------
         gamma_transit : ScannableParameter
-            Transit brodening of the system. Passed transparently to super function.
+            Transit broadening of the system. Passed transparently to super function.
         repop: dict, optional
             Dictionary of states for transit to repopulate in to.
             The keys represent tshe state labels. The values represent
@@ -988,7 +988,7 @@ class Cell(Sensor):
         Parameters
         ----------
         statespec : A_QState
-            State specification againt which to perform matching,
+            State specification against which to perform matching,
 
         Returns
         -------
@@ -1085,7 +1085,7 @@ class Cell(Sensor):
                   state). 
                 - `"all"` which divides :math:`\\Delta \\gamma` amongst all states in the 
                   :class:`~.Cell` which already have a `"gamma_transition"` value. The fraction
-                  each transition gets is weighted by the fraction of the total thdat transitions
+                  each transition gets is weighted by the fraction of the total that transitions
                   `"gamma_transition"` value accounts for. If this method is used, every state in
                   the `Cell` must have at least one dipole-allowed decay path. 
                 - `"none"` which will not account for this discrepancy at all. In this case this
@@ -1177,7 +1177,7 @@ class Cell(Sensor):
 
         if len(out_edges) == 0 and state[:3] != ground_nlj:
             msg = "'all' option selected for gamma_mismatch handling but no dipole-allowed "\
-                f"states have been been added for tranistion out of {state}"
+                f"states have been been added for transition out of {state}"
             raise RydiquleError(msg)
 
         transition_total = sum(e[2] for e in out_edges)

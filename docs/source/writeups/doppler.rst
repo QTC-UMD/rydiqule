@@ -38,7 +38,7 @@ meaning all Doppler shifts are due to velocities projected along a single axis.
 Choosing which velocity classes to calculate when performing doppler averaging is a fairly complex meshing problem.
 Our ultimate goal is to numerically approximate a continuous integral in one to three dimensions using a discrete sum approximation.
 For thermal vapors, where the spread of doppler velocities is large,
-resulting in Doppler shifts much greater than other detunings, linewidths, or Rabi frequenices in the problem,
+resulting in Doppler shifts much greater than other detunings, linewidths, or Rabi frequencies in the problem,
 most velocity classes only contribute minor incoherent absorption to the final result.
 This allows for much coarser meshes.
 The difficulty lies in determining which velocity classes, a-priori, can participate in generally narrow coherent processes.

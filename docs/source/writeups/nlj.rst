@@ -32,7 +32,7 @@ which has a similar role and dependencies as :math:`m_j` in a fine structure sta
 
 In a Rydberg atom, the hyperfine structure of the ground states and first few excited states is resolveable
 (though often obscured by doppler averaging in a thermal ensemble).
-As a result, these states are typicaly defined by :math:`|n,l,j,f,m_f\rangle`.
+As a result, these states are typically defined by :math:`|n,l,j,f,m_f\rangle`.
 This interaction is much less strong for Rydberg states,
 so the appropriate quantum numbers to use are the fine structure
 :math:`|n,l,j,m_j\rangle`.
@@ -69,7 +69,7 @@ may be due to stray fields.
 
     Level diagram of 2-photon Rydberg EIT system using the degenerate sublevels approximation.
 
-A subtlty to using this approximation is in defining the dipole moment of a transition.
+A subtlety to using this approximation is in defining the dipole moment of a transition.
 The dipole moment depends on the magnetic sublevels of either state, which are ignored by the approximation.
 When the sublevels are degenerate, any sublevel with population in it will contribute to an average coupling
 based on the dipole-allowed transitions.

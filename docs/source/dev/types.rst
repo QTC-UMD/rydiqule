@@ -10,7 +10,7 @@ The easiest way to use this checker locally is via the VS Code Pylance extension
 which defaults to the pyright type checker and will automatically run when configuration options are detected in the root `pyproject.toml`.
 
 Note that python is still a dynamic, duck-typed language,
-and rydiqule employs some features that are perfectly valid python which are not expressable in the type hinting system.
+and rydiqule employs some features that are perfectly valid python which are not expressible in the type hinting system.
 In these situations, we err on the side of type hints being primarily documentation,
 and do our best to not obfuscate functioning code merely to satisfy the type checker.
 

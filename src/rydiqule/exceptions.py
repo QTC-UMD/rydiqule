@@ -64,7 +64,7 @@ def debug_state():
     return DEBUG
 
 # suppress final frame of RydiquleError tracebacks for normal usage
-# ensure we use current excepthook as fallback, in case someone has overrideen already
+# ensure we use current excepthook as fallback, in case someone has overridden already
 current_excepthook = sys.excepthook
 def quiet_exception_handler(exception_type, exception, tb):
 

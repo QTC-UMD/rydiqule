@@ -2,7 +2,7 @@ Building the Documentation
 ==========================
 
 This section describes how to build the documentation locally.
-A web-hosted copy of the docs is avialable at `https://rydiqule.readthedocs.io/ <https://rydiqule.readthedocs.io/>`_
+A web-hosted copy of the docs is available at `https://rydiqule.readthedocs.io/ <https://rydiqule.readthedocs.io/>`_
 and should generally be used.
 These instructions are provided for local testing and development purposes.
 

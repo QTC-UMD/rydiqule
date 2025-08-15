@@ -1,7 +1,7 @@
 Fine and Hyperfine Structure with Sublevels
 ===========================================
 
-In many situtations, accurate modeling requires solving for the entire atomic structure (i.e. explicit handling of the magnetic sublevels).
+In many situations, accurate modeling requires solving for the entire atomic structure (i.e. explicit handling of the magnetic sublevels).
 These situations include calculating changes in probing polarization and ellipticity angles,
 non-degenerate states due to ambient magnetic fields,
 or inhomogeneous coupling strengths due to sublevel structure.
@@ -267,7 +267,7 @@ The Clebsch-Gordon coefficients are related to the spherical matrix element by
     
     For example, :math:`\langle J=1/2, m_J=\pm1/2|d|J'=3/2, m_J'=\pm3/2\rangle` has `coherent_cc=1`.
     
-    Note, however, that :math:`\langle J=1/2, m_J=\pm1/2|d|J'=1/2, m_J'=\mp1/2\rangle` has `coherenct_cc=4/3`.
+    Note, however, that :math:`\langle J=1/2, m_J=\pm1/2|d|J'=1/2, m_J'=\mp1/2\rangle` has `coherent_cc=4/3`.
     
 
 HFS to HFS

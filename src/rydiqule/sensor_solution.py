@@ -1,5 +1,5 @@
 """
-Object used to store aspects of a solution when calling rydiule.solve()
+Object used to store aspects of a solution when calling rydiqule.solve()
 Adds essential keys with "None" entries
 """
 from __future__ import annotations

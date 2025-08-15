@@ -44,7 +44,7 @@ Equations of Motion
 -------------------
 
 The Master equation that governs system dynamics used by Rydiqule is the `Linbladian <https://en.wikipedia.org/wiki/Lindbladian>`_.
-It is a semi-classical formulation of the Schoedinger equation for use in open quantum systems.
+It is a semi-classical formulation of the Schroedinger equation for use in open quantum systems.
 
 .. math:: \dot{\rho} = -\frac{i}{\hbar}[H,\rho]-\mathcal{L}
 
