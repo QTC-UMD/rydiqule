@@ -26,13 +26,13 @@ ATOMS = {
 Alkali atoms defined by ARC that can be used with :class:`~.Cell`.
 """
 
-def _load_arc_atom(atom_flag: str) -> 'arc.alkali_atom_data.Alkali_Atom':
+def _load_arc_atom(atom_flag: str) -> 'arc.alkali_atom_data.AlkaliAtom':
     """
     Function that lazy loads ARC atoms from :external+arc:module:`~arc.alkali_atom_data`
 
     Returns
     -------
-    arc.alkali_atom_data.Alkali_Atom
+    arc.alkali_atom_data.AlkaliAtom
         ARC alkali atom class associated with the provided atom_flag.
     """
 
