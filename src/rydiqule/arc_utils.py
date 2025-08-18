@@ -5,8 +5,11 @@ Helper methods for interfacing with ARC atom classes
 from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Dict, Callable, Tuple
 
-from arc import C_e, C_c, C_h
 from scipy.constants import pi, hbar, epsilon_0, physical_constants
+from scipy.constants import c as C_c
+from scipy.constants import h as C_h
+from scipy.constants import e as C_e
+
 import numpy as np
 
 from math import sqrt

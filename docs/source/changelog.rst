@@ -7,6 +7,12 @@ Latest
 Improvements
 ++++++++++++
 
+- `leveldiagram` and `arc` dependencies are now lazy loaded at first use
+  (`draw_diagram` and `Cell` instantiation, respectively).
+  This improves `import rydiqule as rq` time by about a second
+  and ensures second-order dependencies such as matplotlib and sympy are not
+  imported unless explicitly needed.
+
 
 Bug Fixes
 +++++++++
