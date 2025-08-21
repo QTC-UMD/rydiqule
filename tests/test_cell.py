@@ -82,7 +82,8 @@ def test_dipole_scaling(Rb85_sensor_kwargs):
 
 
 @pytest.mark.structure
-def test_decoherences(Rb85_sensor_kwargs):
+@pytest.mark.dev
+def test_decoherences():
     """Confirms that the decoherence matrix is building correctly.
     """
     gState = A_QState(5, 0, 0.5)
@@ -100,7 +101,7 @@ def test_decoherences(Rb85_sensor_kwargs):
     riDecay = atom.getTransitionRate(*rState[:3], *iState[:3])*1e-6
     rrcDecay = atom.getTransitionRate(*rState[:3], *rcState[:3])*1e-6
     rcgDecay = atom.getTransitionRate(*rcState[:3], *gState[:3])*1e-6
-    transit = 2*np.pi*65.5286e-3*0
+    transit = 2*np.pi*65.5286e-3
 
     # calculates all dipole allowed dephasings
     # any dephasing not accounted for from the natural lifetime
@@ -117,8 +118,8 @@ def test_decoherences(Rb85_sensor_kwargs):
     gamma_expected[:, 0] += transit
 
     cell = rq.Cell('Rb85', [gState, iState, rState, rcState], 
-                   **Rb85_sensor_kwargs)
-    cell.add_transit_broadening(transit)
+                   gamma_transit=transit,
+                   )
 
     np.testing.assert_allclose(cell.decoherence_matrix(), gamma_expected,
                                atol=2*np.pi*1e-4, rtol=0,
