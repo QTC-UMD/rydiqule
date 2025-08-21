@@ -1075,7 +1075,7 @@ class Cell(Sensor):
         `gamma_transition` values on edges leaving that state. However, it is not always
         desirable to account for all states in this way for simplicity or computational
         complexity reasons. This function allows the :class:`~.Cell` to account for any
-        differences in these values that arise as a result of excluding physicalstates from a
+        differences in these values that arise as a result of excluding physical states from a
         :class:`~.Cell`. There are multiple ways to resolve these discrepancies, specified by
         the `method` argument, which is detailed in the `Parameters` section.
 
@@ -1164,8 +1164,9 @@ class Cell(Sensor):
             m_j = None if g.m_j is None else "all"
             (f, m_f) = (None, None) if g.f is None else ("all","all")
             ground_manifold = A_QState(g.n, g.l, g.j, m_j=m_j, f=f, m_f=m_f)
+            degeneracy = len(self.states_with_spec(ground_manifold))
 
-            self.add_decoherence((state, ground_manifold), gamma=(lifetime-transition_total), label="mismatch")
+            self.add_decoherence((state, ground_manifold), gamma=(lifetime-transition_total)/degeneracy, label="mismatch")
 
     
     def _add_gamma_mismatch_to_all(self, state:A_QState):
@@ -1189,18 +1190,21 @@ class Cell(Sensor):
 
         transition_total = sum(e[2] for e in out_edges)
         
-        #if they dom't match, we add a decoherence to the entire ground state manifold
-        #that matches what remains
+        #if they dom't match, we proportionally increase existing decoherences to make up the difference
         if not np.isclose(transition_total, lifetime):
-            #construct the dictionary of coupling coefficients coefficients
-            cc = {
-                (s1, s2):gamma/transition_total for s1, s2, gamma in out_edges
-                if gamma
-            }
-
+            gamma_total_mismatch = lifetime-transition_total
             out_states_list = [s2 for _, s2, _ in out_edges]
-            self.add_decoherence_group([state], out_states_list, gamma = transition_total, coupling_coefficients=cc, label="mismatch")
+            if len(out_states_list) > 1:
+                #construct the dictionary of coupling coefficients
+                cc = {
+                    (s1, s2):gamma/transition_total for s1, s2, gamma in out_edges
+                    if gamma
+                }
 
+                self.add_decoherence_group([state], out_states_list, gamma = gamma_total_mismatch, coupling_coefficients=cc, label="mismatch")
+            else:
+                self.add_single_decoherence((state, out_states_list[0]), gamma_total_mismatch,
+                                            label='mismatch')
 
     def _validate_input_states(self, atomic_states: List[A_QState]):
         """Helper function to check that input states are compatible and defined"""
