@@ -204,6 +204,7 @@ class Cell(Sensor):
         self._add_state_lifetimes()
         self._add_decoherence_rates()
         self._add_gamma_mismatches(gamma_mismatch)
+        self.add_transit_broadening(gamma_transit)
 
     
     def set_experiment_values(self,
