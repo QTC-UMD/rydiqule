@@ -82,7 +82,6 @@ def test_dipole_scaling(Rb85_sensor_kwargs):
 
 
 @pytest.mark.structure
-@pytest.mark.dev
 def test_decoherences():
     """Confirms that the decoherence matrix is building correctly.
     """
@@ -124,6 +123,61 @@ def test_decoherences():
     np.testing.assert_allclose(cell.decoherence_matrix(), gamma_expected,
                                atol=2*np.pi*1e-4, rtol=0,
                                err_msg='gamma matrix for 2-photon;1 RF not equal')
+
+
+@pytest.mark.structure
+def test_gamma_mismatching_NLJ():
+    """Tests that mismatch handling mechanisms in Cell work as intended with NLJ systems
+    """
+
+    g = rq.A_QState(5, 0, 0.5)
+    e = rq.A_QState(5, 1, 1.5)
+    r = rq.A_QState(50, 2, 2.5)
+
+    c = rq.Cell('Rb85', [g,e,r], gamma_mismatch='ground', gamma_transit=0)
+    lifetimes = np.array([c.couplings.nodes[n]['gamma_lifetime'] for n in c.couplings.nodes])
+    dephasings = c.decoherence_matrix()
+    # sum of all dephasings to lower states for each state (ie each row) should equal lifetime
+    mismatches = np.sum(dephasings, axis=1)
+    np.testing.assert_allclose(lifetimes, mismatches,
+                            err_msg='NLJ: ground-mismatch disagreement')
+  
+    c = rq.Cell('Rb85', [g,e,r], gamma_mismatch='all', gamma_transit=0)
+    lifetimes = np.array([c.couplings.nodes[n]['gamma_lifetime'] for n in c.couplings.nodes])
+    dephasings = c.decoherence_matrix()
+    # full dephasing rate should be to next lower state only (ie first sub-diagonal)
+    mismatches = np.diag(dephasings, k=-1)
+    np.testing.assert_allclose(lifetimes[1:], mismatches,
+                            err_msg='NLJ: all-mismatch disagreement')
+    
+
+@pytest.mark.structure
+def test_gamma_mismatch_groups():
+    """Tests that mismatch handling mechanisms in Cell work as intended with HFS systems
+    """
+
+    g = rq.A_QState(5, 0, 0.5, f=1, m_f='all')
+    e = rq.A_QState(5, 1, 1.5, f=1, m_f='all')
+
+    c = rq.Cell('Rb87', [g,e], gamma_mismatch='none', gamma_transit=0)
+    dipole_allowed_dephasings_mask = c.decoherence_matrix() != 0.0
+
+    c = rq.Cell('Rb87', [g,e], gamma_mismatch='ground', gamma_transit=0)
+    lifetimes = np.array([c.couplings.nodes[n]['gamma_lifetime'] for n in c.couplings.nodes])
+    dephasings = c.decoherence_matrix()
+    mismatches = np.sum(dephasings, axis=1)
+    np.testing.assert_allclose(lifetimes, mismatches,
+                               atol=1e-7, # need atol since comparing against 0
+                               err_msg='HFS: ground-mismatch disagreement')
+    
+    c = rq.Cell('Rb87', [g,e], gamma_mismatch='all', gamma_transit=0)
+    lifetimes = np.array([c.couplings.nodes[n]['gamma_lifetime'] for n in c.couplings.nodes])
+    dephasings = c.decoherence_matrix()
+    masked_dephasings = np.where(dipole_allowed_dephasings_mask, dephasings, 0) # ensure we don't sum accidental 'new' dephasings
+    mismatches = np.sum(masked_dephasings, axis=1)
+    np.testing.assert_allclose(lifetimes, mismatches,
+                               atol=1e-7, # need atol since comparing against 0
+                               err_msg='HFS: all-mismatch disagreement')
 
 
 @pytest.mark.structure
