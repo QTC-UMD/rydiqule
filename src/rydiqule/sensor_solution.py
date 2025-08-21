@@ -543,7 +543,7 @@ class Solution():
 
         """
 
-        probe_wavelength = np.abs(c/(self.probe_freq/(2*np.pi))) #meters
+        probe_wavelength = abs(c/(self.probe_freq/(2*np.pi))) #meters
         probe_wavevector = 2*np.pi/probe_wavelength #1/meters
         OD = self.get_susceptibility().imag*self.cell_length*probe_wavevector
         if np.any(OD > 1.0):

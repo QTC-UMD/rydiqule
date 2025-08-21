@@ -5,7 +5,8 @@ Subclass of `Sensor` with functionality for representing real atoms.
 import scipy
 import numpy as np
 import warnings
-import itertools 
+import itertools
+import math
 
 import scipy.constants
 from scipy.constants import Boltzmann, e
@@ -185,20 +186,20 @@ class Cell(Sensor):
         self.temp = temp  # K
         self.beam_area = beam_area
         self.density = self.atom.arc_atom.getNumberDensity(self.temp)
-        self.atom_mass = self.atom.arc_atom.mass
+        self.atom_mass: float = self.atom.arc_atom.mass
         if beam_diam is None:
-            self.beam_diameter = 2.0*np.sqrt(beam_area/np.pi)
+            self.beam_diameter = 2.0*math.sqrt(beam_area/np.pi)
         else:
             self.beam_diameter = beam_diam
 
         if gamma_transit is None:
-            gamma_transit = 1E-6*np.sqrt(8*Boltzmann*self.temp/(self.atom_mass*np.pi)
-                                         )/(self.beam_diameter/2*np.sqrt(2*np.log(2)))
+            gamma_transit = 1E-6*math.sqrt(8*Boltzmann*self.temp/(self.atom_mass*np.pi)
+                                         )/(self.beam_diameter/2*math.sqrt(2*math.log(2)))
         self.gamma_transit = gamma_transit
 
         # most probable speed for a 3D Maxwell-Boltzmann distribution
         # used when defining doppler averaging
-        self.vP = np.sqrt(2*Boltzmann*self.temp/self.atom_mass)
+        self.vP = math.sqrt(2*Boltzmann*self.temp/self.atom_mass)
    
         self._add_state_energies()
         self._add_state_lifetimes()
@@ -905,7 +906,7 @@ class Cell(Sensor):
             lam = abs(self.atom.get_transition_wavelength(state1, state2)) # in m
             kvec = 2*np.pi/lam*np.asarray(kunit)*1e-6 # scaled to Mrad/m
         else:
-            raise RydiquleError(f'Coupling {states} has un-normalized |kunit|={np.sqrt(k_norm_sq):.2f}!=1')
+            raise RydiquleError(f'Coupling {states} has un-normalized |kunit|={math.sqrt(k_norm_sq):.2f}!=1')
 
         super().add_single_coupling(states=states,
                                     rabi_frequency=passed_rabi,
