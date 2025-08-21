@@ -343,7 +343,7 @@ class Cell(Sensor):
 
 
     @property
-    def kappa(self):
+    def kappa(self) -> float:
         """Property to calculate the kappa value of the system. 
 
         The value is computed with the following formula Eq. 5 of
@@ -371,7 +371,7 @@ class Cell(Sensor):
             return self._kappa
         
         if self.probe_tuple is None:
-            raise RydiquleError("Cell.probe_tuple not set. Either set manually or add at least one coupling before calculation.")
+            raise RydiquleError("Cell.probe_tuple not set. Add at least one coupling before calculation.")
         
         ground_manifold = self.states_with_spec(self.probe_tuple[0])
         excited_manifold = self.states_with_spec(self.probe_tuple[1])
@@ -396,6 +396,7 @@ class Cell(Sensor):
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
 
         kappa = calc_kappa(omega_rad, dipole_moment, self.density)
+        self._kappa = kappa
     
         return kappa
 
@@ -435,7 +436,7 @@ class Cell(Sensor):
     
 
     @property
-    def eta(self):
+    def eta(self) -> float:
         """Get the eta value for the system.
 
         The value is computed with the following formula Eq. 7 of
@@ -461,7 +462,7 @@ class Cell(Sensor):
         if hasattr(self, "_eta"):
             return self._eta
         if self.probe_tuple is None:
-            raise RydiquleError("Cell.probe_tuple not set. Either set manually or add at least one coupling before calculation.")
+            raise RydiquleError("Cell.probe_tuple not set. Add at least one coupling before calculation.")
         
         ground_manifold = self.states_with_spec(self.probe_tuple[0])
         excited_manifold = self.states_with_spec(self.probe_tuple[1])
@@ -485,12 +486,13 @@ class Cell(Sensor):
         omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2.0*np.pi
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
         eta = calc_eta(omega_rad, dipole_moment, self.beam_area)
+        self._eta = eta
 
         return eta
     
 
     @eta.setter
-    def eta(self, value):
+    def eta(self, value: float):
         """Setter for the eta attribute.
 
         Updates the self._eta class attribute.
@@ -521,7 +523,7 @@ class Cell(Sensor):
 
 
     @property
-    def probe_freq(self):
+    def probe_freq(self) -> float:
         """Get the probe transition frequency, in rad/s.
 
         Note that for :class:`~.Cell`, probing transition frequency is calculated using only
@@ -537,6 +539,8 @@ class Cell(Sensor):
 
         if hasattr(self, '_probe_freq'):
             return self._probe_freq
+        if self.probe_tuple is None:
+            raise RydiquleError("Cell.probe_tuple not set. Add at least one coupling before calculation.")
         
         probe_lower_manifold = self.states_with_spec(self.probe_tuple[0])
         probe_upper_manifold = self.states_with_spec(self.probe_tuple[1])
@@ -546,11 +550,14 @@ class Cell(Sensor):
 
         energy_lower = self.atom.get_state_energy(A_QState(n1, l1, j1), s=0.5)*2*np.pi
         energy_upper = self.atom.get_state_energy(A_QState(n2, l2, j2), s=0.5)*2*np.pi
+
+        probe_freq = abs(energy_upper - energy_lower)
+        self._probe_freq = probe_freq
         
-        return np.abs(energy_upper - energy_lower)
+        return probe_freq
     
     @probe_freq.setter
-    def probe_freq(self, value):
+    def probe_freq(self, value: float):
         """Setter for the probe_freq attribute.
 
         Updates the self._probe_freq class attribute.
