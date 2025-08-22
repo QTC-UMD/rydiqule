@@ -352,7 +352,7 @@ class Solution():
         (3,)
         >>> rho_01_im = sols.get_solution_element(0)
         >>> print(rho_01_im)
-        0.0013711656
+        0.00131399
 
         """
         basis_size = np.sqrt(self.rho.shape[-1] + 1)
@@ -382,7 +382,11 @@ class Solution():
         >>> sol = rq.solve_steady_state(my_cell)
         >>> for e in sol.couplings.edges(data="coherent_cc"):
         ...     print(*e)
+        (5, 0, 0.5, m_j=-0.5) (5, 0, 0.5, m_j=-0.5) None
+        (5, 0, 0.5, m_j=-0.5) (5, 0, 0.5, m_j=0.5) None
         (5, 0, 0.5, m_j=-0.5) (5, 1, 0.5, m_j=-0.5) -0.816496580927726
+        (5, 0, 0.5, m_j=0.5) (5, 0, 0.5, m_j=-0.5) None
+        (5, 0, 0.5, m_j=0.5) (5, 0, 0.5, m_j=0.5) None
         (5, 0, 0.5, m_j=0.5) (5, 1, 0.5, m_j=0.5) 0.816496580927726
         (5, 1, 0.5, m_j=-0.5) (5, 0, 0.5, m_j=-0.5) None
         (5, 1, 0.5, m_j=-0.5) (5, 0, 0.5, m_j=0.5) None
@@ -495,7 +499,7 @@ class Solution():
         (3,)
         >>> sus = sols.get_susceptibility()
         >>> print(sus)
-        (1.9734254e-05+0.000376067j)
+        (1.891136e-05+0.00036817j)
 
         """
         probe_rabi = self.probe_rabi*1e6 #rad/s
@@ -539,7 +543,7 @@ class Solution():
         (3,)
         >>> OD = sols.get_OD()
         >>> print(OD)
-        0.3028422896
+        0.2964844
 
         """
 
@@ -577,7 +581,7 @@ class Solution():
         (3,)
         >>> t = sols.get_transmission_coef()
         >>> print(t)
-        0.73871559029
+        0.743427
 
         """
         OD = self.get_OD()
@@ -605,7 +609,7 @@ class Solution():
         >>> print(sols.rho.shape)
         (3,)
         >>> print(sols.get_phase_shift())
-        80.5295218956
+        80.5294887
         
         """
         # reverse probe tuple order to get correct sign of imag

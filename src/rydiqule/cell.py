@@ -746,7 +746,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 2.0, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11316}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.40697}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11316, gamma_transit: 0.40697}
         Energy Shifts:
             None
         
@@ -764,7 +765,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 2.0, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.40696}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.113, gamma_transit: 0.40696}
         Energy Shifts:
             None
 
@@ -781,7 +783,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 1.177, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.40696}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11, gamma_transit: 0.40696}
         Energy Shifts:
             None
 
@@ -796,7 +799,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 4.3, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.4117}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.113, gamma_transit: 0.4117}
         Energy Shifts:
             None
 

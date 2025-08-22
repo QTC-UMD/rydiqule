@@ -90,8 +90,8 @@ def get_snr(sensor: Sensor,
     >>> c.add_coupling(states=(g,e), rabi_frequency=np.linspace(1e-6, 1, 5), detuning=1, label="probe")
     >>> snr, mesh = rq.get_snr(c, 'probe_rabi_frequency')
     >>> print(snr) 
-    [       0.       13947396.7 27887614.4 41813486.6
-     55717871.1]
+    [       0.       13654034.1 27301261.5 40934886.9
+     54548137.6]
     >>> print(mesh) # doctest: +SKIP
     [array([0.      , 0.25    , 0.499999, 0.749999, 0.999999])]
 

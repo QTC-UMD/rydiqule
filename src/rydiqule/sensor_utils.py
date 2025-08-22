@@ -405,9 +405,9 @@ def convert_to_full_dm(dm: np.ndarray) -> np.ndarray:
     >>> c.add_coupling(states=(g, e), rabi_frequency=1, detuning=1)
     >>> sols = rq.solve_steady_state(c)
     >>> print(sols.rho)
-    [0.001371 0.02613  0.000686]
+    [0.001313 0.02558  0.000664]
     >>> print(rq.sensor_utils.convert_to_full_dm(sols.rho))
-    [9.993144e-01 1.371165e-03 2.612972e-02 6.855828e-04]
+    [9.993359e-01 1.31399e-03 2.55811e-02 6.64016e-04]
 
     """
     b, r = divmod(math.sqrt(dm.shape[-1]+1), 1.0)
@@ -461,10 +461,10 @@ def convert_dm_to_complex(dm: np.ndarray) -> np.ndarray:
     >>> c.add_coupling(states=(g, e), rabi_frequency=1, detuning=1)
     >>> sols = rq.solve_steady_state(c)
     >>> print(sols.rho)
-    [0.001371 0.02613  0.000686]
+    [0.001313 0.02558  0.000664]
     >>> print(rq.sensor_utils.convert_dm_to_complex(sols.rho))
-    [[9.993144e-01+0.j      1.371166e-03+0.02613j]
-     [1.371166e-03-0.02613j 6.855828e-04+0.j     ]]
+    [[9.993359e-01+0.j      1.31399e-03+0.025581j]
+     [1.313990e-03-0.025581j 6.64016e-04+0.j     ]]
 
     """
     b, r = divmod(math.sqrt(dm.shape[-1]+1), 1.0)
