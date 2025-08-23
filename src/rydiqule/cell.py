@@ -5,7 +5,8 @@ Subclass of `Sensor` with functionality for representing real atoms.
 import scipy
 import numpy as np
 import warnings
-import itertools 
+import itertools
+import math
 
 import scipy.constants
 from scipy.constants import Boltzmann, e
@@ -185,25 +186,26 @@ class Cell(Sensor):
         self.temp = temp  # K
         self.beam_area = beam_area
         self.density = self.atom.arc_atom.getNumberDensity(self.temp)
-        self.atom_mass = self.atom.arc_atom.mass
+        self.atom_mass: float = self.atom.arc_atom.mass
         if beam_diam is None:
-            self.beam_diameter = 2.0*np.sqrt(beam_area/np.pi)
+            self.beam_diameter = 2.0*math.sqrt(beam_area/np.pi)
         else:
             self.beam_diameter = beam_diam
 
         if gamma_transit is None:
-            gamma_transit = 1E-6*np.sqrt(8*Boltzmann*self.temp/(self.atom_mass*np.pi)
-                                         )/(self.beam_diameter/2*np.sqrt(2*np.log(2)))
+            gamma_transit = 1E-6*math.sqrt(8*Boltzmann*self.temp/(self.atom_mass*np.pi)
+                                         )/(self.beam_diameter/2*math.sqrt(2*math.log(2)))
         self.gamma_transit = gamma_transit
 
         # most probable speed for a 3D Maxwell-Boltzmann distribution
         # used when defining doppler averaging
-        self.vP = np.sqrt(2*Boltzmann*self.temp/self.atom_mass)
+        self.vP = math.sqrt(2*Boltzmann*self.temp/self.atom_mass)
    
         self._add_state_energies()
         self._add_state_lifetimes()
         self._add_decoherence_rates()
         self._add_gamma_mismatches(gamma_mismatch)
+        self.add_transit_broadening(gamma_transit)
 
     
     def set_experiment_values(self,
@@ -341,7 +343,7 @@ class Cell(Sensor):
 
 
     @property
-    def kappa(self):
+    def kappa(self) -> float:
         """Property to calculate the kappa value of the system. 
 
         The value is computed with the following formula Eq. 5 of
@@ -369,7 +371,7 @@ class Cell(Sensor):
             return self._kappa
         
         if self.probe_tuple is None:
-            raise RydiquleError("Cell.probe_tuple not set. Either set manually or add at least one coupling before calculation.")
+            raise RydiquleError("Cell.probe_tuple not set. Add at least one coupling before calculation.")
         
         ground_manifold = self.states_with_spec(self.probe_tuple[0])
         excited_manifold = self.states_with_spec(self.probe_tuple[1])
@@ -394,6 +396,7 @@ class Cell(Sensor):
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
 
         kappa = calc_kappa(omega_rad, dipole_moment, self.density)
+        self._kappa = kappa
     
         return kappa
 
@@ -433,7 +436,7 @@ class Cell(Sensor):
     
 
     @property
-    def eta(self):
+    def eta(self) -> float:
         """Get the eta value for the system.
 
         The value is computed with the following formula Eq. 7 of
@@ -459,7 +462,7 @@ class Cell(Sensor):
         if hasattr(self, "_eta"):
             return self._eta
         if self.probe_tuple is None:
-            raise RydiquleError("Cell.probe_tuple not set. Either set manually or add at least one coupling before calculation.")
+            raise RydiquleError("Cell.probe_tuple not set. Add at least one coupling before calculation.")
         
         ground_manifold = self.states_with_spec(self.probe_tuple[0])
         excited_manifold = self.states_with_spec(self.probe_tuple[1])
@@ -483,12 +486,13 @@ class Cell(Sensor):
         omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2.0*np.pi
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
         eta = calc_eta(omega_rad, dipole_moment, self.beam_area)
+        self._eta = eta
 
         return eta
     
 
     @eta.setter
-    def eta(self, value):
+    def eta(self, value: float):
         """Setter for the eta attribute.
 
         Updates the self._eta class attribute.
@@ -519,7 +523,7 @@ class Cell(Sensor):
 
 
     @property
-    def probe_freq(self):
+    def probe_freq(self) -> float:
         """Get the probe transition frequency, in rad/s.
 
         Note that for :class:`~.Cell`, probing transition frequency is calculated using only
@@ -535,6 +539,8 @@ class Cell(Sensor):
 
         if hasattr(self, '_probe_freq'):
             return self._probe_freq
+        if self.probe_tuple is None:
+            raise RydiquleError("Cell.probe_tuple not set. Add at least one coupling before calculation.")
         
         probe_lower_manifold = self.states_with_spec(self.probe_tuple[0])
         probe_upper_manifold = self.states_with_spec(self.probe_tuple[1])
@@ -544,11 +550,14 @@ class Cell(Sensor):
 
         energy_lower = self.atom.get_state_energy(A_QState(n1, l1, j1), s=0.5)*2*np.pi
         energy_upper = self.atom.get_state_energy(A_QState(n2, l2, j2), s=0.5)*2*np.pi
+
+        probe_freq = abs(energy_upper - energy_lower)
+        self._probe_freq = probe_freq
         
-        return np.abs(energy_upper - energy_lower)
+        return probe_freq
     
     @probe_freq.setter
-    def probe_freq(self, value):
+    def probe_freq(self, value: float):
         """Setter for the probe_freq attribute.
 
         Updates the self._probe_freq class attribute.
@@ -737,7 +746,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 2.0, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11316}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.40697}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11316, gamma_transit: 0.40697}
         Energy Shifts:
             None
         
@@ -755,7 +765,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 2.0, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.40696}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.113, gamma_transit: 0.40696}
         Energy Shifts:
             None
 
@@ -772,7 +783,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 1.177, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.40696}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11, gamma_transit: 0.40696}
         Energy Shifts:
             None
 
@@ -787,7 +799,8 @@ class Cell(Sensor):
         Coherent Couplings: 
             ((5, 0, 0.5),(5, 1, 1.5)): {rabi_frequency: 4.3, detuning: 1.0, phase: 0, kvec: (0, 0, 0), label: probe, coherent_cc: 1, dipole_moment: 2.44, q: 0}
         Decoherent Couplings:
-            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.11}
+            ((5, 0, 0.5),(5, 0, 0.5)): {gamma_transit: 0.4117}
+            ((5, 1, 1.5),(5, 0, 0.5)): {gamma_transition: 38.113, gamma_transit: 0.4117}
         Energy Shifts:
             None
 
@@ -904,7 +917,7 @@ class Cell(Sensor):
             lam = abs(self.atom.get_transition_wavelength(state1, state2)) # in m
             kvec = 2*np.pi/lam*np.asarray(kunit)*1e-6 # scaled to Mrad/m
         else:
-            raise RydiquleError(f'Coupling {states} has un-normalized |kunit|={np.sqrt(k_norm_sq):.2f}!=1')
+            raise RydiquleError(f'Coupling {states} has un-normalized |kunit|={math.sqrt(k_norm_sq):.2f}!=1')
 
         super().add_single_coupling(states=states,
                                     rabi_frequency=passed_rabi,
@@ -1066,7 +1079,7 @@ class Cell(Sensor):
         `gamma_transition` values on edges leaving that state. However, it is not always
         desirable to account for all states in this way for simplicity or computational
         complexity reasons. This function allows the :class:`~.Cell` to account for any
-        differences in these values that arise as a result of excluding physicalstates from a
+        differences in these values that arise as a result of excluding physical states from a
         :class:`~.Cell`. There are multiple ways to resolve these discrepancies, specified by
         the `method` argument, which is detailed in the `Parameters` section.
 
@@ -1155,8 +1168,9 @@ class Cell(Sensor):
             m_j = None if g.m_j is None else "all"
             (f, m_f) = (None, None) if g.f is None else ("all","all")
             ground_manifold = A_QState(g.n, g.l, g.j, m_j=m_j, f=f, m_f=m_f)
+            degeneracy = len(self.states_with_spec(ground_manifold))
 
-            self.add_decoherence((state, ground_manifold), gamma=(lifetime-transition_total), label="mismatch")
+            self.add_decoherence((state, ground_manifold), gamma=(lifetime-transition_total)/degeneracy, label="mismatch")
 
     
     def _add_gamma_mismatch_to_all(self, state:A_QState):
@@ -1180,18 +1194,21 @@ class Cell(Sensor):
 
         transition_total = sum(e[2] for e in out_edges)
         
-        #if they dom't match, we add a decoherence to the entire ground state manifold
-        #that matches what remains
+        #if they dom't match, we proportionally increase existing decoherences to make up the difference
         if not np.isclose(transition_total, lifetime):
-            #construct the dictionary of coupling coefficients coefficients
-            cc = {
-                (s1, s2):gamma/transition_total for s1, s2, gamma in out_edges
-                if gamma
-            }
-
+            gamma_total_mismatch = lifetime-transition_total
             out_states_list = [s2 for _, s2, _ in out_edges]
-            self.add_decoherence_group([state], out_states_list, gamma = transition_total, coupling_coefficients=cc, label="mismatch")
+            if len(out_states_list) > 1:
+                #construct the dictionary of coupling coefficients
+                cc = {
+                    (s1, s2):gamma/transition_total for s1, s2, gamma in out_edges
+                    if gamma
+                }
 
+                self.add_decoherence_group([state], out_states_list, gamma = gamma_total_mismatch, coupling_coefficients=cc, label="mismatch")
+            else:
+                self.add_single_decoherence((state, out_states_list[0]), gamma_total_mismatch,
+                                            label='mismatch')
 
     def _validate_input_states(self, atomic_states: List[A_QState]):
         """Helper function to check that input states are compatible and defined"""

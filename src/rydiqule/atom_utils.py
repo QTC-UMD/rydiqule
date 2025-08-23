@@ -4,6 +4,7 @@ Utilities for interacting with atomic parameters and ARC.
 
 from scipy.constants import epsilon_0, hbar, c
 import numpy as np
+import math
 import re
 from .sensor_utils import expand_statespec
 
@@ -667,7 +668,7 @@ def calc_eta(omega: float, dipole_moment:float, beam_area: float) -> float:
         The value of eta, in root(Hz)
     """
 
-    eta = np.sqrt((omega*dipole_moment**2)/(2.0*c*epsilon_0*hbar*beam_area))
+    eta = math.sqrt((omega*dipole_moment**2)/(2.0*c*epsilon_0*hbar*beam_area))
 
     return eta
 
@@ -793,7 +794,7 @@ def validate_qnums(qstate:A_QState, I: Optional[float]=None):
     #validate (n,l) int, j half int
     assert int(n)==n, f"invalid n quantum number {n}."
     assert (int(l)==l) and (l < n), f"invalid l quantum number {l}."
-    assert j==l+1/2 or j==np.abs(l-1/2), f"invalid j quantum number {j}"
+    assert j==l+1/2 or j==abs(l-1/2), f"invalid j quantum number {j}"
 
     #test m_j, f, m_f are allowed values
     if m_j is not None:
@@ -967,7 +968,7 @@ def get_valid_f(state: A_QState, I: Optional[float]=None) -> List[float]:
     J_qnum=state[2]
     if not isinstance(J_qnum, (int, float)) or not isinstance(I, (int, float)):
         raise ValueError(f"Invalid I,J quantum number types {(type(I),type(J_qnum))}.")
-    return np.arange(np.abs(J_qnum - I), J_qnum + I + 1).tolist()
+    return np.arange(abs(J_qnum - I), J_qnum + I + 1).tolist()
 
 
 def get_valid_mf(state: A_QState, I: Optional[float]=None) -> List[float]:

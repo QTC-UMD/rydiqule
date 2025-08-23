@@ -23,6 +23,10 @@ Bug Fixes
   It is expected that other plots and values will differ by small amounts when using `Cell` and ARC v3.9.0
 - Fixed bug where `solve_doppler_analytic` ignored parameter time-dependence. 
   It now follows the behavior of other steady-state solvers by constructing the Hamiltonian and equations of motion at `t=0`.
+- Ensure that `Cell.eta`, `Cell.kappa`, and `Cell.probe_freq` properly cache their values as intended.
+- Fix bug where `Cell` would not add transit broadening automatically, as intended.
+- Fix errors in `gamma_mismatch` calculations when coupling groups are used.
+  Also fix issue that prevented `gamma_mismatch='all'` from working if only 1 dephasing is present that needs modification.
 
 Deprecations
 ++++++++++++
