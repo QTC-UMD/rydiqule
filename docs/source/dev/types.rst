@@ -21,7 +21,7 @@ To run this check locally, install the `mypy` python package and run the followi
 
     mypy
 
-This command will automatically read configuration options set in the `mypy.ini` file.
+This command will automatically read configuration options set in the `pyproject.toml` file.
 Further optional flags can be passed to the command to override or add optional behaviors.
 Initial run of the mypy takes some time, however subsequent runs take advantage of local caching to increase analysis speed.
 Using the mypy daemon mode can further increase analysis speed if necessary.
