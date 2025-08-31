@@ -12,3 +12,4 @@ details relating to policies and tools can be found here.
     types
     linting
     docs
+    contributing
