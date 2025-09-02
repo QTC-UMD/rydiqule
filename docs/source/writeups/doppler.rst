@@ -142,7 +142,7 @@ making them easily re-usable for any velocity distribution that obeys the Maxwel
 Analytically Averaging Velocity Classes
 ---------------------------------------
 
-Rydiqule's implementation of analytic doppler-averaging follows the propagator method derived in `Exact steady state of perturbed open quantum systems <https://arxiv.org/abs/2501.06134>`_
+Rydiqule's implementation of analytic doppler-averaging follows the propagator method derived in `Exact steady state of perturbed open quantum systems <https://doi.org/10.1103/kgsg-3npp>`_
 by Omar Nagib and Thad Walker. 
 In one spatial dimension, the time evolution of a system is governed by the master equation in the superoperator form
 
