@@ -209,6 +209,8 @@ Rydiqule's solutions are kept in its computational basis (i.e. real, with first 
 Standard observable calculations using this basis are provided by :class:`~.Solution`.
 If you would like to convert the solutions back to the complex basis directly,
 the utility function :func:`.sensor_utils.convert_dm_to_complex` can be used.
+The :attr:`Solution.complex_rho` convenience attribute provides this conversion for
+solutions.
 
 .. rubric:: References
 
