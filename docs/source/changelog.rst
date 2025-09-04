@@ -36,6 +36,7 @@ Bug Fixes
   Also fix issue that prevented `gamma_mismatch='all'` from working if only 1 dephasing is present that needs modification.
 - Update RF heterodyne example notebook to use new `Cell` syntax.
 - Properly mark slow/high-memory analytic doppler test.
+- Fix `convert_complex_to_dm` to properly return arrays with real dtype.
 
 Deprecations
 ++++++++++++
