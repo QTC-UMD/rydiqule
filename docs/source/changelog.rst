@@ -14,6 +14,11 @@ Improvements
   imported unless explicitly needed.
 - Expand Observables documentation to describe generalized paradigm in version 2,
   including how to calculate custom observables.
+- Improved documentation based on JOSS reviewer @a-eghrari feedback.
+  Biggest additions include more detailed contribution guidelines and
+  a quantitative discussion of rydiqule performance (largely lifted from Comp Sci Comms article).
+- Added the `Solution.complex_rho` property which provides ready conversion of the solved
+  density matrices into the complex basis with ground state present.
 
 
 Bug Fixes
