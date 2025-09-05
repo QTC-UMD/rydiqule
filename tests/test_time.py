@@ -6,7 +6,6 @@ from rydiqule.atom_utils import A_QState
 
 
 @pytest.mark.time
-@pytest.mark.slow
 @pytest.mark.doppler
 def test_rabi_flop_doppler():
     """Tests that time solver functions with Doppler broadening

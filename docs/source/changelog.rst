@@ -28,6 +28,7 @@ Bug Fixes
 - Fix errors in `gamma_mismatch` calculations when coupling groups are used.
   Also fix issue that prevented `gamma_mismatch='all'` from working if only 1 dephasing is present that needs modification.
 - Update RF heterodyne example notebook to use new `Cell` syntax.
+- Properly mark slow/high-memory analytic doppler test.
 
 Deprecations
 ++++++++++++

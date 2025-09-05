@@ -73,6 +73,8 @@ The markers we use are
     - Marks a test of the definition of the atomic system.
   * - exception
     - Marks a test of error handling.
+  * - backend
+    - Marks a test that uses an optional backend
   * - dev
     - Used to temporarily mark a single test that is being developed so it can run independently.
 
