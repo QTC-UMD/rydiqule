@@ -199,7 +199,7 @@ def solve_time(sensor: Sensor, end_time: float, num_pts: int,
     >>> print(sol_dop.rho.shape)
     (11, 1000, 8)
     >>> print(sol_dop_nosum.rho.shape)
-    (565, 11, 1000, 8)
+    (570, 11, 1000, 8)
     >>> print(sol_dop.axis_labels)
     ['(0,1)_detuning', 'time', 'density_matrix']
     >>> print(sol_dop_nosum.axis_labels)

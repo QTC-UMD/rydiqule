@@ -189,7 +189,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
               Configuration parameters include:
 
                 - `"width_doppler"`: Float that specifies one-sided width of gaussian
-                  distribution to average over, in units of most probable speed. Defaults to 2.2.
+                  distribution to average over, in units of most probable speed. Defaults to 2.5.
                 - `"n_uniform"`: Int that specifies how many points to use. Defaults to 1601.
 
             - `"isopop"`: Defines a grid with uniform population in each interval.
@@ -210,7 +210,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
 
               - `"width_doppler"`: Float that specifies one-sided width of coarse grided portion
                 of the gaussian distribution.
-                Units are in most probable speed. Defaults to 2.2.
+                Units are in most probable speed. Defaults to 2.5.
               - `"width_coherent"`: Float that specifies one-sided width of fine grided portion
                 of gaussian distribution. Units are in most probable speed. Defaults to 0.4.
               - `"n_doppler"`: Int that specifies how many points to use for the coarse grid.
@@ -241,7 +241,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
 
     >>> classes = rq.doppler_utils.doppler_classes() #use the default values
     >>> print(classes.shape)
-    (565,)
+    (570,)
 
     Specifying "uniform" with no additional arguments produces 1601 evenly spaced
     classes by default.
@@ -264,7 +264,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
     >>> m = {"method":"split", "n_coherent":301, "n_doppler":501}
     >>> classes = rq.doppler_utils.doppler_classes(method=m)
     >>> print(classes.shape)
-    (711,)
+    (721,)
 
     References
     ----------
@@ -286,7 +286,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
 
     if method["method"] == "uniform":
         # use default options if not provided
-        width_doppler = method.get("width_doppler",2.2)
+        width_doppler = method.get("width_doppler",2.5)
         n_uniform = method.get("n_uniform",1601)
         doppler_velocities = np.linspace(-width_doppler,width_doppler,n_uniform)
     elif method["method"] == "isopop":
@@ -297,7 +297,7 @@ def doppler_classes(method: Optional[MeshMethod] = None
         doppler_velocities: np.ndarray = special.erfinv(2*bin_centers-1)*np.sqrt(2)
     elif method["method"] == "split":
         # use default options if not provided
-        width_doppler = method.get("width_doppler",2.2)
+        width_doppler = method.get("width_doppler",2.5)
         width_coherent = method.get("width_coherent",0.4)
         n_doppler = method.get("n_doppler",201)
         n_coherent = method.get("n_coherent",401)
