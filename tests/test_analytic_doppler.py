@@ -96,6 +96,8 @@ def test_analytic_1D_doppler():
                                err_msg='Sampled and analytic 1D doppler do not match')
     
 
+@pytest.mark.slow
+@pytest.mark.high_memory
 @pytest.mark.steady_state
 @pytest.mark.doppler
 def test_analytic_2D_doppler():
