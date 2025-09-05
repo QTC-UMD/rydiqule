@@ -12,6 +12,8 @@ Improvements
   This improves `import rydiqule as rq` time by about a second
   and ensures second-order dependencies such as matplotlib and sympy are not
   imported unless explicitly needed.
+- Expand Observables documentation to describe generalized paradigm in version 2,
+  including how to calculate custom observables.
 
 
 Bug Fixes
