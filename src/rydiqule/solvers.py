@@ -135,7 +135,7 @@ def solve_steady_state(
     >>> s.add_transit_broadening(0.1)
     >>> sol = rq.solve_steady_state(s, doppler=True, sum_doppler=False)
     >>> print(sol.rho.shape)
-    (561, 11, 8)
+    (565, 11, 8)
     >>> print(sol.axis_labels)
     ['doppler_0', '(0,1)_detuning', 'density_matrix']
 
