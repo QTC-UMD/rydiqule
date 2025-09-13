@@ -16,7 +16,7 @@ Improvements
 Bug Fixes
 +++++++++
 
-
+- Fix `convert_complex_to_dm` to properly return arrays with real dtype.
 
 Deprecations
 ++++++++++++

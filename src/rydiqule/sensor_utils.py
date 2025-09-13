@@ -530,7 +530,7 @@ def convert_complex_to_dm(complex_dm: np.ndarray) -> np.ndarray:
     if np.iscomplexobj(real_dm):
         raise RydiquleError('Converted matrix is not real, likely unphysical')
     
-    return dm
+    return real_dm
 
 
 def check_positive_semi_definite(dm: np.ndarray):
