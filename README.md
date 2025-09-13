@@ -56,4 +56,5 @@ We actively encourage contributions and collaboration in the development of rydi
 Unforunately, rydiqule's development is done privately, _for reasons_.
 If you would like to submit a PR for all but the most trivial of changes,
 please e-mail us directly so we can discuss the collaboration.
+Please see the [documentation](https://rydiqule.readthedocs.io/page/dev/contributing.html) for details.
 
