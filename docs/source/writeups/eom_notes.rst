@@ -138,10 +138,10 @@ The term we need to add, :math:`M'` is
 
 This can be implemented as the tensor product of two vectors
 
-.. math:: M'_{li} = -M_{l0} \otimes p*
+.. math:: M'_{li} = -M_{l0} \otimes p^*
 
 where :math:`M_{i0}` is just :math:`M[:,0]` and
-:math:`p*=p_{[j=(b+1)\times x]}` is a vector of ones and zeros that is
+:math:`p^*=p_{[j=(b+1)\times x]}` is a vector of ones and zeros that is
 generated with list comprehension.
 
 The end result is an equation where each ground state term of the
@@ -189,8 +189,6 @@ table format,
    5         :math:`\rho_{11}` :math:`\rho_{11}`
    ========= ================= =====================
 
-   | 
-
 We implement this with a transformation matrix :math:`U` that is unitary
 up to a scale factor,
 
@@ -203,6 +201,16 @@ up to a scale factor,
 This matrix is calculated in the :func:`~.get_basis_transform` helper
 function and is subsequently used to transform between the complex and
 real bases.
+
+Converting Solutions Back to the Complex Basis
+----------------------------------------------
+
+Rydiqule's solutions are kept in its computational basis (i.e. real, with first state removed).
+Standard observable calculations using this basis are provided by :class:`~.Solution`.
+If you would like to convert the solutions back to the complex basis directly,
+the utility function :func:`.sensor_utils.convert_dm_to_complex` can be used.
+The :attr:`Solution.complex_rho` convenience attribute provides this conversion for
+solutions.
 
 .. rubric:: References
 

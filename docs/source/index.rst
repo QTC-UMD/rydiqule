@@ -60,6 +60,7 @@ If you use rydiqule in your work, please cite as
    overview
    intro_nbs/Introduction_To_Rydiqule
    intro_nbs/Cell_Basics
+   intro_nbs/Profiling
    changelog   
 
 .. toctree::

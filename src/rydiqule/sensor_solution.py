@@ -176,6 +176,22 @@ class Solution():
             `Sensor`.
         """
         return list(self.couplings.nodes())
+    
+
+    @property
+    def complex_rho(self) -> np.ndarray:
+        """Density-matrix solutions in complex basis.
+        
+        This function calls :func:`.sensor_utils.convert_dm_to_complex`
+        on :attr:`~.rho`.
+
+        Returns
+        -------
+        numpy.ndarray
+            Complex density matrix solutions, with ground state present.
+        """
+
+        return sensor_utils.convert_dm_to_complex(self.rho)
         
 
     def coupling_rabi(self, coupling: sensor_utils.StateSpecs) -> ComplexResult:

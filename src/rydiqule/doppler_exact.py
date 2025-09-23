@@ -3,7 +3,7 @@ Steady-state solver for analytical Doppler averaging
 
 Code in this module implements analytical doppler averaging techniques described in
 Omar Nagib and Thad G. Walker, *Exact steady state of perturbed open quantum systems*,
-arXiv 2501.06134 (2025) http://arxiv.org/abs/2501.06134
+Phys. Rev. Research **7** 033076 (2025) https://doi.org/10.1103/kgsg-3npp
 
 This solver computes the doppler averaged steady state of a sensor.
 In 1 spatial dimension problems, it averages analytically.
@@ -195,8 +195,8 @@ def solve_doppler_analytic(sensor: Sensor, doppler_mesh_method: Optional[MeshMet
     ----------
     .. [1] Omar Nagib and Thad G. Walker,
         Exact steady state of perturbed open quantum systems,
-        arXiv 2501.06134 (2025)
-        http://arxiv.org/abs/2501.06134v3
+        Phys. Rev. Research **7** 033076 (2025)
+        https://doi.org/10.1103/kgsg-3npp
     """
 
     spatial_dim = sensor.spatial_dim()
