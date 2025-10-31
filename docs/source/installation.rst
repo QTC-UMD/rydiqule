@@ -85,7 +85,7 @@ either by a system-wide installation or via conda in the virtual environment (`c
     To see what architectures are supported, please see the 
     `vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
 
-Editable installtion requires `git` to be installed.
+Editable installation requires `git` to be installed.
 
 Confirm installation
 --------------------
@@ -144,7 +144,7 @@ Editable Installation Upgrade
 +++++++++++++++++++++++++++++
 
 If using an editable install, simply replacing the files in the same directory is sufficient.
-Though it is recommended to also run the appropriate pip update command as well to capture updated depedencies.
+Though it is recommended to also run the appropriate pip update command as well to capture updated dependencies.
 
 .. code-block:: shell
 
@@ -156,15 +156,15 @@ Dependencies
 
 This package requires installation of the excellent `ARC <https://github.com/nikolasibalic/ARC-Alkali-Rydberg-Calculator>`_ 
 package, which is used to get Rydberg atomic properties. 
-It also requires other standard computation dependenices, such as `numpy`, `scipy`, `matplotlib`, etc.
+It also requires other standard computation dependencies, such as `numpy`, `scipy`, `matplotlib`, etc.
 These will be automatically installed if not already present.
 
 .. note::
 
-    Rydiqule's performance does depend on these depedencies.
+    Rydiqule's performance does depend on these dependencies.
     In particular, `numpy` can be compiled with a variety of backends that implements
     BLAS and LAPACK routines that can have different performance for different computer architectures.
-    When using Windows, it is recommended to install `numpy` from conda,
+    When using Windows, it is recommended to install `numpy` from the conda default channel,
     which is built against the IntelMKL and has generally shown the best performance for Intel-based PCs.
 
 Optional timesolver backend dependencies include the `numba`
