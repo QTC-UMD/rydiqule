@@ -53,6 +53,8 @@ backends = [
     "numba",
     "cyrk>=0.12.1",
 ]
+
+[dependency-groups]
 docs = [
     "Sphinx==8.2.3",
     "furo==2024.8.6",
