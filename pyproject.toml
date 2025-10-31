@@ -79,6 +79,9 @@ mypy = [
 linter = ["ruff"]
 dev = ["setuptools-scm"]
 
+[tool.uv.dependency-groups.docs]
+requires-python = ">=3.11"
+
 [tool.ruff]
 line-length = 100
 src = ["src"]
