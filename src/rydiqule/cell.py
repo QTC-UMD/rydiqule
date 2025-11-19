@@ -390,7 +390,12 @@ class Cell(Sensor):
                     " = <value> prior to running calculations"
             warnings.warn(msg)
 
-        q = self.couplings.edges[ground_manifold[0], excited_manifold[0]]["q"]
+        # extract q from coupling group, this ensures we find a dipole allowed edge with q defined
+        manifold_subgraph = self._coupling_subgraph(self.probe_tuple)
+        for (_, _, d) in manifold_subgraph.edges(data=True):
+            if 'q' in d:
+                q = d['q']
+                break
 
         omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2*np.pi
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
@@ -481,7 +486,12 @@ class Cell(Sensor):
                     " = <value> prior to running calculations"
             warnings.warn(msg)
 
-        q = self.couplings.edges[ground_manifold[0], excited_manifold[0]]["q"]
+        # extract q from coupling group, this ensures we find a dipole allowed edge with q defined
+        manifold_subgraph = self._coupling_subgraph(self.probe_tuple)
+        for (_, _, d) in manifold_subgraph.edges(data=True):
+            if 'q' in d:
+                q = d['q']
+                break
 
         omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2.0*np.pi
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
