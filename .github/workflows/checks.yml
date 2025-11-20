@@ -69,7 +69,12 @@ jobs:
     # https://fredrikmeyer.net/2021/05/12/github-actions-changelog.html
     name: Changelog Updated
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'QTC-UMD' && github.event_name == 'pull_request'
+    if: >
+      (
+        github.repository_owner == 'QTC-UMD' &&
+        github.event_name == 'pull_request' &&
+        ! contains(github.event.pull_request.labels.*.name, 'no changelog')
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v4
