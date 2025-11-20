@@ -73,7 +73,9 @@ jobs:
       (
         github.repository_owner == 'QTC-UMD' &&
         github.event_name == 'pull_request' &&
-        ! contains(github.event.pull_request.labels.*.name, 'no changelog')
+        ! contains(github.event.pull_request.labels.*.name, 'no changelog') &&
+        ! github.event.pull_request.draft &&
+        ! contains(github.event.pull_request.title, 'WIP')
       )
     steps:
       - name: Checkout
