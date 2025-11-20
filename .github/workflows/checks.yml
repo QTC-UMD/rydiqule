@@ -67,6 +67,7 @@ jobs:
 
   changelog:
     # https://fredrikmeyer.net/2021/05/12/github-actions-changelog.html
+    # https://github.com/taridees/changelog-check-action
     name: Changelog Updated
     runs-on: ubuntu-latest
     if: >
