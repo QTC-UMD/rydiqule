@@ -37,7 +37,7 @@ jobs:
       - name: Install Rydiqule and Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[tests,backends]
+          pip install -e .[tests,backends] "numpy<2"
 
       - name: Run Unit Tests
         run: |
