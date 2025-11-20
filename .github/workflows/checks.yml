@@ -37,7 +37,7 @@ jobs:
       - name: Install Rydiqule and Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[tests,backends]
+          pip install -e .[tests,backends] "numpy<2"
 
       - name: Run Unit Tests
         run: |
@@ -67,9 +67,17 @@ jobs:
 
   changelog:
     # https://fredrikmeyer.net/2021/05/12/github-actions-changelog.html
+    # https://github.com/taridees/changelog-check-action
     name: Changelog Updated
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'QTC-UMD' && github.event_name == 'pull_request'
+    if: >
+      (
+        github.repository_owner == 'QTC-UMD' &&
+        github.event_name == 'pull_request' &&
+        ! contains(github.event.pull_request.labels.*.name, 'no changelog') &&
+        ! github.event.pull_request.draft &&
+        ! contains(github.event.pull_request.title, 'WIP')
+      )
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -93,7 +93,7 @@ def generate_eom(hamiltonian: np.ndarray, gamma_matrix: np.ndarray,
     >>> print(ham.shape)
     (2, 2)
     >>> eom, const = rq.sensor_utils.generate_eom(ham, gamma)
-    >>> print(eom)
+    >>> print(eom + 0.0)  # adding 0.0 prevents occasional -0.0 in doctest
     [[-0.1  2.   0. ]
      [-2.  -0.1  0. ]
      [ 0.   0.  -0.1]]
