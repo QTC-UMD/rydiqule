@@ -53,6 +53,8 @@ backends = [
     "numba",
     "cyrk>=0.12.1",
 ]
+
+[dependency-groups]
 docs = [
     "Sphinx==8.2.3",
     "furo==2024.8.6",
@@ -67,6 +69,9 @@ tests = [
     "coverage",
     "pytest-cov",
 ]
+profiling = [
+    "line_profiler==3.5.1", # pin to version that supports cython line profiling
+]
 mypy = [
     "mypy",
     "numpy>=1.21",
@@ -75,7 +80,17 @@ mypy = [
     "types-psutil",
 ]
 linter = ["ruff"]
-dev = ["setuptools-scm"]
+dev = [
+    "setuptools-scm",
+    "ipykernel",
+    {include-group = "tests"},
+]
+
+[tool.uv.dependency-groups.docs]
+requires-python = ">=3.11"
+
+[tool.uv.dependency-groups.profiling]
+requires-python = "<3.11"
 
 [tool.ruff]
 line-length = 100

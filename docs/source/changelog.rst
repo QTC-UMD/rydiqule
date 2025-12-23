@@ -12,6 +12,7 @@ Improvements
   a quantitative discussion of rydiqule performance (largely lifted from Comp Sci Comms article).
 - Added the `Solution.complex_rho` property which provides ready conversion of the solved
   density matrices into the complex basis with ground state present.
+- Made project `uv` compatible and added installation docs describing how to use it.
 
 Bug Fixes
 +++++++++
