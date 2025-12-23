@@ -48,11 +48,54 @@ Regular Installation
 
   This command will use pip to install all necessary dependencies.
 
+.. tab:: uv
+
+  The `uv` package and project manager allows for unified project management in a way
+  that is reproducible and easy to share.
+  You create a new simulation project that relies on `rydiqule` by running the following commands.
+
+  .. code-block:: shell
+
+    uv init new-project
+    cd new-project
+    uv venv --python 3.12  # this line optionally sets python version to use for the venv
+
+  These commands create a project template in the sub-directory `new-project`.
+  This directory is readily version controlled and contains all information needed to reproduce your environment.
+
+  You finish configuring the project by adding required dependencies, starting with `rydiqule`.
+
+  .. code-block:: shell
+
+    uv add rydiqule
+
+  You can now create a script in the project and run it directly:
+
+  .. code-block:: shell
+
+    uv run example.py
+
+  You can also add jupyter kernel support and run jupyter notebooks from VS Code.
+  This support is added as a development dependency.
+
+  .. code-block:: shell
+
+    uv add --dev ipykernel
+
+  Once added, VS Code can launch a jupyter notebook using the project's virtual environment
+  located in the `/new-project/.venv/` sub-directory.
+
+  You can also run jupyter lab directly from the virtual environment with the following command
+
+  .. code-block:: shell
+
+    uv run --with jupyter jupyter lab
+
 Editable Installation
 ---------------------
 
 If you would like to install rydiqule in editable mode to locally modify its source,
-this must be done using pip.
+use the following commands.
 
 .. tab:: conda
 
@@ -74,6 +117,25 @@ this must be done using pip.
 
     pip install -e .
 
+.. tab:: uv
+
+  Using `uv` on an existing python package automatically installs it in editable mode.
+  Run the following from the root of the local repository.
+
+  .. code-block:: shell
+
+    uv venv --python 3.12  # this line optionally sets a python version for the venv
+    uv sync
+
+  Note that `uv sync` automatically installs the `dev` dependency group which includes `ipykernel` and `pytest`.
+
+  You can now use VS Code to run jupyter notebooks with the virtual environment at `rydiqule/.venv/`.
+  To use jupyter lab, run the following command
+
+  .. code-block:: shell
+
+    uv run --with jupyter jupyter lab
+
 Note that editable installations should have `git` available if you want dynamic versioning (via `setuptools-scm`),
 either by a system-wide installation or via conda in the virtual environment (`conda install git`).
 
@@ -85,7 +147,6 @@ either by a system-wide installation or via conda in the virtual environment (`c
     To see what architectures are supported, please see the 
     `vendoring repository <https://github.com/QTC-UMD/rydiqule-vendored-conda-builds>`_.
 
-Editable installation requires `git` to be installed.
 
 Confirm installation
 --------------------
@@ -140,16 +201,39 @@ Regular Installation Upgrade
     # greedy upgrade: ie update dependencies too
     pip install -U rydiqule
 
+.. tab:: uv
+
+  .. code-block:: shell
+
+    uv lock --upgrade-package rydiqule
+    # greedy upgrade
+    uv lock --upgrade
+
 Editable Installation Upgrade
 +++++++++++++++++++++++++++++
 
 If using an editable install, simply replacing the files in the same directory is sufficient.
 Though it is recommended to also run the appropriate pip update command as well to capture updated dependencies.
 
-.. code-block:: shell
+.. tab:: conda
 
-  pip install -U -e .
+  .. code-block:: shell
 
+    pip install -U -e .
+
+.. tab:: pip
+
+  .. code-block:: shell
+
+    pip install -U -e .
+
+.. tab:: uv
+
+  .. code-block:: shell
+
+    uv sync
+
+  Note that any `uv run` command will automatically sync and thereby capture updated dependencies.
 
 Dependencies
 ------------
@@ -162,7 +246,7 @@ These will be automatically installed if not already present.
 .. note::
 
     Rydiqule's performance does depend on these dependencies.
-    In particular, `numpy` can be compiled with a variety of backends that implements
+    In particular, `numpy` can be compiled with a variety of backends that implement
     BLAS and LAPACK routines that can have different performance for different computer architectures.
     When using Windows, it is recommended to install `numpy` from the conda default channel,
     which is built against the IntelMKL and has generally shown the best performance for Intel-based PCs.
@@ -186,5 +270,15 @@ Both are available via `pip`, `conda`, or our anaconda channel.
   .. code-block:: shell
 
     pip install rydiqule[backends]
+
+.. tab:: uv
+
+  Backends can be installed automatically via the optional extras specification for the `uv sync` command.
+
+  .. code-block:: shell
+
+    uv sync --extra backends
+
+  Note that these dependencies will be uninstalled if `uv sync` is called without the extras flag.
 
 .. |pythons| image:: https://img.shields.io/pypi/pyversions/rydiqule.svg
