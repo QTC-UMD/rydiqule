@@ -3066,6 +3066,29 @@ class Sensor():
 
         """
         return match_states(statespec, self.states)
+    
+
+    def _coupling_subgraph(self, coupling: StateSpecs) -> nx.Graph:
+        """
+        Returns a subgraph view of the couplings graph corresponding to `coupling`.
+
+        Parameters
+        ----------
+        coupling: StateSpecs
+            Coupling specification
+
+        Returns
+        -------
+        networkx.Graph
+            View of the corresponding subgraph
+        """
+
+        states1 = self.states_with_spec(coupling[0])
+        states2 = self.states_with_spec(coupling[1])
+
+        subgraph = self.couplings.subgraph(states1 + states2)
+
+        return subgraph
 
 
     def get_couplings(self) -> Dict[States, CouplingDict]:
