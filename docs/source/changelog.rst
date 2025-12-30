@@ -13,6 +13,7 @@ Improvements
 - Added the `Solution.complex_rho` property which provides ready conversion of the solved
   density matrices into the complex basis with ground state present.
 - Made project `uv` compatible and added installation docs describing how to use it.
+- Updated license metadata to follow PEP 639 standard
 
 Bug Fixes
 +++++++++

@@ -26,10 +26,10 @@ keywords = [
     "atomic-sensors",
     "electrometry",
 ]
-license = {text = "Apache"}
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3 :: Only",
 ]
 requires-python = ">= 3.8"
