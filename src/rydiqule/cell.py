@@ -396,6 +396,8 @@ class Cell(Sensor):
             if 'q' in d:
                 q = d['q']
                 break
+        else:
+            raise RydiquleError(f"No 'q' defined for coupling {self.probe_tuple}")
 
         omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2*np.pi
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
@@ -492,6 +494,8 @@ class Cell(Sensor):
             if 'q' in d:
                 q = d['q']
                 break
+        else:
+            raise RydiquleError(f"No 'q' defined for coupling {self.probe_tuple}")
 
         omega_rad = self.atom.get_transition_frequency(probe_g_nlj, probe_e_nlj)*2.0*np.pi
         dipole_moment = self.atom.get_dipole_matrix_element(probe_g_nlj, probe_e_nlj, q=q)*a0*e
