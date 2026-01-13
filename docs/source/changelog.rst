@@ -19,6 +19,8 @@ Bug Fixes
 +++++++++
 
 - Fix `convert_complex_to_dm` to properly return arrays with real dtype.
+- Fix `Cell.kappa` and `Cell.eta` to properly introspect `q` when first edge on the graph
+  happens to not be dipole-allowed.
 
 Deprecations
 ++++++++++++
