@@ -9,7 +9,7 @@ import warnings
 import itertools
 
 from .sensor_utils import (ScannableParameter, CouplingDict, State, States, StateSpec, StateSpecs, TimeFunc,
-                           match_states, _squeeze_dims, expand_statespec, state_tuple_to_str)
+                           match_states, _squeeze_dims, expand_statespec, state_tuple_to_str, process_scannable_parameter)
 from .exceptions import RydiquleError, CouplingNotAllowedError
 from .exceptions import RWAWarning, PopulationNotConservedWarning, RydiquleWarning, debug_state
 
@@ -416,6 +416,7 @@ class Sensor():
             raise RydiquleError(f"state {state} is not a node on the graph")
 
         self._remove_edge_data((state, state), kind="coherent")
+        shift = process_scannable_parameter(shift)
         self.couplings.add_edge(state, state, e_shift=shift, label=label)
         if debug_state():
             print(f'   Added energy shift for {state}')
@@ -856,8 +857,8 @@ class Sensor():
         field_params_trimmed = {k:v for k,v in field_params.items() if v is not None}
 
         full_edge_data = {
-            param: np.array(val)
-            if param in self.scannable_parameters and hasattr(val, "__len__")
+            param: process_scannable_parameter(val)
+            if param in self.scannable_parameters
             else val
             for (param, val) in {**field_params_trimmed, **extra_kwargs}.items()
         }
@@ -1718,8 +1719,7 @@ class Sensor():
 
         states = self._states_valid(states)
         # coerce gamma to numpy array if a sequence
-        if isinstance(gamma, Sized):
-            gamma = np.array(gamma)
+        gamma = process_scannable_parameter(gamma)
 
         gamma_full = decoherent_cc*gamma
         if np.all(gamma_full==0.0):

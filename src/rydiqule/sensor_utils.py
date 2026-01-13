@@ -11,7 +11,7 @@ from .exceptions import RydiquleError
 import scipy.constants
 from scipy.constants import hbar, e
 
-from typing import Dict, Tuple, Union, List, Callable, TYPE_CHECKING
+from typing import Dict, Tuple, Union, List, Callable, Sequence, TYPE_CHECKING
 if TYPE_CHECKING:
     # only import when type checking, avoid circular import
     from .sensor import Sensor
@@ -1034,6 +1034,37 @@ def state_tuple_to_str(states:States) -> str:
         States for which to produce a string representation.
     """
     return "(" + ",".join([str(s) for s in states]) + ")"
+
+
+def process_scannable_parameter(val: ScannableParameter) -> Union[np.ndarray, float]:
+    """Ensures that scannable parameters are coerced to numpy arrays.
+    
+    If the parameter only has length of one, content is extracted.
+
+    Parameters
+    ----------
+    val : ScannableParameter
+        Scannable parameter to process.
+
+    Returns
+    -------
+    float or numpy.ndarray
+
+    Raises
+    ------
+    RydiquleError:
+        Raised if passed an empty sequence
+    """
+
+    if isinstance(val, (Sequence, np.ndarray)):
+        if len(val) > 1:
+            return np.array(val)
+        elif len(val) == 1:
+            return val[0]
+        else:
+            raise RydiquleError('Length-0 sequence passed as scannable parameter')
+    else:
+        return val
 
 
 def _validate_sols(sols) -> np.ndarray:
