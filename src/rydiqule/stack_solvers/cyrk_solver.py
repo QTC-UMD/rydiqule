@@ -139,15 +139,15 @@ def _derEqns(obes_base: np.ndarray, const_base: np.ndarray,
              obes_time_r: np.ndarray, const_r: np.ndarray,
              obes_time_i: np.ndarray, const_i: np.ndarray,
              time_inputs: Sequence[TimeFunc]
-             ) -> Callable[[float, np.ndarray, np.ndarray], None]:
+             ) -> Callable[[np.ndarray, float, np.ndarray], None]:
     """
-    Function to build the callable passed to CyRK's cyrk_ode cython solver.
+    Function to build the callable passed to CyRK's pysolve_ivp cython solver.
 
     Note that `time_inputs` functions must be njit compiled.
 
     Uses the base and time matrix components of the eoms to build
     a function of vector and scalar time
-    that has the expected input/output of functions passed to `cyrk.cyrk_ode()`
+    that has the expected input/output of functions passed to `cyrk.pysolve_ivp()`
     """
     import numba as nb
 
@@ -185,7 +185,7 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
                   obes_time_r: np.ndarray, const_r: np.ndarray,
                   obes_time_i: np.ndarray, const_i: np.ndarray,
                   time_inputs: Sequence[TimeFunc]
-                  ) -> Callable[[float, np.ndarray, np.ndarray], None]:
+                  ) -> Callable[[np.ndarray, float, np.ndarray], None]:
     """
     Function to build the callable passed to CyRK's pysolve_ivp cython solver.
 
@@ -232,7 +232,7 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
                 result_out[i] += ts[idx].real*const_r[idx, const_time_idx] + ts[idx].imag*const_i[idx, const_time_idx]
             
             for j in range(b):
-                # define indeces for this step
+                # define indices for this step
                 obe_idx = i*b+j
                 A_idx = (i//b)*b+j
                 # add time-independent obe part
