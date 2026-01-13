@@ -14,6 +14,8 @@ Improvements
   density matrices into the complex basis with ground state present.
 - Made project `uv` compatible and added installation docs describing how to use it.
 - Updated license metadata to follow PEP 639 standard
+- Improve scannable parameter handling so that all sequences are saved to the graph as numpy arrays.
+  Also ensures proper handling of length-1 and length-0 sequences.
 
 Bug Fixes
 +++++++++
