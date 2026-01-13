@@ -812,7 +812,7 @@ def draw_diagram(sensor: "Sensor", include_dephasing: bool = True) -> "LD":
                 ld_kw['linestyle'] = 'dashed'
             else:
                 t_factor = 1.0
-            c_rabi_max = np.max(np.abs(vals.get('rabi_frequency'))) * t_factor
+            c_rabi_max = np.max(np.abs(vals.get('rabi_frequency') * t_factor))
             if np.isclose(c_rabi_max, 0.0):
                 ld_kw['hidden'] = True
             else:
