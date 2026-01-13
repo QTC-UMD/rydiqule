@@ -139,15 +139,15 @@ def _derEqns(obes_base: np.ndarray, const_base: np.ndarray,
              obes_time_r: np.ndarray, const_r: np.ndarray,
              obes_time_i: np.ndarray, const_i: np.ndarray,
              time_inputs: Sequence[TimeFunc]
-             ) -> Callable[[float, np.ndarray, np.ndarray], None]:
+             ) -> Callable[[np.ndarray, float, np.ndarray], None]:
     """
-    Function to build the callable passed to CyRK's cyrk_ode cython solver.
+    Function to build the callable passed to CyRK's pysolve_ivp cython solver.
 
     Note that `time_inputs` functions must be njit compiled.
 
     Uses the base and time matrix components of the eoms to build
     a function of vector and scalar time
-    that has the expected input/output of functions passed to `cyrk.cyrk_ode()`
+    that has the expected input/output of functions passed to `cyrk.pysolve_ivp()`
     """
     import numba as nb
 
@@ -185,7 +185,7 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
                   obes_time_r: np.ndarray, const_r: np.ndarray,
                   obes_time_i: np.ndarray, const_i: np.ndarray,
                   time_inputs: Sequence[TimeFunc]
-                  ) -> Callable[[float, np.ndarray, np.ndarray], None]:
+                  ) -> Callable[[np.ndarray, float, np.ndarray], None]:
     """
     Function to build the callable passed to CyRK's pysolve_ivp cython solver.
 
@@ -204,7 +204,6 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
 
     # basis dimension size
     b = obes_base.shape[-1]
-    b2 = b**2
     # time function dimension size
     t_func_num = obes_time_r.shape[0]
     # flatten eqns arrays
@@ -233,17 +232,16 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
                 result_out[i] += ts[idx].real*const_r[idx, const_time_idx] + ts[idx].imag*const_i[idx, const_time_idx]
             
             for j in range(b):
-                # define indeces for this step
+                # define indices for this step
                 obe_idx = i*b+j
-                obe_time_idx = obe_idx%b2
                 A_idx = (i//b)*b+j
                 # add time-independent obe part
                 # implements einsum('...ij,...j', obes, A)
                 result_out[i] += obes_base[obe_idx] * A_flat[A_idx]
                 for idx in range(t_func_num):
                     # add time-dependent obe part
-                    result_out[i] += (ts[idx].real*obes_time_r[idx, obe_time_idx]
-                                      + ts[idx].imag*obes_time_i[idx, obe_time_idx]) * A_flat[A_idx]
+                    result_out[i] += (ts[idx].real*obes_time_r[idx, obe_idx]
+                                      + ts[idx].imag*obes_time_i[idx, obe_idx]) * A_flat[A_idx]
 
     return func
 
