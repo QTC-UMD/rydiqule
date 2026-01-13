@@ -204,7 +204,6 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
 
     # basis dimension size
     b = obes_base.shape[-1]
-    b2 = b**2
     # time function dimension size
     t_func_num = obes_time_r.shape[0]
     # flatten eqns arrays
@@ -235,15 +234,14 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
             for j in range(b):
                 # define indeces for this step
                 obe_idx = i*b+j
-                obe_time_idx = obe_idx%b2
                 A_idx = (i//b)*b+j
                 # add time-independent obe part
                 # implements einsum('...ij,...j', obes, A)
                 result_out[i] += obes_base[obe_idx] * A_flat[A_idx]
                 for idx in range(t_func_num):
                     # add time-dependent obe part
-                    result_out[i] += (ts[idx].real*obes_time_r[idx, obe_time_idx]
-                                      + ts[idx].imag*obes_time_i[idx, obe_time_idx]) * A_flat[A_idx]
+                    result_out[i] += (ts[idx].real*obes_time_r[idx, obe_idx]
+                                      + ts[idx].imag*obes_time_i[idx, obe_idx]) * A_flat[A_idx]
 
     return func
 
