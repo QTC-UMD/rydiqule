@@ -251,7 +251,7 @@ class Sensor():
             Coupling that corresponds to the probing field. If `None`, corresponding Sensor
             attribute remains unchanged. Defaults to `None`.
         probe_freq: float
-            Frequency of the probing transition, in Mrad/s. If `None`, corresponding Sensor
+            Frequency of the probing transition, in rad/s. If `None`, corresponding Sensor
             attribute remains unchanged. Defaults to `None`.
         kappa: float
             Numerical prefactor that defines susceptibility, in (rad/s)/m.
