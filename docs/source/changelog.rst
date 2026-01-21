@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Latest
+v2.1.2
 ------
 
 Improvements
@@ -18,6 +18,7 @@ Improvements
   Also ensures proper handling of length-1 and length-0 sequences.
 - Modified the `about` function to provide numpy's BLAS/LAPACK backend information.
 - Updates stale example notebooks to incorporate v2.1.1 bugfixes
+- Improved documentation based on JOSS reviewer @nikolasibalic feedback.
 
 Bug Fixes
 +++++++++
