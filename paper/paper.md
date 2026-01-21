@@ -132,7 +132,8 @@ That work derives the exact velocity dependence due to Doppler shifts for a syst
 It effectively reduces the Doppler-averaging integration along that single dimension to two diagonalizations,
 avoiding velocity sampling that dimension, and enabling a general, analytic result.
 For example, a two-dimensional Doppler-average only needs to be numerically sampled along one axis, with the other performed analytically.
-This reduction in dimensionality results in over an order of magnitude reduction in calculation time and memory footprint while returning significantly higher accuracy solutions.
+This reduction in dimensionality results in over an order of magnitude reduction in calculation time while returning significantly higher accuracy solutions,
+with the added benefit of lower memory footprint over RydIQule's current implementation.
 Experimental support for 1D solves only was released in version 2.0.0, with RydIQule v2.1.0 providing full support.
 
 # Related Packages and Work
