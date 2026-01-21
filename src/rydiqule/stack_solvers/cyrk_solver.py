@@ -206,13 +206,25 @@ def _derEqns_flat(obes_base: np.ndarray, const_base: np.ndarray,
     b = obes_base.shape[-1]
     # time function dimension size
     t_func_num = obes_time_r.shape[0]
+    # shapes to broadcast time-dependent parts to before flattening
+    obes_time_shape = (t_func_num, ) + obes_base.shape
+    const_time_shape = obes_time_shape[:-1]
     # flatten eqns arrays
     obes_base = obes_base.reshape(-1)
     const_base = const_base.reshape(-1)
-    obes_time_r = obes_time_r.reshape((t_func_num, -1))
-    obes_time_i = obes_time_i.reshape((t_func_num, -1))
-    const_r = const_r.reshape((t_func_num, -1))
-    const_i = const_i.reshape((t_func_num, -1))
+    # broadcasts ensure that time-dependent parts trivially match base
+    # this ensures we don't have to implement arbitrary broadcasting rules below
+    # note that these arrays are not guaranteed to be C-contiguous
+    # with may have performance implications
+    obes_time_r_broad = np.broadcast_to(obes_time_r, obes_time_shape)
+    obes_time_i_broad = np.broadcast_to(obes_time_i, obes_time_shape)
+    const_r_broad = np.broadcast_to(const_r, const_time_shape)
+    const_i_broad = np.broadcast_to(const_i, const_time_shape)
+    # we now flatten to 2D arrays
+    obes_time_r = obes_time_r_broad.reshape((t_func_num, -1))
+    obes_time_i = obes_time_i_broad.reshape((t_func_num, -1))
+    const_r = const_r_broad.reshape((t_func_num, -1))
+    const_i = const_i_broad.reshape((t_func_num, -1))
 
     @nb.njit("void(f8[::1], f8, f8[::1])")
     def func(result_out: np.ndarray, t: float, A_flat: np.ndarray):
