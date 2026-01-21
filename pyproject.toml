@@ -34,7 +34,7 @@ classifiers = [
 ]
 requires-python = ">= 3.8"
 dependencies = [
-    "arc-alkali-rydberg-calculator>=3.10.1",
+    "arc-alkali-rydberg-calculator>=3.5.0",
     "numpy",
     "scipy>=0.19.1",
     "leveldiagram>=0.3.1",
