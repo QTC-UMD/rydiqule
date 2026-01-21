@@ -25,7 +25,8 @@ Bug Fixes
 - Fix `Cell.kappa` and `Cell.eta` to properly introspect `q` when first edge on the graph
   happens to not be dipole-allowed.
 - Fix `draw_diagram` to handle complex time-dependent functions correctly.
-- Fix `cyrk_solve` flat diffEq backend to properly handle EOM stacks.
+- Fix `cyrk_solve` flat diffEq backend to properly handle EOM stacks
+  in both steady-state and time-dependent problems.
 
 Deprecations
 ++++++++++++
