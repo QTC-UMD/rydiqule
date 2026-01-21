@@ -13,7 +13,7 @@ from importlib.metadata import version
 
 
 def about(obscure_paths: bool = True,
-          show_numpy_config: bool = False):
+          show_numpy_config: bool = True):
     """About box describing Rydiqule and its core dependencies.
 
     Prints human readable strings of information about the system.
@@ -24,7 +24,7 @@ def about(obscure_paths: bool = True,
     obscure_paths: bool, optional
         Remove user directory from printed paths. Default is True.
     show_numpy_config: bool, optional
-        Show the numpy config for BLAS/LAPACK backends. Default is False.
+        Show the numpy config for BLAS/LAPACK backends. Default is True.
 
     Examples
     --------
@@ -33,22 +33,27 @@ def about(obscure_paths: bool = True,
             Rydiqule
         ================
     <BLANKLINE>
-    Rydiqule Version:     1.2.0
+    Rydiqule Version:     2.1.1
     Installation Path:    ~\\rydiqule\\src\\rydiqule
     <BLANKLINE>
-        Dependencies
+          Dependencies
         ================
     <BLANKLINE>
-    NumPy Version:        1.24.3
-    SciPy Version:        1.11.3
-    Matplotlib Version:   3.8.0
-    ARC Version:          3.4.0
-    Python Version:       3.9.18
+    NumPy Version:        2.2.5
+    SciPy Version:        1.16.0
+    Matplotlib Version:   3.10.0
+    ARC Version:          3.9.0
+    Python Version:       3.11.10
     Python Install Path:  ~\\miniconda3\\envs\\arc
     Platform Info:        Windows (AMD64)
-    CPU Count:            16
+    CPU Count:            16 @ 3.91 GHz
     Total System Memory:  256 GB
-
+    <BLANKLINE>
+         NumPy backends
+        ================
+    <BLANKLINE>
+    blas: provided by mkl-sdl (2023.1)
+    lapack: provided by mkl-sdl (2023.1)
     """
     home = Path.home()
     install_path = inspect.getsourcefile(rydiqule)
@@ -95,9 +100,11 @@ def about(obscure_paths: bool = True,
     print(f'Total System Memory:  {psutil.virtual_memory().total/1024**3:.0f} GB')
 
     if show_numpy_config:
-        print('\nNumPy BLAS/LAPACK configuration:\n')
+        print('\n     NumPy backends\n    ================\n')
         import numpy
-        numpy.show_config()
+        config = numpy.show_config('dicts')
+        for dep, info in config['Build Dependencies'].items():
+            print(f"{dep}: provided by {info['name']} ({info['version']})")
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ Improvements
 - Updated license metadata to follow PEP 639 standard
 - Improve scannable parameter handling so that all sequences are saved to the graph as numpy arrays.
   Also ensures proper handling of length-1 and length-0 sequences.
+- Modified the `about` function to provide numpy's BLAS/LAPACK backend information.
 
 Bug Fixes
 +++++++++
