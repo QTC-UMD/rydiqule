@@ -70,14 +70,15 @@ jobs:
       - name: Conda package (Unix)
         shell: bash -l {0}
         run: |
-          conda install -c labscript-suite setuptools-conda "conda-build<25"
-          setuptools-conda build $CONDA_BUILD_ARGS .
+          mkdir conda_packages
+          conda install conda-build
+          conda build conda.recipe/ -c rydiqule/label/main --no-test --no-anaconda-upload --output-folder conda_packages/
 
       - name: Upload Artifact (conda)
         uses: actions/upload-artifact@v4
         with:
           name: conda_packages
-          path: ./conda_packages
+          path: ./conda_packages/*/*.conda
           if-no-files-found: error
 
   github-release:
@@ -94,12 +95,6 @@ jobs:
         with:
           name: dist
           path: ./dist
-
-      - name: Download Artifact (conda)
-        uses: actions/download-artifact@v4
-        with:
-          name: conda_packages
-          path: ./conda_packages
 
       - name: Get Version Number
         run: |

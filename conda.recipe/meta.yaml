@@ -1,0 +1,48 @@
+{% set version = "2.1.2" %}
+
+package:
+  name: rydiqule
+  version: {{ version }}
+
+source:
+  path: ..  # source code in parent directory
+
+build:
+  noarch: python
+  script: {{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  number: 0
+
+requirements:
+  host:
+    - python >=3.8
+    - setuptools >=64
+    - setuptools-scm >=8
+    - pip
+  run:
+    - python >=3.8
+    - arc-alkali-rydberg-calculator >=3.5.0
+    - numpy
+    - scipy >=0.19.1
+    - leveldiagram >=0.3.1
+    - networkx
+    - psutil
+    - typing_extensions
+
+test:
+  imports:
+    - rydiqule
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  summary: Rydberg Sensor Interactive Quantum Physics Module
+  license: Apache-2.0
+  license_file: LICENSE
+  doc_url: https://rydiqule.readthedocs.io/en/latest/
+  dev_url: https://github.com/QTC-UMD/rydiqule
+
+extra:
+  recipe-maintainers:
+    - dihm
