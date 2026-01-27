@@ -116,7 +116,7 @@ In version 1, this class could only handle simplified atomic models that treated
 Though this type of model is very fast and can be effective in many situations,
 it breaks down for systems in the presence of magnetic fields (including those as weak as Earth's background magnetic field)
 or for large electric field amplitudes that result in inhomogeneous couplings due to sublevel structure.
-By leveraging the tuple labelling outlined above, `Cell` can now define states by their quantum numbers directly,
+By leveraging the tuple labeling outlined above, `Cell` can now define states by their quantum numbers directly,
 which allows for natural definition and coupling of entire manifolds.
 
 Version 2 also greatly enhances the leveraging of ARC to calculate more system parameters automatically.
