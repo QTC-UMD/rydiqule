@@ -127,7 +127,7 @@ fine and hyperfine respectively, lowering the total number of sublevels that nee
 ## Analytic Doppler Averaging
 
 Support for steady-state Doppler-averaged models leveraging an exact analytic method has been added.
-This functionality is based on the theoretical work presented in [@nagib_exact_2025].
+This functionality is based on the theoretical work presented in @nagib_exact_2025.
 That work derives the exact velocity dependence due to Doppler shifts for a system along a single axis.
 It effectively reduces the Doppler-averaging integration along that single dimension to two diagonalizations,
 avoiding velocity sampling that dimension, and enabling a general, analytic result.
