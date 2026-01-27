@@ -33,16 +33,16 @@ authors:
     affiliation: 1
 affiliations:
   - index: 1
-    name: DEVCOM Army Research Laboratory, 2800 Powder Mill Rd, Adelphi, MD, 20783, USA
+    name: DEVCOM Army Research Laboratory, 2800 Powder Mill Rd, Adelphi, MD, 20783, United States of America
     ror: 011hc8f90
   - index: 2
-    name: Program in Applied Mathematics, University of Arizona, 1200 E University Blvd, Tuscon, AZ 85721, USA
+    name: Program in Applied Mathematics, University of Arizona, 1200 E University Blvd, Tuscon, AZ 85721, United States of America
     ror: 03m2x1q45
   - index: 3
-    name: Department of Physics, University of Wisconsin-Madison, 1150 University Avenue, Madison, WI, 53706, USA
+    name: Department of Physics, University of Wisconsin-Madison, 1150 University Avenue, Madison, WI, 53706, United States of America
     ror: 01y2jtd41
   - index: 4
-    name: Naval Air Warfare Center, 1 Administration Circle, China Lake, CA, 93555, USA
+    name: Naval Air Warfare Center, 1 Administration Circle, China Lake, CA, 93555, United States of America
     ror: 01f0pxq13
 
 date: 13 March 2025
@@ -84,7 +84,7 @@ and quantum information [@adams_rydberg_2019].
 However, the breadth of possible configurations and experimental parameters makes general modeling of an experiment difficult.
 One challenge is that many atomic energy levels consist of numerous magnetic sublevels that arise from the different possible orientations of the electron's and nucleus's angular momentum.
 These sublevels have different responses to applied magnetic and electric fields which leads to measureable differences for most real-world atomic sensors.
-In some cases, this sublevel structure can be treated in average and safely ignored.
+In some cases, this sublevel structure can be treated on average and safely ignored.
 More often however, they are ignored due to the significant complexity inherent in expanding the model size to account for them.
 
 For example, in accounting for magnetic splitting,
@@ -97,7 +97,7 @@ In particular, this release introduces a new paradigm for structured labeling of
 and expands the automated calculation of relevant atomic properties on alkali atoms commonly used in Rydberg physics
 to include sublevels.
 This release also includes a new steady-state Doppler-averaging method that greatly improves speed and accuracy,
-along with many other optimizations and improvements to the code-base.
+along with many other optimizations and improvements to the codebase.
 
 ## Handling Sublevel Structure
 
@@ -106,7 +106,7 @@ It handles this sublevel structure by expanding the way nodes are labelled.
 Rather than only using integers, arbitrary tuples can now be used as graph nodes.
 This allows for manifolds to be defined by using tuples in a way that directly maps to the atomic structure.
 RydIQule's core functions relating to graph operations have been updated to interchangeably address individual states or entire manifolds.
-It's internals have been overhauled to not only ensure that all relevant states/couplings are added, but tracked as originating from a single manifold.
+Its internals have been overhauled to not only ensure that all relevant states/couplings are added, but tracked as originating from a single manifold.
 
 ## Improved Calculation of Atomic Properties
 
@@ -132,9 +132,10 @@ That work derives the exact velocity dependence due to Doppler shifts for a syst
 It effectively reduces the Doppler-averaging integration along that single dimension to two diagonalizations,
 avoiding velocity sampling that dimension, and enabling a general, analytic result.
 For example, a two-dimensional Doppler-average only needs to be numerically sampled along one axis, with the other performed analytically.
-This reduction in dimensionality results in over an order of magnitude reduction in calculation time while returning significantly higher accuracy solutions,
-with the added benefit of lower memory footprint over RydIQule's current implementation.
-Experimental support for 1D solves only was released in version 2.0.0, with RydIQule v2.1.0 providing full support.
+This reduction in dimensionality gives a fundamental improvement to the time complexity of the calculation (over an order of magnitude) while simultaneously returning higher accuracy results.
+It also has the added benefit of a smaller memory footprint than RydIQule's original implementation,
+which is explicitly space inefficient to avoid interpreter overhead and thereby optimize computational speed.
+Experimental support for 1D solves was released in version 2.0.0, with RydIQule v2.1.0 providing full support.
 
 # Related Packages and Work
 
