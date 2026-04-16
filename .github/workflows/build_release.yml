@@ -15,7 +15,7 @@ env:
   # needed.
   # Assumes the package is pure (ie does not have compiled extensions)
   NOARCH: true
-  python_version: '3.10'
+  python_version: '3.12'
 
 jobs:
   build:
@@ -24,10 +24,10 @@ jobs:
     if: github.repository_owner == 'QTC-UMD'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.python_version }}
 
@@ -44,7 +44,7 @@ jobs:
           python -m build -w .
 
       - name: Upload Artifact (pip)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dist
           path: ./dist
@@ -60,12 +60,14 @@ jobs:
           fi
           echo "CONDA_BUILD_ARGS=$CONDA_BUILD_ARGS" >> $GITHUB_ENV
 
-      - name: Install Miniconda
+      - name: Install Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
+          miniforge-version: "latest"
           auto-update-conda: true
-          python-version: ${{ env.python_version }}
-          miniconda-version: "latest"
+          conda-remove-defaults: true
+          auto-activate: true
+          activate-environment: ""
 
       - name: Conda package (Unix)
         shell: bash -l {0}
@@ -75,7 +77,7 @@ jobs:
           conda build conda.recipe/ -c rydiqule/label/main --no-test --no-anaconda-upload --output-folder conda_packages/
 
       - name: Upload Artifact (conda)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: conda_packages
           path: ./conda_packages/*/*.conda
@@ -91,7 +93,7 @@ jobs:
       contents: write
     steps:
       - name: Download Artifact (pip)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: ./dist
@@ -123,7 +125,7 @@ jobs:
       id-token: write
     steps:
       - name: Download Artifact (pip)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: ./dist
@@ -145,7 +147,7 @@ jobs:
       id-token: write
     steps:
       - name: Download Artifact (pip)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist
           path: ./dist
@@ -160,17 +162,19 @@ jobs:
     needs: [build]
     steps:
       - name: Download Artifact (conda)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: conda_packages
           path: ./conda_packages
 
-      - name: Install Miniconda
+      - name: Install Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
+          miniforge-version: "latest"
           auto-update-conda: true
-          python-version: ${{ env.python_version }}
-          miniconda-version: "latest"
+          conda-remove-defaults: true
+          auto-activate: true
+          activate-environment: ""
 
       - name: Install Anaconda cloud client
         shell: bash -l {0}
