@@ -391,7 +391,7 @@ class Cell(Sensor):
             warnings.warn(msg)
 
         # extract q from coupling group, this ensures we find a dipole allowed edge with q defined
-        manifold_subgraph = self._coupling_subgraph(self.probe_tuple)
+        manifold_subgraph = self.coupling_subgraph(self.probe_tuple)
         for (_, _, d) in manifold_subgraph.edges(data=True):
             if 'q' in d:
                 q = d['q']
@@ -489,7 +489,7 @@ class Cell(Sensor):
             warnings.warn(msg)
 
         # extract q from coupling group, this ensures we find a dipole allowed edge with q defined
-        manifold_subgraph = self._coupling_subgraph(self.probe_tuple)
+        manifold_subgraph = self.coupling_subgraph(self.probe_tuple)
         for (_, _, d) in manifold_subgraph.edges(data=True):
             if 'q' in d:
                 q = d['q']
@@ -611,6 +611,7 @@ class Cell(Sensor):
             e_field: Optional[ScannableParameter] = None, beam_power: Optional[float] = None,
             beam_waist: Optional[float] = None, coherent_cc: Optional[float]=None,
             q: Literal[-1, 0, 1] = 0,
+            kmag_detuning_correction: Optional[float] = None,
             **extra_kwargs) -> None:
         """
         Overload of :meth:`~.Sensor.add_single_coupling`, which allows for alternate specifications
@@ -710,6 +711,13 @@ class Cell(Sensor):
             Coupling polarization in spherical basis.
             Valid values are -1, 0, 1 for :math:`-\\sigma`, linear, :math:`+\\sigma`.
             Default is 0 for linear.
+        kmag_detuning_correction: float, optional
+            Detuning to use when calculating the magnitude of the k-vector.
+            By default, `Cell` uses the transition frequency to define the k-vector.
+            For large detuned couplings, this can lead to inaccurate results.
+            Detuning should be given in units of Mrad/s.
+        **extra_kwargs:
+            Keyword arguments that are passed directly to :meth:`Sensor.add_single_coupling`.
 
         Raises
         ------
@@ -824,9 +832,9 @@ class Cell(Sensor):
         not_nlj = (state1.stype != 'NLJ' and state2.stype != 'NLJ')
 
         # check that tuple energy convention matches atomic properties
-        freq_diff = 2*np.pi*self.atom.get_transition_frequency(state1, state2)*1e-6
-        det_sign = np.sign(freq_diff)
-        if np.sign(freq_diff) != 1:
+        ang_freq_diff = 2*np.pi*self.atom.get_transition_frequency(state1, state2)*1e-6
+        det_sign = np.sign(ang_freq_diff)
+        if np.sign(ang_freq_diff) != 1:
             if det_sign > 0:
                 msg = ' higher energy, but it is actually lower. '
             else:
@@ -915,7 +923,14 @@ class Cell(Sensor):
                 it is calculated based on atomic properties."""
                 raise RydiquleError(msg)
             else:
-                transition_frequency = freq_diff
+                transition_frequency = ang_freq_diff
+
+        # define coupling angular frequency to use for calculating magnitude of k-vector
+        # by default, uses the atomic transition frequency
+        if kmag_detuning_correction is not None:
+            ang_freq_mean = abs(ang_freq_diff) + kmag_detuning_correction
+        else:
+            ang_freq_mean = abs(ang_freq_diff)
 
         if 'kvec' in extra_kwargs:
             raise RydiquleError("Cell couplings no longer accept 'kvec' as a parameter. " +
@@ -927,9 +942,9 @@ class Cell(Sensor):
             # doppler not requested for this coupling, pass default along
             kvec = kunit
         elif np.isclose(k_norm_sq, 1.0):
-            # apply standard doppler shift
-            lam = abs(self.atom.get_transition_wavelength(state1, state2)) # in m
-            kvec = 2*np.pi/lam*np.asarray(kunit)*1e-6 # scaled to Mrad/m
+            # pass full k-vector, accounting for detuning correction if provided
+            kmag = ang_freq_mean / scipy.constants.c # already scaled to Mrad/m
+            kvec = kmag*np.asarray(kunit)
         else:
             raise RydiquleError(f'Coupling {states} has un-normalized |kunit|={math.sqrt(k_norm_sq):.2f}!=1')
 

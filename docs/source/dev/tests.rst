@@ -67,6 +67,8 @@ The markers we use are
     - Marks a test that incorporates Doppler averaging.
   * - experiments
     - Marks a test that represents a full experiment.
+  * - solution
+    - Marks a test of the `Solution` object and methods.
   * - util
     - Marks a test of the ancillary utilities.
   * - structure

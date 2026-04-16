@@ -37,7 +37,7 @@ but written in terms of atomic constants :math:`\kappa` and :math:`\eta` (see [2
 We validate that rydiqule calculates these observable quantities in a manner consistent with
 a canonical reference, namely Steck's Quantum and Atom Optics notes [1].
 The unit tests in 
-`test_experiments.py <https://github.com/qtc-umd/rydiqule/blob/main/tests/test_experiments.py>`_
+`test_solution.py <https://github.com/qtc-umd/rydiqule/blob/main/tests/test_solution.py>`_
 test that rydiqule and Steck align,
 but assume that the density matrix element :math:`\rho_{eg}` is correct.
 Validity of density matrix elements is checked in numerous other tests.
@@ -49,7 +49,7 @@ as is done in Steck's Quantum and Atom Optics notes, Eq. 5.273 [1].
 Another way to calculate the scattering rate is using the imaginary term of the susceptibility
 corresponding to the probing field coupling.
 This is the method Rydiqule uses, and can be found in Eq 6.73 of [1]. 
-This test is implemented in `test_experiments.py <https://github.com/qtc-umd/rydiqule/blob/main/tests/test_experiments.py>`_
+This test is implemented in `test_solution.py <https://github.com/qtc-umd/rydiqule/blob/main/tests/test_solution.py>`_
 as the `test_OD_with_steck` unit test.
 
 Running just these observable and experiment unit tests can be done by installing the `pytest` dependencies (see :doc:`Unit Tests <../dev/tests>`),

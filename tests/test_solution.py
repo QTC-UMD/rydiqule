@@ -8,6 +8,7 @@ import scipy.constants
 a0 = scipy.constants.physical_constants["Bohr radius"][0]
 
 
+@pytest.mark.solution
 @pytest.mark.experiments
 def test_OD_with_Steck():
 
@@ -42,6 +43,7 @@ def test_OD_with_Steck():
     np.testing.assert_allclose(steck_OD_thin, rq_OD, rtol=0.025)
 
 
+@pytest.mark.solution
 @pytest.mark.experiments
 def test_susceptibility_with_steck():
     cell_length = .00001 #keep small to stay in the thin limit.
@@ -68,6 +70,7 @@ def test_susceptibility_with_steck():
     np.testing.assert_allclose(sus_steck, sus_rq)
 
 
+@pytest.mark.solution
 @pytest.mark.experiments
 def test_phase_shift_with_steck():
     #these values are copied from the susceptibility test (above)
@@ -107,3 +110,71 @@ def test_phase_shift_with_steck():
     np.testing.assert_allclose(phase, phase_steck)
     np.testing.assert_allclose(sus_steck, sol.get_susceptibility())
 
+
+@pytest.mark.solution
+@pytest.mark.exception
+def test_OD_warning():
+    """Confirm that `get_OD` warns about large OD"""
+
+    atom = "Rb85"
+    [g, e] = rq.D1_states(atom, splitting='fs')
+
+    c = rq.Cell(atom, [g,e])
+    c.add_coupling((g,e), beam_power=1e-6, beam_waist=1e-3, detuning=0, label='laser')
+
+    sol = rq.solve_steady_state(c)
+
+    with pytest.warns(rq.RydiquleWarning, match="optical depth greater than 1"):
+        sol.get_OD()
+
+    # update cell_length so warning is not thrown
+    c.cell_length = 1e-4
+    sol2 = rq.solve_steady_state(c)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        sol2.get_OD()
+
+
+@pytest.mark.solution
+@pytest.mark.exception
+def test_solution_exception():
+    """Test input validation exceptions"""
+
+    atom = "Rb85"
+    [g, e] = rq.D1_states(atom, splitting='fs')
+
+    g_states = rq.expand_qnums([g])
+    e_states = rq.expand_qnums([e])
+
+    c = rq.Cell(atom, [g,e], cell_length=1e-4)
+    c.add_coupling((g,e), beam_power=1e-6, beam_waist=1e-3, detuning=0, label='laser')
+
+    sol = rq.solve_steady_state(c)
+
+    with pytest.raises(ValueError, match="no edges with defined rabi"):
+        sol.coupling_rabi((g_states[0], e_states[1]))
+
+
+@pytest.mark.solution
+def test_solution_elements():
+    """Tests that both methods of extracting elements agree"""
+
+    atom = "Rb85"
+    [g, e] = rq.D1_states(atom, splitting='fs')
+
+    g_states = rq.expand_qnums([g])
+    e_states = rq.expand_qnums([e])
+
+    c = rq.Cell(atom, [g,e], cell_length=1e-4)
+    c.add_coupling((g,e), beam_power=1e-6, beam_waist=1e-3, detuning=0, label='laser')
+
+    sol = rq.solve_steady_state(c)
+
+    rho_20 = sol.rho_ij(2,0)
+    rho_20_labels = sol.rho_ij(e_states[0], g_states[0])
+    rho_20_imag = sol.get_solution_element(7)
+
+    assert rho_20 == pytest.approx(rho_20_labels), 'rho_ij inconsistency between labels and indexes'
+
+    assert rho_20.imag == pytest.approx(rho_20_imag), 'rho_ij and get_solution_element do not match'
