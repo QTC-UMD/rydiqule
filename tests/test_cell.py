@@ -292,3 +292,30 @@ def test_rabi_consistency():
                            err_msg='Field and Power specifications do not match')
     np.testing.assert_allclose(ham_rabi, ham_field,
                           err_msg='Rabi and Field specifications do not match')
+
+@pytest.mark.structure
+def test_kmag_correction():
+    """Test that k-magnitude corrections in Cell work correctly"""
+
+    g = rq.A_QState(5, 0, 0.5)
+    e1 = rq.A_QState(5, 1, 1.5)
+    e2 = rq.A_QState(5, 2, 2.5)
+
+    c = rq.Cell('Rb85', [g, e1, e2])
+
+    twoPhotonFreq = c.atom.get_transition_frequency(g, e2)/2
+    offsetDet = (twoPhotonFreq - c.atom.get_transition_frequency(g, e1))*1e-6 # Mrad/s
+
+    # simulate 2-photon clock transition in Rb
+    dets = np.linspace(-10, 10, 101)
+    p1 = {'states':(g,e1), 'detuning':2*np.pi*dets + 2*np.pi*offsetDet, 'rabi_frequency':2*np.pi*1,
+          'kunit':(1,0,0), 'kmag_detuning_correction':2*np.pi*offsetDet, 'label':'p1'}
+    p2 = {'states':(e1,e2), 'detuning':2*np.pi*dets - 2*np.pi*offsetDet, 'rabi_frequency':2*np.pi*1,
+          'kunit':(-1,0,0), 'kmag_detuning_correction':-2*np.pi*offsetDet, 'label':'p2'}
+    
+    c.add_couplings(p1, p2)
+    c.zip_parameters({'p1':'detuning', 'p2':'detuning'})
+
+    kvecs = c.get_value_dictionary('kvec')
+
+    assert kvecs[(g, e1)] == pytest.approx(-kvecs[(e1, e2)]), 'k-vector magnitudes are not equal'

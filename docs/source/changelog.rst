@@ -1,6 +1,28 @@
 Changelog
 =========
 
+v2.1.3
+------
+
+Improvements
+++++++++++++
+
+- Add `kmag_detuning_correction` keyword argument to `Cell.add_single_coupling`.
+  Default behavior is to only use the atomic transition frequency to calculate the k-vector magnitude
+  for a coupling with `kunit` provided,
+  but this leads to inaccurate doppler averages if the coupling detuning is large relative to Doppler shifts.
+  This new argument allows passing in a detuning to be applied to the calculation of the k-vector magnitude
+  for a coupling. 
+
+Bug Fixes
++++++++++
+
+- Fix issue where `Solution.coupling_rabi` would fail for a coupling group
+  that contains non-dipole-allowed transitions (as common in `Cell` with sublevel structure).
+- Fix incorrect `Sensor.dm_basis` labels. E.g. `01_real`, `01_imag` is actually `10_real`, `10_imag`.
+  For real terms, change is purely cosmetic, but imaginary terms there is a sign difference.
+  This change brings `dm_basis` labels to agree with the actual basis definitions (ie `Solution.rho_ij`).
+
 v2.1.2
 ------
 

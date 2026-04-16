@@ -9,7 +9,8 @@ import warnings
 import itertools
 
 from .sensor_utils import (ScannableParameter, CouplingDict, State, States, StateSpec, StateSpecs, TimeFunc,
-                           match_states, _squeeze_dims, expand_statespec, state_tuple_to_str, process_scannable_parameter)
+                           match_states, _squeeze_dims, expand_statespec, state_tuple_to_str, process_scannable_parameter,
+                           coupling_subgraph, nx_edges_with)
 from .exceptions import RydiquleError, CouplingNotAllowedError
 from .exceptions import RWAWarning, PopulationNotConservedWarning, RydiquleWarning, debug_state
 
@@ -3019,18 +3020,8 @@ class Sensor():
         >>> print(s.couplings_with("detuning"))
         {(0, 1): {'rabi_frequency': 2, 'detuning': 1, 'phase': 0, 'kvec': (0, 0, 0), 'coherent_cc': 1.0, 'label': '(0,1)'}}
         """
-        def notAll(x):
-            return not all(x)
 
-        def notAny(x):
-            return not any(x)
-
-        methods = {"any":any, "all":all, "not any": notAny, "not all": notAll}
-
-        return {s:p
-                for s,p in self.couplings.edges.items()
-                if methods[method]([k in p for k in keys])
-                }
+        return nx_edges_with(self.couplings, *keys, method=method)
 
 
     def states_with_spec(self, statespec: StateSpec) -> List[State]:
@@ -3068,7 +3059,7 @@ class Sensor():
         return match_states(statespec, self.states)
     
 
-    def _coupling_subgraph(self, coupling: StateSpecs) -> nx.Graph:
+    def coupling_subgraph(self, coupling: StateSpecs) -> nx.Graph:
         """
         Returns a subgraph view of the couplings graph corresponding to `coupling`.
 
@@ -3083,12 +3074,7 @@ class Sensor():
             View of the corresponding subgraph
         """
 
-        states1 = self.states_with_spec(coupling[0])
-        states2 = self.states_with_spec(coupling[1])
-
-        subgraph = self.couplings.subgraph(states1 + states2)
-
-        return subgraph
+        return coupling_subgraph(coupling, self.couplings)
 
 
     def get_couplings(self) -> Dict[States, CouplingDict]:
@@ -3257,11 +3243,11 @@ class Sensor():
         --------
         >>> s = rq.Sensor(3)
         >>> print(s.dm_basis())
-        ['01_real' '02_real' '01_imag' '11_real' '12_real' '02_imag' '12_imag'
+        ['10_real' '20_real' '10_imag' '11_real' '21_real' '20_imag' '21_imag'
          '22_real']
 
         """
-        dm_basis = [f'{j:d}{i:d}_imag' if i > j else f'{i:d}{j:d}_real'
+        dm_basis = [f'{i:d}{j:d}_imag' if i > j else f'{j:d}{i:d}_real'
                     for i in range(self.basis_size)
                     for j in range(self.basis_size)][1:]  # indexing removes ground state label
         return np.array(dm_basis)

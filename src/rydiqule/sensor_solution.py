@@ -11,7 +11,6 @@ import numpy as np
 import networkx as nx
 from scipy.constants import c
 import warnings
-import itertools
 
 # have to import this way to prevent circular imports
 from rydiqule import sensor_utils
@@ -219,7 +218,8 @@ class Solution():
         Raises
         ------
         ValueError
-            If `coupling` is a group with mismatched rabi frequencies, either in shape or value.
+            If `coupling` is a group with mismatched rabi frequencies, either in shape or value,
+            or coupling has no defined rabi frequencies.
 
         Examples
         --------
@@ -257,11 +257,15 @@ class Solution():
         """
         
         #check all rabis are match, we do this to avoid accidental misuse of the function
-        states1 = sensor_utils.match_states(coupling[0], list(self.couplings.nodes))
-        states2 = sensor_utils.match_states(coupling[1], list(self.couplings.nodes))
+        coupling_subgraph = sensor_utils.coupling_subgraph(coupling, self.couplings)
 
-        rabis = [self.couplings.edges[s1,s2].get("rabi_frequency")
-                 for s1,s2 in itertools.product(states1, states2)]
+        nonzero_couplings = sensor_utils.nx_edges_with(coupling_subgraph, 'rabi_frequency')
+
+        if not len(nonzero_couplings):
+            raise ValueError(f'Coupling {coupling} has no edges with defined rabi frequencies')
+
+        rabis = [edge.get("rabi_frequency")
+                 for edge in nonzero_couplings.values()]
 
         #check all are the same shape
         #cast to array if another data type
@@ -371,10 +375,10 @@ class Solution():
         0.00131399
 
         """
-        basis_size = np.sqrt(self.rho.shape[-1] + 1)
         try:
             sol_slice = self.rho.take(indices=idx, axis=-1)
         except IndexError as err:
+            basis_size = np.sqrt(self.rho.shape[-1] + 1)
             raise RydiquleError(f"No element with given index for {basis_size}-level system") from err
 
         return sol_slice

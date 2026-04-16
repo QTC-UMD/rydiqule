@@ -11,7 +11,7 @@ from .exceptions import RydiquleError
 import scipy.constants
 from scipy.constants import hbar, e
 
-from typing import Dict, Tuple, Union, List, Callable, Sequence, TYPE_CHECKING
+from typing import Dict, Tuple, Union, List, Callable, Sequence, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
     # only import when type checking, avoid circular import
     from .sensor import Sensor
@@ -1034,6 +1034,85 @@ def state_tuple_to_str(states:States) -> str:
         States for which to produce a string representation.
     """
     return "(" + ",".join([str(s) for s in states]) + ")"
+
+
+def coupling_subgraph(coupling: StateSpecs, coupling_graph: nx.Graph) -> nx.Graph:
+    """
+    Returns a subgraph view of the `couplings_graph` corresponding to `coupling`.
+
+    Parameters
+    ----------
+    coupling: StateSpecs
+        Coupling specification
+    coupling_graph: networkx.Graph
+        Couplings graph to make the subgraph from
+
+    Returns
+    -------
+    networkx.classes.graph.Graph
+        View of the corresponding subgraph
+    """
+
+    all_states = list(coupling_graph.nodes)
+
+    states1 = match_states(coupling[0], all_states)
+    states2 = match_states(coupling[1], all_states)
+
+    subgraph = coupling_graph.subgraph(states1 + states2)
+
+    return subgraph
+
+
+def nx_edges_with(couplings_graph: nx.Graph, *keys: str,
+                  method: Literal['all', 'any', 'not any', 'not all'] = 'all') -> Dict[States, CouplingDict]:
+    """
+    Returns a version of couplings_graph with only the keys specified.
+
+    Can be specified with a several criteria, including all, none, or any of the keys
+    specified.
+
+    Parameters
+    ----------
+    keys : tuple of str
+        tuple of strings which should be one the valid
+        parameter names for a state. See :meth:`~.add_coupling` for which
+        names are valid for a Sensor object.
+    method : Literal['all','any', 'not any', 'not all'], optional
+        Method to see if a given field matches the keys
+        given. Choosing "all" will return couplings
+        which have keys matching all of the values provided in the keys
+        argument, while choosing "any", will return all couplings with keys
+        matching at least one of the values specified by keys. For example,
+        `sensor.couplings_with("rabi_frequency")` returns a dictionary of
+        all couplings for which a rabi_frequency was specified.
+        `sensor.couplings_with("rabi_frequency", "detuning", method="all")`
+        returns all couplings for which both rabi_frequency and detuning
+        are specified.
+        'sensor.couplings_with("rabi_frequency", "detuning", method="any")`
+        returns all couplings for which either rabi_frequency or detuning
+        are specified.
+        "not any" and "not all" give the inverse of the above.
+        Defaults to "all".
+
+    Returns
+    -------
+    dict
+        A copy of the `couplings_graph` edges dictionary with only couplings containing
+        the specified parameter keys.
+    """
+    
+    def notAll(x):
+            return not all(x)
+
+    def notAny(x):
+        return not any(x)
+
+    methods = {"any":any, "all":all, "not any": notAny, "not all": notAll}
+
+    return {s:p
+            for s,p in couplings_graph.edges.items()
+            if methods[method]([k in p for k in keys])
+            }
 
 
 def process_scannable_parameter(val: ScannableParameter) -> Union[np.ndarray, float]:
